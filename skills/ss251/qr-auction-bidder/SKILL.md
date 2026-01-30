@@ -1,6 +1,6 @@
 ---
 name: qr-auction-bidder
-description: Bid on $QR auctions at qrcoin.fun. Place bids on Base mainnet using USDC.
+description: Bid on $QR auctions at qrcoin.fun. Place bids on Base mainnet using USDC. Uses Bankr for transaction execution — no wallet management needed.
 metadata:
   openclaw:
     emoji: "🎯"
@@ -19,6 +19,7 @@ $QR runs continuous 24-hour auctions on Base mainnet. The highest bid wins, and 
 - **Network**: Base mainnet (chain ID 8453)
 - **Currency**: USDC (6 decimals)
 - **Community**: m/qr on moltbook.com
+- **Transaction execution**: Uses [Bankr](https://bankr.bot) — install the `bankr` skill from https://github.com/BankrBot/moltbot-skills
 
 ## Contract Addresses
 
@@ -40,176 +41,109 @@ $QR runs continuous 24-hour auctions on Base mainnet. The highest bid wins, and 
 2. Each auction has a `tokenId`, `startTime`, and `endTime` (typically 24 hours)
 3. Bidders call `createBid()` to bid on a URL, or `contributeToBid()` to add USDC to an existing URL's bid
 4. The highest total bid when time expires wins
-5. If a new highest bid arrives in the last 5 minutes, the auction extends (up to 3 hours max)
+5. If the leading URL changes in the last 5 minutes, the auction extends by 5 more minutes (up to 3 hours max beyond the scheduled end). Note: contributing to the already-winning URL does NOT trigger an extension.
 6. After the auction ends, it's settled and losing bidders are refunded
 
-## Bidding with viem
+## Prerequisites
 
-### Setup
+This skill uses **Bankr** for on-chain transaction execution. Install the bankr skill first:
 
-```typescript
-import { createPublicClient, createWalletClient, http, parseAbi } from "viem";
-import { base } from "viem/chains";
-import { privateKeyToAccount } from "viem/accounts";
-
-const AUCTION_ADDRESS = "0x7309779122069EFa06ef71a45AE0DB55A259A176";
-const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http("https://mainnet.base.org"),
-});
-
-// WARNING: Never hardcode private keys. Use environment variables or secure key management.
-const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
-
-const walletClient = createWalletClient({
-  account,
-  chain: base,
-  transport: http("https://mainnet.base.org"),
-});
+```
+https://github.com/BankrBot/moltbot-skills
 ```
 
-### Check Auction Status
+Bankr handles wallet creation, USDC approvals, transaction signing, gas estimation, and confirmation. No private keys or wallet setup needed.
 
-```typescript
-const auctionAbi = parseAbi([
-  "function auction() view returns (uint256 tokenId, (uint256 totalAmount, string urlString, (address contributor, uint256 amount, uint256 timestamp)[] contributions) highestBid, uint256 startTime, uint256 endTime, bool settled, (uint256 validUntil, string urlString) qrMetadata)",
-  "function getBidCount() view returns (uint256)",
-  "function getAllBids() view returns ((uint256 totalAmount, string urlString, (address contributor, uint256 amount, uint256 timestamp)[] contributions)[])",
-  "function getBid(string _urlString) view returns ((uint256 totalAmount, string urlString, (address contributor, uint256 amount, uint256 timestamp)[] contributions))",
-]);
+## Check Auction Status
 
-// Get current auction state
-const auction = await publicClient.readContract({
-  address: AUCTION_ADDRESS,
-  abi: auctionAbi,
-  functionName: "auction",
-});
+Query the current auction state via RPC:
 
-const tokenId = auction[0];        // Current token ID
-const highestBid = auction[1];     // { totalAmount, urlString, contributions[] }
-const startTime = auction[2];      // Unix timestamp
-const endTime = auction[3];        // Unix timestamp
-const settled = auction[4];        // boolean
-
-const now = BigInt(Math.floor(Date.now() / 1000));
-const isActive = now < endTime && !settled;
-const timeRemaining = isActive ? Number(endTime - now) : 0;
-
-console.log(`Auction #${tokenId}`);
-console.log(`Active: ${isActive}`);
-console.log(`Time remaining: ${Math.floor(timeRemaining / 60)} minutes`);
-console.log(`Highest bid: ${Number(highestBid.totalAmount) / 1e6} USDC`);
-console.log(`Leading URL: ${highestBid.urlString}`);
+```bash
+# Get current auction state (tokenId, highestBid, startTime, endTime, settled)
+curl -s -X POST https://mainnet.base.org \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x7309779122069EFa06ef71a45AE0DB55A259A176","data":"0xe4b8f0de"},"latest"],"id":1}' \
+  | jq -r '.result'
 ```
 
-### Approve USDC Spending
+The `auction()` function (selector `0xe4b8f0de`) returns the full auction state including `tokenId`, `highestBid`, `startTime`, `endTime`, `settled`, and `qrMetadata`.
 
-Before bidding, approve the auction contract to spend your USDC:
-
-```typescript
-const erc20Abi = parseAbi([
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-]);
-
-// Check existing allowance
-const allowance = await publicClient.readContract({
-  address: USDC_ADDRESS,
-  abi: erc20Abi,
-  functionName: "allowance",
-  args: [account.address, AUCTION_ADDRESS],
-});
-
-const bidAmount = 12_000_000n; // 12.00 USDC (6 decimals)
-
-if (allowance < bidAmount) {
-  const hash = await walletClient.writeContract({
-    address: USDC_ADDRESS,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [AUCTION_ADDRESS, bidAmount],
-  });
-  await publicClient.waitForTransactionReceipt({ hash });
-}
+```bash
+# Get number of bids in current auction
+curl -s -X POST https://mainnet.base.org \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x7309779122069EFa06ef71a45AE0DB55A259A176","data":"0x91a3823f"},"latest"],"id":1}' \
+  | jq -r '.result' | xargs printf "%d\n"
 ```
 
-### Create a New Bid
-
-Use `createBid` when no bid exists yet for your URL:
-
-```typescript
-const bidAbi = parseAbi([
-  "function createBid(uint256 _tokenId, string _urlString, string _name)",
-]);
-
-const hash = await walletClient.writeContract({
-  address: AUCTION_ADDRESS,
-  abi: bidAbi,
-  functionName: "createBid",
-  args: [
-    tokenId,                    // Current auction token ID
-    "https://your-url.com",     // URL you're bidding for
-    "YourName",                 // Display name for the bid
-  ],
-});
-
-const receipt = await publicClient.waitForTransactionReceipt({ hash });
-console.log(`Bid placed! tx: ${receipt.transactionHash}`);
+```bash
+# Get create bid reserve price (should return 11110000 = 11.11 USDC)
+curl -s -X POST https://mainnet.base.org \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_call","params":[{"to":"0x7309779122069EFa06ef71a45AE0DB55A259A176","data":"0x4b6014f6"},"latest"],"id":1}' \
+  | jq -r '.result' | xargs printf "%d\n"
 ```
 
-The contract transfers your full USDC allowance (or balance, whichever is lower) as the bid amount. Set your approval to exactly the amount you want to bid.
+## Bidding with Bankr
 
-### Contribute to an Existing Bid
+### Step 1: Approve USDC
+
+Before bidding, approve the auction contract to spend your USDC. The contract takes your full allowance (up to your balance) as the bid amount, so set approval to exactly what you want to bid.
+
+```
+Approve 15 USDC to 0x7309779122069EFa06ef71a45AE0DB55A259A176 on Base
+```
+
+Or via Bankr script:
+```bash
+scripts/bankr.sh "Approve 15 USDC to 0x7309779122069EFa06ef71a45AE0DB55A259A176 on Base"
+```
+
+### Step 2: Create a New Bid
+
+Use `createBid` when no bid exists yet for your URL. Always query the current `tokenId` from `auction()` first.
+
+**Function**: `createBid(uint256 _tokenId, string _urlString, string _name)`
+
+```
+Send transaction to 0x7309779122069EFa06ef71a45AE0DB55A259A176 on Base calling createBid(329, "https://your-url.com", "YourName")
+```
+
+Or via Bankr script:
+```bash
+scripts/bankr.sh 'Send transaction to 0x7309779122069EFa06ef71a45AE0DB55A259A176 on Base calling createBid(329, "https://your-url.com", "YourName")'
+```
+
+> **Important**: Replace `329` with the actual current `tokenId`. Using a wrong token ID reverts with `INVALID_TOKEN_ID`.
+
+### Step 3: Contribute to an Existing Bid
 
 Use `contributeToBid` to add USDC to a URL that already has a bid:
 
-```typescript
-const contributeAbi = parseAbi([
-  "function contributeToBid(uint256 _tokenId, string _urlString, string _name)",
-]);
+**Function**: `contributeToBid(uint256 _tokenId, string _urlString, string _name)`
 
-const hash = await walletClient.writeContract({
-  address: AUCTION_ADDRESS,
-  abi: contributeAbi,
-  functionName: "contributeToBid",
-  args: [
-    tokenId,                    // Current auction token ID
-    "https://existing-url.com", // URL with an existing bid
-    "YourName",                 // Display name
-  ],
-});
+```
+Send transaction to 0x7309779122069EFa06ef71a45AE0DB55A259A176 on Base calling contributeToBid(329, "https://existing-url.com", "YourName")
+```
+
+Or via Bankr script:
+```bash
+scripts/bankr.sh 'Send transaction to 0x7309779122069EFa06ef71a45AE0DB55A259A176 on Base calling contributeToBid(329, "https://existing-url.com", "YourName")'
 ```
 
 ### Decide: createBid vs contributeToBid
 
-```typescript
-// Check if a URL already has a bid
-try {
-  const existingBid = await publicClient.readContract({
-    address: AUCTION_ADDRESS,
-    abi: auctionAbi,
-    functionName: "getBid",
-    args: ["https://your-url.com"],
-  });
-
-  if (existingBid.totalAmount > 0n) {
-    // URL already has a bid — use contributeToBid
-  } else {
-    // No bid for this URL — use createBid
-  }
-} catch {
-  // getBid reverts if not found — use createBid
-}
-```
+- If your URL has **no existing bid** → use `createBid` (minimum 11.11 USDC)
+- If your URL **already has a bid** → use `contributeToBid` (minimum 1.00 USDC)
+- Calling `createBid` with a URL that already has a bid reverts with `URL_ALREADY_HAS_BID`
+- Calling `contributeToBid` with a URL that has no bid reverts with `BID_NOT_FOUND`
 
 ## Auction Timing
 
 | Parameter | Value |
 |-----------|-------|
 | Duration | 24 hours |
-| Time buffer | 5 minutes (bids in last 5 min extend the auction) |
+| Time buffer | 5 minutes (a new leading URL in the last 5 min extends the auction) |
 | Max extension | 3 hours beyond scheduled end |
 
 ## Important Notes
@@ -220,6 +154,17 @@ try {
 - **URL must be unique per auction.** If someone already bid on your URL, use `contributeToBid`. Calling `createBid` with a taken URL will revert with `URL_ALREADY_HAS_BID`.
 - **Token ID must match.** Always read the current `tokenId` from `auction()` before bidding. Using a wrong token ID reverts with `INVALID_TOKEN_ID`.
 
+## Error Codes
+
+| Error | Meaning | Solution |
+|-------|---------|----------|
+| `INVALID_TOKEN_ID` | Wrong auction token ID | Query `auction()` for current tokenId |
+| `AUCTION_OVER` | Auction has ended | Wait for next auction |
+| `RESERVE_PRICE_NOT_MET` | Bid below minimum | Approve at least 11.11 USDC (create) or 1.00 USDC (contribute) |
+| `URL_ALREADY_HAS_BID` | URL already bid on | Use `contributeToBid` instead |
+| `BID_NOT_FOUND` | No existing bid for URL | Use `createBid` instead |
+| `AUCTION_SETTLED` | Auction already settled | Wait for next auction |
+
 ## ABI Reference
 
 The full QRAuctionV5 ABI is available at `references/QRAuctionV5.abi.json` in this skill package.
@@ -228,13 +173,14 @@ Key functions:
 
 | Function | Description |
 |----------|-------------|
-| `auction()` | Get current auction state |
+| `auction()` | Get current auction state (tokenId, highestBid, startTime, endTime, settled) |
 | `getAllBids()` | Get all bids for current auction |
 | `getBid(url)` | Get bid for a specific URL |
 | `getBidCount()` | Number of bids in current auction |
 | `createBid(tokenId, url, name)` | Place a new bid for a URL |
 | `contributeToBid(tokenId, url, name)` | Add to an existing URL's bid |
-| `settings()` | Get contract config (reserves, timing) |
+| `createBidReservePrice()` | Get minimum for new bids |
+| `contributeBidReservePrice()` | Get minimum for contributions |
 
 Key events:
 
@@ -244,3 +190,20 @@ Key events:
 | `BidContributionMade` | Contribution added to existing bid |
 | `AuctionSettled` | Auction ended, winner determined |
 | `AuctionCreated` | New auction started |
+
+## Typical Workflow
+
+1. **Check auction status** — Query `auction()` for current tokenId and time remaining
+2. **Check existing bids** — Query `getAllBids()` or `getBid(url)` to see what's already bid
+3. **Approve USDC via Bankr** — Set allowance to exactly your intended bid amount
+4. **Place bid via Bankr** — `createBid` for a new URL or `contributeToBid` for an existing one
+5. **Monitor** — Watch for outbids and contribute more if needed
+6. **Settlement** — Losing bids are refunded automatically after the auction settles
+
+## Links
+
+- **Platform**: https://qrcoin.fun
+- **About / Docs**: https://qrcoin.fun/about
+- **Auction Contract**: https://basescan.org/address/0x7309779122069EFa06ef71a45AE0DB55A259A176
+- **Bankr skill**: https://github.com/BankrBot/moltbot-skills
+- **Community**: m/qr on moltbook.com
