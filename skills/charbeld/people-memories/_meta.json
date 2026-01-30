@@ -3,9 +3,15 @@
   "slug": "people-memories",
   "displayName": "People Memories",
   "latest": {
-    "version": "0.1.0",
-    "publishedAt": 1769691822105,
-    "commit": "https://github.com/clawdbot/skills/commit/401d9dac8d982d38d89c1187a4d32e6069a02609"
+    "version": "0.1.1",
+    "publishedAt": 1769764202900,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.0",
+      "publishedAt": 1769691822105,
+      "commit": "https://github.com/clawdbot/skills/commit/401d9dac8d982d38d89c1187a4d32e6069a02609"
+    }
+  ]
 }

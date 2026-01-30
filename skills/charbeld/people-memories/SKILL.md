@@ -45,11 +45,20 @@ Use the bundled script to manage the database:
 skills/people-memories/scripts/people_memory.py <command> [options]
 ```
 - `remember --person Alex --note "loves chai" --tags drinks,preferences` – adds a note.
-- `recall --person Alex --limit 3` – reads the latest notes.
-- `summarize --person Alex` – prints fact card with counts, tags, last updates.
+- `recall --person Alex --limit 3` – reads the latest notes (now prints note `id` too).
+- `summarize --person Alex` – prints a fact card with counts, tags, events, last updates.
 - `search --query coffee` – finds people whose notes mention “coffee”.
-- `export --person Alex --format md --out ~/Desktop/alex.md` – dumps the notes as Markdown (or JSON). 
+- `export --person Alex --format md --out ~/Desktop/alex.md` – dumps the notes as Markdown (or JSON).
 - `list` – enumerates everyone stored plus note counts.
+
+### Editing / cleanup
+- `edit-note --person Alex --note-id <id> --note "new text" --tags a,b,c`
+- `delete-note --person Alex --note-id <id>`
+  - You can also use `--idx 1` / `--idx 2` etc. based on the newest-first list shown by `recall`.
+
+### Person management
+- `rename-person --from "Alex" --to "Alex M"`
+- `merge-person --from "Alex" --to "Alex M"` – moves notes/events and removes the source person.
 
 ## Auto capture (voice/chat)
 The `extensions/people-memories` extension listens to `/voice-chat` transcripts. When you say something like “remember Alex likes cats,” it automatically runs the `remember` command and logs the note. The index updates in the background, and we keep confirmations quiet unless you explicitly ask for them.
