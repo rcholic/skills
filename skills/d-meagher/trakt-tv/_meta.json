@@ -1,0 +1,11 @@
+{
+  "owner": "d-meagher",
+  "slug": "trakt-tv",
+  "displayName": "Trakt.tv",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1769892338328,
+    "commit": null
+  },
+  "history": []
+}
