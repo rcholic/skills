@@ -3,9 +3,15 @@
   "slug": "onlymolts",
   "displayName": "OnlyMolts",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1769836806690,
-    "commit": "https://github.com/clawdbot/skills/commit/bcd3286b592c61f261ddbad08cef5b5257c6c4fa"
+    "version": "1.1.0",
+    "publishedAt": 1769838541801,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1769836806690,
+      "commit": "https://github.com/clawdbot/skills/commit/bcd3286b592c61f261ddbad08cef5b5257c6c4fa"
+    }
+  ]
 }
