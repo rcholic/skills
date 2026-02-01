@@ -1,18 +1,18 @@
-# WooClaw Connector Skill 🦞
+# OpenClaw Connector Skill 🦞
 
-This is an OpenClaw Skill designed to bridge the gap between your AI agents and your WooCommerce store. It works in tandem with the **WooClaw Connector** WordPress plugin.
+This is an OpenClaw Skill designed to bridge the gap between your AI agents and your WooCommerce store. It works in tandem with the **OpenClaw Connector Lite** WordPress plugin.
 
 ## 🛠 Prerequisites
 
-To use this skill, you must have the **WooClaw Connector** plugin installed and active on your WordPress site.
+To use this skill, you must have the **OpenClaw Connector Lite** plugin installed and active on your WordPress site.
 
 1.  Install the plugin on your WordPress site.
-2.  Go to **WooClaw Lite** (or WooCommerce > Settings > WooClaw).
+2.  Go to **OpenClaw Lite** (or WooCommerce > Settings > OpenClaw).
 3.  Copy your **Store Secret Key**.
 
 ## 🚀 Installation (Skill)
 
-1.  Place the `wooclaw` folder in your OpenClaw skills directory.
+1.  Place the `openclaw` folder in your OpenClaw skills directory.
 2.  Open a terminal in the folder and run:
     ```bash
     npm install
@@ -24,8 +24,8 @@ Configure your bot environment with the following variables:
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
-| `WOOCLAW_STORE_URL` | Your website base URL | `https://yourstore.com` |
-| `WOOCLAW_STORE_SECRET` | The `sk_live_...` key from the plugin | `sk_live_abc123...` |
+| `OPENCLAW_STORE_URL` | Your website base URL | `https://yourstore.com` |
+| `OPENCLAW_STORE_SECRET` | The `sk_live_...` key from the plugin | `sk_live_abc123...` |
 
 ## 🧰 Available Tools
 

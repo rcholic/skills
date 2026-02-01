@@ -2,31 +2,28 @@ const axios = require('axios');
 const crypto = require('crypto');
 
 // 1. Configuration
-// We use WOOCLAW_ prefixes for the user configuration
-const { WOOCLAW_STORE_URL, WOOCLAW_STORE_SECRET } = process.env;
+const { OPENCLAW_STORE_URL, OPENCLAW_STORE_SECRET } = process.env;
 
-if (!WOOCLAW_STORE_URL || !WOOCLAW_STORE_SECRET) {
-    throw new Error('Configuration Error: WOOCLAW_STORE_URL and WOOCLAW_STORE_SECRET environment variables are required.');
+if (!OPENCLAW_STORE_URL || !OPENCLAW_STORE_SECRET) {
+    throw new Error('Configuration Error: OPENCLAW_STORE_URL and OPENCLAW_STORE_SECRET environment variables are required.');
 }
 
 // 2. Helper Function
 async function callWoo(endpoint, payload) {
     try {
-        // NOTE: The WordPress plugin currently uses the 'moltbot/v1' namespace and 'X-Moltbot-Signature'.
-        // We keep these strings to ensure compatibility with the installed plugin.
-        const url = `${WOOCLAW_STORE_URL}/wp-json/moltbot/v1${endpoint}`;
+        const url = `${OPENCLAW_STORE_URL}/wp-json/openclaw/v1${endpoint}`;
         const body = JSON.stringify(payload);
 
         // Generate HMAC-SHA256 Signature
         const signature = crypto
-            .createHmac('sha256', WOOCLAW_STORE_SECRET)
+            .createHmac('sha256', OPENCLAW_STORE_SECRET)
             .update(body)
             .digest('hex');
 
         const config = {
             headers: {
                 'Content-Type': 'application/json',
-                'X-Moltbot-Signature': signature
+                'X-OpenClaw-Signature': signature
             }
         };
 
@@ -107,7 +104,7 @@ module.exports = {
      */
     store_status: async () => {
         try {
-            const url = `${WOOCLAW_STORE_URL}/wp-json/moltbot/v1/system/status`;
+            const url = `${OPENCLAW_STORE_URL}/wp-json/openclaw/v1/system/status`;
             const response = await axios.get(url); 
             
             const data = response.data;

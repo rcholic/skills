@@ -1,5 +1,5 @@
 {
-  "name": "wooclaw-connector",
+  "name": "openclaw-connector",
   "version": "1.0.0",
   "description": "OpenClaw skill for WooCommerce integration",
   "main": "index.js",

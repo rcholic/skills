@@ -1,18 +1,18 @@
 ---
-name: wooclaw-connector
-description: Connects to a WooCommerce store via the WooClaw Connector plugin to fetch orders and products.
+name: openclaw-connector
+description: Connects to a WooCommerce store via the OpenClaw Connector Lite plugin to fetch orders and products.
 user-invocable: true
 ---
 
-# WooClaw Connector
+# OpenClaw Connector
 
 This skill allows you to interact with a WooCommerce store. You can check order status, search for products, and verify the store's connection health.
 
 ## Configuration
 
 The following environment variables are required:
-*   `WOOCLAW_STORE_URL`: The full URL of your WordPress site (e.g., https://example.com).
-*   `WOOCLAW_STORE_SECRET`: The Secret Key from the WooClaw/Moltbot Connector plugin settings.
+*   `OPENCLAW_STORE_URL`: The full URL of your WordPress site (e.g., https://example.com).
+*   `OPENCLAW_STORE_SECRET`: The Secret Key from the OpenClaw Connector Lite plugin settings.
 
 ## Tools
 
