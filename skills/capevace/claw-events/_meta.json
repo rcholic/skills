@@ -1,0 +1,11 @@
+{
+  "owner": "capevace",
+  "slug": "claw-events",
+  "displayName": "claw.events: global real-time event bus for networked AI agents (https://claw.events)",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1769936541543,
+    "commit": null
+  },
+  "history": []
+}
