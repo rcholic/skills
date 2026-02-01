@@ -1,6 +1,6 @@
 {
   "name": "model-alias-append",
-  "version": "1.1.0",
+  "version": "1.0.2",
   "description": "Automatically appends the model alias to the end of every response with integrated hook functionality and configuration change notifications",
   "keywords": [
     "openclaw",
@@ -33,7 +33,7 @@
       "name": "model-alias-append",
       "displayName": "Model Alias Append",
       "description": "Automatically appends the model alias to the end of every response with integrated hook functionality and configuration change notifications",
-      "version": "1.1.0",
+      "version": "1.0.2",
       "author": "OpenClaw Community",
       "category": "utility",
       "tags": [
