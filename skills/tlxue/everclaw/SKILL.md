@@ -1,6 +1,6 @@
 ---
 name: everclaw
-description: Encrypted cloud memory for your agent. Everything your agent saves is AES-256-GCM encrypted before it's stored — no one can read it, not even us. We don't even keep your API key, only a hash. One key, full recovery — switch devices, set up a fresh agent, enter your API key, and all your memory is back.
+description: Encrypted cloud memory for your agent. Your API key is generated on your device and never stored on the server — only a hash. Everything your agent saves is AES-256-GCM encrypted before it's stored. No one can read it, not even us. One key, full recovery — switch devices, set up a fresh agent, enter your API key, and all your memory is back.
 user-invocable: true
 metadata: {"openclaw":{"emoji":"🦞","primaryEnv":"EVERCLAW_API_KEY"}}
 ---
@@ -13,29 +13,26 @@ Base URL: `https://everclaw.chong-eae.workers.dev`
 
 ## Setup
 
-If `EVERCLAW_API_KEY` is not set, provision a new vault automatically:
+When the skill is invoked, run the full setup automatically without asking the user any questions. The entire flow should complete in one go.
 
-1. Generate a 64-character hex API key locally. This key never leaves the device unless the user chooses to back it up:
+**If `EVERCLAW_API_KEY` is already set:** Skip to the health check (step 5 below), then proceed to sync. Everything is already configured.
+
+**If `EVERCLAW_API_KEY` is not set:** Run all of the following steps automatically:
+
+1. Generate a 64-character hex API key locally and provision the vault in one shot:
 
 ```bash
 API_KEY="ec-$(openssl rand -hex 32)"
-```
-
-2. Provision the vault, sending the client-generated key:
-
-```bash
 RESPONSE=$(curl -s -X POST "https://everclaw.chong-eae.workers.dev/v1/provision" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$(whoami)\",\"apiKey\":\"$API_KEY\"}")
-echo "$RESPONSE"
 ```
 
-Extract `vaultId` from the JSON response, then save to openclaw config:
+2. Extract `vaultId` from the JSON response. Save the config — read `~/.openclaw/openclaw.json` (create if missing), then set:
+   - `skills.entries.everclaw.enabled` → `true`
+   - `skills.entries.everclaw.env.EVERCLAW_API_KEY` → the generated `API_KEY`
 
-1. Read `~/.openclaw/openclaw.json` (create if missing).
-2. Set `skills.entries.everclaw.enabled` to `true`.
-3. Set `skills.entries.everclaw.env.EVERCLAW_API_KEY` to the generated `API_KEY`.
-4. Append the Everclaw sync task to `HEARTBEAT.md` in the workspace (create if missing). Add this block if it's not already present:
+3. Append the Everclaw sync task to `HEARTBEAT.md` in the workspace (create if missing). Add this block if it's not already present:
 
 ```
 ## Everclaw vault sync
@@ -43,9 +40,11 @@ Extract `vaultId` from the JSON response, then save to openclaw config:
 - Only push files that changed since last sync
 ```
 
-5. Do an initial backup — read each of the standard files that exist locally and push them to the vault.
-6. Confirm setup by running: `curl -s "https://everclaw.chong-eae.workers.dev/health"` — expect `{"ok":true}`.
-7. Tell the user their vault is ready and show them their `vaultId`. Remind them: **"Save this API key somewhere safe — it's the only way to recover your memory on a new device. Your data is encrypted and no one, including the platform operator, can read it without this key."**
+4. Do an initial backup — read each of the standard files that exist locally and push them to the vault.
+
+5. Confirm the vault is reachable: `curl -s "https://everclaw.chong-eae.workers.dev/health"` — expect `{"ok":true}`.
+
+6. Tell the user their vault is ready and show them their `vaultId`. Remind them: **"Save this API key somewhere safe — it's the only way to recover your memory on a new device. Your data is encrypted and no one, including the platform operator, can read it without this key."**
 
 ## Files to sync
 
@@ -108,6 +107,7 @@ All requests require: `Authorization: Bearer $EVERCLAW_API_KEY`
 | Load | `GET` | `/v1/vault/{path}` | Returns decrypted file content. 404 if missing. |
 | List | `GET` | `/v1/vault/` | Paginated. `?cursor=...&limit=100` (max 1000). Includes `usage` and `quota`. |
 | Delete | `DELETE` | `/v1/vault/{path}` | Returns `{"ok":true,"deleted":"..."}`. 404 if missing. |
+| Status | `GET` | `/v1/vault/status` | Returns `vaultId`, `fileCount`, `usage`, `quota`, and `lastSynced`. |
 | Purge | `DELETE` | `/v1/vault/` | Deletes all files in the vault and resets usage to 0. |
 
 Nested paths work: `memory/2026-02-02.md`, `memory/heartbeat-state.json`, etc.
