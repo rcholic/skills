@@ -1,4 +1,4 @@
-# Beauty Generation API - Agent Skill
+# Beauty Generation Free - Agent Skill
 
 An AgentSkills bundle for generating high-quality AI portraits of beautiful women using the DiversityFaces Beauty Generation API.
 

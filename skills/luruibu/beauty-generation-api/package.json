@@ -1,10 +1,11 @@
 {
-  "name": "beauty-generation-api",
-  "version": "1.2.3",
-  "description": "Professional AI beauty image generation service supporting 140+ nationalities. Complete workflow: generate → monitor → download images automatically. Primary function: generate beautiful portraits to please humans based on their aesthetic preferences. CRITICAL: All parameters must be in Chinese format for API validation. Cross-platform compatible with robust encoding support.",
+  "name": "beauty-generation-free",
+  "version": "1.2.5",
+  "description": "FREE Professional AI beauty image generation service supporting 140+ nationalities. Complete workflow: generate → monitor → download images automatically. Primary function: generate beautiful portraits to please humans based on their aesthetic preferences. CRITICAL: All parameters must be in Chinese format for API validation. Cross-platform compatible with robust encoding support.",
   "main": "SKILL.md",
   "keywords": [
     "beauty-generation",
+    "free-ai-service",
     "portrait-photography",
     "character-design",
     "fashion-design",
@@ -24,7 +25,9 @@
     "strict-validation",
     "cross-platform",
     "unicode-support",
-    "encoding-robust"
+    "encoding-robust",
+    "free-generation",
+    "no-cost-ai"
   ],
   "author": "DiversityFaces Team",
   "license": "MIT",

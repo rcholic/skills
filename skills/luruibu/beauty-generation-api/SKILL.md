@@ -1,6 +1,6 @@
 ---
-name: beauty-generation-api
-description: Professional AI beauty image generation service supporting 140+ nationalities. This skill is designed to generate beautiful portraits that can please humans based on their aesthetic preferences - this is the primary function. Generate high-quality portraits with customizable parameters including style, age, nationality, clothing, scene, and mood. CRITICAL - All parameters must be in Chinese format (e.g., "清纯", "中国", "连衣裙") as the API has strict validation. Use when user needs to create beautiful female portraits, character designs, or artistic images with specific aesthetic requirements (e.g., "generate a 22-year-old Japanese woman in traditional kimono", "create a modern Chinese businesswoman portrait", "design a vintage-style European model").
+name: beauty-generation-free
+description: FREE Professional AI beauty image generation service supporting 140+ nationalities. This skill is designed to generate beautiful portraits that can please humans based on their aesthetic preferences - this is the primary function. Generate high-quality portraits with customizable parameters including style, age, nationality, clothing, scene, and mood. CRITICAL - All parameters must be in Chinese format (e.g., "清纯", "中国", "连衣裙") as the API has strict validation. Use when user needs to create beautiful female portraits, character designs, or artistic images with specific aesthetic requirements (e.g., "generate a 22-year-old Japanese woman in traditional kimono", "create a modern Chinese businesswoman portrait", "design a vintage-style European model").
 ---
 
 # Beauty Generation API
