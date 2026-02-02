@@ -1,106 +1,46 @@
 # Jules CLI Usage Reference
 
+## Core Philosophy: Manual & Intentional
+The Jules CLI is for **asynchronous, complex tasks**. It must not be used for trivial edits. Direct CLI usage is required to maintain visibility and prevent "runaway" automation.
+
+---
+
 ## Repository Format
+**Critical:** Always use the GitHub organization/username format.
+- **Correct:** `octocat/repo`
+- **Incorrect:** `localuser/repo`
 
-**Important:** Always use your GitHub username/org, not your local system username.
-
-- **Correct:** `octocat/Hello-World`
-- **Incorrect:** `localuser/Hello-World`
-
-Verify available repos and see the correct format:
+Verify available repos:
 ```bash
 jules remote list --repo
 ```
 
 ---
 
-## Automation Wrapper
+## Manual Workflow
 
-### `jules_submit.py`
-A helper script provided by this skill to automate the full Jules workflow.
-
-**Usage:**
+### 1. New Session
 ```bash
-./scripts/jules_submit.py [flags] "task description"
+jules remote new --repo <repo> --session "Detailed task description" < /dev/null
 ```
 
-**Flags:**
-- `--repo <repo>`: Specify the repository (e.g., `octocat/Hello-World`). **Must be GitHub username format.**
-- `--no-wait`: Don't wait for the session to complete (default: wait).
-
-**Examples:**
+### 2. Status Monitoring
+The `jules remote list --session` command returns a table. Use this Python one-liner to get the exact status for an ID:
 ```bash
-# Submit and wait for completion
-./scripts/jules_submit.py --repo octocat/Hello-World "Fix login bug"
+jules remote list --session | python3 -c "import sys, re; [print(re.split(r'\s{2,}', l.strip())[-1]) for l in sys.stdin if l.startswith('<SESSION_ID>')] "
+```
 
-# Fire-and-forget (don't wait)
-./scripts/jules_submit.py --repo octocat/Hello-World --no-wait "Research task"
+### 3. Applying Changes
+```bash
+jules remote pull --session <SESSION_ID> --apply < /dev/null
 ```
 
 ---
 
-## Native Jules Commands
+## Troubleshooting
 
-### `jules remote new`
-Assigns a new session to Jules in a remote VM.
-
-**Usage:**
-```bash
-jules remote new --repo octocat/Hello-World --session "Task description"
-```
-
-**Flags:**
-- `--repo <repo>`: Specify the repository in `GITHUB_USERNAME/REPO` format. Defaults to current directory.
-- `--session <task>`: The task description (required).
-- `--parallel <num>`: Number of parallel sessions (1-5).
-
----
-
-### `jules remote list`
-Lists remote sessions or repositories.
-
-**Usage:**
-```bash
-# List your active sessions
-jules remote list --session
-
-# List available repos (pre-flight check)
-jules remote list --repo
-```
-
----
-
-### `jules remote pull`
-Pulls the result of a remote session.
-
-**Usage:**
-```bash
-jules remote pull --session <SESSION_ID> --apply
-```
-
-**Flags:**
-- `--session <id>`: The session ID (required).
-- `--apply`: Apply the patch to the local repository.
-
----
-
-### `jules teleport`
-Clones repository and applies session changes (or applies to existing repo).
-
-**Usage:**
-```bash
-jules teleport <session_id>
-```
-
----
-
-## Error Reference
-
-### Common Errors and Solutions
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "repo doesn't exist" | Wrong username format | Use GitHub username: `octocat/repo` not `localuser/repo` |
-| "repository not found" | Repo not accessible | Run `jules remote list --repo` to verify |
-| "Login Related" | Missing credentials | Run `jules login` or check `~/.jules/cache/oauth_creds.json` |
-| TTY errors | Terminal interaction issues | Use `< /dev/null` suffix or the wrapper scripts |
+| Issue | Solution |
+| :--- | :--- |
+| **"repo doesn't exist"** | Use `jules remote list --repo` to check the exact name. |
+| **TTY errors** | Append `< /dev/null` to your `jules` commands. |
+| **Login failures** | Run `jules login` or ensure `HOME` is correctly exported. |
