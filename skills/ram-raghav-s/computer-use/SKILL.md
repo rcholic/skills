@@ -1,6 +1,7 @@
 ---
 name: computer-use
-description: Full desktop computer use for headless Linux servers and VPS. Creates a virtual display (Xvfb + XFCE) to control GUI applications without a physical monitor. Screenshots, mouse clicks, keyboard input, scrolling, dragging — all 17 standard actions. Model-agnostic, works with any LLM.
+description: Full desktop computer use for headless Linux servers and VPS. Creates a virtual display (Xvfb + XFCE) to control GUI applications without a physical monitor. Screenshots, mouse clicks, keyboard input, scrolling, dragging — all 17 standard actions. Includes VNC setup for live remote viewing and interaction. Model-agnostic, works with any LLM.
+version: 1.1.0
 ---
 
 # Computer Use Skill
@@ -92,9 +93,74 @@ xfce4-terminal &                   # Terminal
 thunar &                           # File manager
 ```
 
+## Live Desktop Viewing (VNC)
+
+Watch the desktop in real-time and optionally interact with it.
+
+### Setup (one-time)
+
+```bash
+sudo apt install -y x11vnc novnc websockify
+```
+
+### Start VNC Services
+
+```bash
+# Start VNC server (shares display :99)
+x11vnc -display :99 -forever -shared -nopw -listen localhost &
+
+# Start noVNC web bridge (browser access)
+websockify --web=/usr/share/novnc 6080 localhost:5900 &
+```
+
+Or use the helper script:
+```bash
+./scripts/vnc_start.sh
+```
+
+### Connect from Your Machine
+
+**Option 1: Browser (noVNC)**
+```bash
+# SSH tunnel
+ssh -L 6080:localhost:6080 your-server
+
+# Open in browser
+http://localhost:6080/vnc.html?autoconnect=true
+```
+
+**Option 2: VNC Client App**
+```bash
+# SSH tunnel
+ssh -L 5900:localhost:5900 your-server
+
+# Connect VNC client to localhost:5900
+```
+
+### SSH Config (recommended)
+
+Add to `~/.ssh/config` for automatic tunneling:
+```
+Host your-server
+  HostName your.server.ip
+  User your-user
+  LocalForward 6080 127.0.0.1:6080
+  LocalForward 5900 127.0.0.1:5900
+```
+
+Then just `ssh your-server` and VNC is available.
+
+### Stop VNC Services
+
+```bash
+./scripts/vnc_stop.sh
+# or
+pkill x11vnc; pkill websockify
+```
+
 ## Requirements
 
 System packages (install once):
 ```bash
-sudo apt install -y xvfb xfce4 xfce4-terminal xdotool scrot imagemagick dbus-x11 chromium-browser
+sudo apt install -y xvfb xfce4 xfce4-terminal xdotool scrot imagemagick dbus-x11 chromium-browser x11vnc novnc websockify
 ```

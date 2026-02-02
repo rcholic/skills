@@ -3,9 +3,15 @@
   "slug": "computer-use",
   "displayName": "Computer Use",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1769945440223,
-    "commit": "https://github.com/clawdbot/skills/commit/c98159094bd73135c0e4186de5d6701e9c6ac82f"
+    "version": "1.1.0",
+    "publishedAt": 1769992531799,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1769945440223,
+      "commit": "https://github.com/clawdbot/skills/commit/c98159094bd73135c0e4186de5d6701e9c6ac82f"
+    }
+  ]
 }
