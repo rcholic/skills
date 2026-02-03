@@ -3,9 +3,15 @@
   "slug": "google-calendar-api",
   "displayName": "Google Calendar",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770022095892,
-    "commit": "https://github.com/clawdbot/skills/commit/0f461618ca0f84470324c82d74d8eb4daa74bc3d"
+    "version": "1.0.1",
+    "publishedAt": 1770117806265,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770022095892,
+      "commit": "https://github.com/clawdbot/skills/commit/0f461618ca0f84470324c82d74d8eb4daa74bc3d"
+    }
+  ]
 }
