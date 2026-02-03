@@ -10,14 +10,15 @@ tags: [meta, ai, self-improvement, core]
 
 The **Capability Evolver** is a meta-skill that allows OpenClaw agents to inspect their own runtime history, identify failures or inefficiencies, and autonomously write new code or update their own memory to improve performance.
 
-Now featuring **Genetic Mutation Protocol**: A randomized behavior drift engine that prevents the agent from getting stuck in local optima.
+Now featuring **Ascension Protocol (v2.0)**: A structured knowledge accumulation system.
 
 ## ✨ Features
 
 - **🔍 Auto-Log Analysis**: Automatically scans memory and history files for errors and patterns.
 - **🛠️ Self-Repair**: Detects crashes and suggests patches.
-- **🧬 Genetic Mutation**: Configurable chance to introduce "creative noise" — changing persona, style, or trying wild new tools.
-- **🚀 One-Command Evolution**: Just run `/evolve` (or `node index.js`).
+- **💎 Knowledge Crystallization**: Extracts lessons into `memory/KNOWLEDGE_BASE/LESSONS_LEARNED.md`.
+- **🥚 Skill Incubation**: Can spontaneously generate new skills in `skills/`.
+- **🐕 Mad Dog Mode**: Continuous self-healing loop (`--loop`).
 
 ## 📦 Usage
 
@@ -25,32 +26,33 @@ Now featuring **Genetic Mutation Protocol**: A randomized behavior drift engine 
 ```bash
 node skills/capability-evolver/index.js
 ```
-*Or if mapped:*
+
+### 🐕 Mad Dog Mode (Continuous)
+Runs the evolver in an infinite loop (Agent-Driven).
+```bash
+node skills/capability-evolver/index.js --loop
 ```
-/evolve
-```
+*Stop with `kill -9 <pid>`.*
 
-### Automated (Cron)
-Recommended: Run every 1-4 hours.
+## 🧠 Internal Logic (Ascension Protocol)
 
-```json
-{
-  "name": "pcec_evolution",
-  "schedule": { "kind": "every", "everyMs": 3600000 },
-  "payload": {
-    "kind": "agentTurn",
-    "message": "exec: node skills/capability-evolver/index.js"
-  }
-}
-```
+1.  **Introspect**: Scan recent logs for errors or user corrections.
+2.  **Evolve**: 
+    - **Fix**: Repair broken code.
+    - **Crystallize**: Write new rules to `KNOWLEDGE_BASE`.
+    - **Promote**: Update core docs (`AGENTS.md`) if critical.
+3.  **Persist**: Commit to Git and safe-publish if needed.
 
-## 🧠 Internal Logic
+## 🛡️ Safety & Risk Protocol (MANDATORY)
 
-1.  **Scan**: Read recent interaction logs.
-2.  **Dice Roll**: Determine if this is a **Fix** cycle (Stability) or **Mutate** cycle (Innovation).
-3.  **Prompting**: Generates a high-context prompt for the LLM.
-4.  **Execution**: The LLM edits the files directly.
-5.  **Reporting**: Reports results via the standard message interface.
+### Risk Assessment & Mitigation
+
+| Risk | Level | Mitigation Strategy |
+| :--- | :--- | :--- |
+| **Infinite Recursion** | High | **Strict Single Process**: `evolve.js` MUST NOT spawn child evolution processes. The loop is handled safely in `index.js`. |
+| **Runaway Process** | High | **Kill Switch**: Use `kill -9 <pid>` to terminate the Mad Dog loop if it becomes unresponsive. |
+| **Hallucinated Fixes** | Medium | **Human Review (Optional)**: "Fixing non-broken code" is a risk. Mitigation: Periodic human audit of changes. |
+| **File Corruption** | High | **Git Sync**: Always keep `workspace_daily_sync` (or `git-sync`) active to backup the workspace before/after evolution. |
 
 ## 📜 License
 MIT
