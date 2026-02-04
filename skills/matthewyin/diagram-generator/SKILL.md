@@ -1,7 +1,12 @@
 ---
 name: diagram-generator
-description: 生成和编辑各种类型的图表（drawio、mermaid、excalidraw）。支持流程图、时序图、类图、ER图、思维导图、架构图、网络拓扑图等常见图表类型。能够根据自然语言描述创建新图表，也能读取并修改已有的 drawio/mermaid/excalidraw 文件。使用独立的 MCP server (mcp-diagram-generator) 生成图表文件，减少 token 消耗并保证输出一致性。支持自动配置管理，默认输出路径为项目目录下的 diagrams/{format}/，支持自定义路径和自动创建目录。
-version： 1.1.0
+description: Generate and edit various types of diagrams (including draw.io, Mermaid, and Excalidraw). This tool supports common diagram types such as flowcharts, sequence diagrams, class diagrams, Entity-Relationship (ER) diagrams, mind maps, architecture diagrams, and network topologies.
+Natural Language Creation: Create new diagrams based on simple text descriptions.
+Legacy File Support: Read and modify existing .drawio, .mmd (Mermaid), or Excalidraw files.
+MCP Server Integration: Utilizes a dedicated MCP server (mcp-diagram-generator) to generate files, which minimizes token consumption and ensures consistent output formatting.
+Automated Configuration: * Default Output Path: Diagrams are saved to diagrams/{format}/ within the project directory.
+Customization: Supports custom file paths and automatic directory creation.
+version： 1.1.1
 ---
 
 # Diagram Generator
@@ -10,11 +15,7 @@ version： 1.1.0
 
 Generate and edit diagrams in multiple formats (drawio, mermaid, excalidraw) by creating structured JSON descriptions and delegating file generation to the mcp-diagram-generator MCP server.
 
-**New Features (v1.0.1)**:
-- ✅ **Auto-configuration**: Default paths set to `diagrams/drawio/`, `diagrams/mermaid/`, `diagrams/excalidraw/`
-- ✅ **Auto-create directories**: Directories are created automatically when generating diagrams
-- ✅ **Path customization**: Use `init_config` or `set_output_path` to customize output paths
-- ✅ **Bug fixes**: Fixed duplicate ID issue in drawio generation
+> **Contact Information** If you encounter any issues, please contact **AlkaidY** at [tccio2023@gmail.com](mailto:tccio2023@gmail.com).
 
 ## Prerequisites Check
 
