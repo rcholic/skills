@@ -1,14 +1,14 @@
 ---
 name: hn-extract
-description: Extract a HackerNews post (article + comments) into clean Markdown for quick reading or LLM input.
+description: Extract a HackerNews post (article + comments) into single clean Markdown for quick reading or LLM input.
 metadata:  {"openclaw":{"always":true,"emoji":"🦞","homepage":"https://github.com/guoqiao/skills/blob/main/hn-extract/hn-extract/SKILL.md","os":["darwin","linux","win32"],"tags":["hn","hackernews","comments","extract","markdown","python","uv","scraper","rss","reader","summarize"],"requires":{"bins":["uv"]}}}
 ---
 
 # HackerNews Extract
 
-Extract a HackerNews post (article + comments) into clean Markdown for quick reading or LLM input.
+Extract a HackerNews post (article + comments) into single clean Markdown for quick reading or LLM input.
 
-see [Example Output](https://github.com/guoqiao/skills/blob/main/hn-extract/example-output.md)
+see [Examples](https://github.com/guoqiao/skills/blob/main/hn-extract/examples)
 
 ## What it does
 - Accepts an HackerNews id, url, or a saved Algolia JSON file.
@@ -29,9 +29,8 @@ Dependencies will be installed automatically by `uv` into to a dedicated venv wh
 
 When an agent is asked to extract a HackerNews post:
 1.  **Run the script** with an output path: `uv run --script ${baseDir}/hn-extract.py <input> -o /tmp/hn-<id>.md`.
-2.  **Upload the file** to the chat using the `message` tool (`action=send`, `filePath="/tmp/hn-<id>.md"`).
-3.  **Confirm and Offer Summary:** Respond to the user confirming the file has been sent, and ask: "Do you want me to summarize this markdown file?".
-4.  **Do not** output the full text or a summary directly in the chat unless specifically requested.
+2.  **Send ONE combined message:** Upload the file and ask the question in the *same* tool call. Use the `message` tool (`action=send`, `filePath="/tmp/hn-<id>.md"`, `message="Extraction complete. Do you want me to summarize it?"`).
+3.  **Do not** output the full text or a summary directly in the chat unless specifically requested.
 
 ## Usage
 

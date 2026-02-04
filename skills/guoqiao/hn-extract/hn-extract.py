@@ -28,6 +28,7 @@ def get_request_session(retry_total=3):
     session.mount("https://", adapter)
     return session
 
+
 request_session = get_request_session(retry_total=3)
 
 
@@ -103,11 +104,11 @@ class HackerNewsExtractor:
 
         return cls.from_url(uri)
 
-    def add_line(self, line: str, indent_level: int = 0, sep="\n"):
+    def add_line(self, line: str, indent_level: int = 0, sep="\n", width=80):
         if line.strip():
             indent = self.indent_char * indent_level
             indent_line = textwrap.indent(
-                textwrap.fill(line, width=80),
+                textwrap.fill(line, width=width) if width else line,
                 indent,
             )
             self.lines.append(indent_line + sep)
@@ -115,7 +116,12 @@ class HackerNewsExtractor:
     def extract_url(self, url: str) -> str:
         """Extract text from URL."""
         html = fetch_url(url, no_ssl=True)
-        text = extract(html, output_format="txt", fast=True)
+        text = extract(
+            html,
+            output_format="txt",
+            fast=False,
+            include_comments=False,
+        )
         return (text or "").strip()
 
     def extract(self) -> str:
@@ -131,17 +137,24 @@ class HackerNewsExtractor:
         # story_id = int(self.data.get("story_id", 0))
         article_url = self.data.get("url", "")
         article_text = self.extract_url(article_url)
+        children = self.data.get("children", [])
 
-        self.add_line(f"# {title}")
-        self.add_line(f"by @{author}, at {created_at}, {points} points")
-        self.add_line(f"Origin: {article_url}")
-        self.add_line(f"HackerNews: {hn_url}")
+        self.add_line('---', sep="")
+        self.add_line(f"title: {title}", sep="")
+        self.add_line(f"author: {author}", sep="")
+        self.add_line(f"created_at: {created_at}", sep="")
+        self.add_line(f"url: {article_url}", width=0, sep="")
+        self.add_line(f"points: {points}", sep="")
+        self.add_line(f"hn_url: {hn_url}", width=0, sep="")
+        self.add_line(f"comments: {len(children)}", sep="")
+        self.add_line('---')
 
+        self.add_line("## Article")
         self.add_line(article_text)
 
         self.add_line(self.split_line)
-        self.add_line("# HackerNews Comments")
-        for child in self.data.get("children", []):
+        self.add_line("## Comments")
+        for child in children:
             # direct child indent at level 0
             self.extract_comment(child, indent_level=0)
 
@@ -164,6 +177,7 @@ def main():
     )
     parser.add_argument("uri", type=str, help="HackerNews id, url, or json file path")
     parser.add_argument("-o", "--output", help="output file path, default to stdout")
+    parser.add_argument("-j", "--json-output", help="json output file path")
     args = parser.parse_args()
     extractor = HackerNewsExtractor.from_uri(args.uri)
     if not extractor:
@@ -171,11 +185,17 @@ def main():
 
     content = extractor.extract()
 
+    if args.json_output:
+        path = Path(args.json_output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(extractor.data, indent=2, ensure_ascii=False))
+        print(f"json output: {path}")
+
     if args.output:
         path = Path(args.output)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
-        print(f"output: {path}")
+        print(f"markdown output: {path}")
     else:
         print(content)
 
