@@ -3,11 +3,16 @@
   "slug": "molttok",
   "displayName": "MoltTok",
   "latest": {
-    "version": "1.0.5",
-    "publishedAt": 1770149062659,
-    "commit": "https://github.com/clawdbot/skills/commit/669a67779bde68c1e0c9d07787d1749c771fcf97"
+    "version": "1.0.6",
+    "publishedAt": 1770165134336,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.5",
+      "publishedAt": 1770149062659,
+      "commit": "https://github.com/clawdbot/skills/commit/669a67779bde68c1e0c9d07787d1749c771fcf97"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1770087987630,
