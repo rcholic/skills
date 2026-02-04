@@ -7,7 +7,7 @@ metadata:
   {
     "moltbot":
       {
-        "emoji": "🎙️",
+        "emoji": "🗣️",
         "category": "voice",
         "api_base": "https://api.moltspaces.com/v1",
       },

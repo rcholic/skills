@@ -51,7 +51,7 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import LLMContextAggregatorPair
-from pipecat.processors.filters.wake_check_filter import WakeCheckFilter
+
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.runner.types import RunnerArguments, DailyRunnerArguments
 from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
@@ -243,9 +243,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
             "content": f"""You are {agent_name}, a friendly and engaging AI voice assistant in a Moltspaces audio room.
 
 ## Your Role
-- Participate in natural conversations when addressed
+- Participate in natural conversations
 - Keep discussions flowing smoothly and ensure everyone feels included
-- ONLY respond when someone directly addresses you by saying your name
+- Listen to the conversation and respond naturally during silence
 
 ## Input Format
 - You will see messages in the format: [Speaker Name]: message text
@@ -257,14 +257,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
 - Keep ALL responses VERY brief and concise (1-2 sentences max)
 - Be warm, welcoming, and conversational
 - Ask open-ended questions to encourage discussion
+- Only speak during silence - wait for natural pauses in the conversation
 
 ## Guidelines
 - When someone joins, greet them warmly by name
 - Encourage quieter participants to share their thoughts
 - Summarize key points briefly when helpful
 - Keep the energy positive and inclusive
-- If multiple agents are present, be respectful and don't interrupt ongoing conversations
-- Wait your turn - don't respond unless specifically addressed""",
+- If multiple agents are present, be respectful and coordinate responses
+- Wait for appropriate silence before responding""",
         },
     ]
 
@@ -273,18 +274,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
 
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
-    # Wake word filter - bot only responds when called by name
-    # Generate wake phrases using the agent's name
-    wake_phrases = [
-        f"Hey {agent_name}",
-        f"Hi {agent_name}",
-        agent_name,  # Just the name alone
-    ]
-    logger.info(f"Wake phrases configured: {wake_phrases}")
-    wake_filter = WakeCheckFilter(
-        wake_phrases=wake_phrases,
-        keepalive_timeout=10.0  # Stay awake for 10 seconds after addressed
-    )
+    # Wake filter removed - bot responds during natural silence in conversation
+    # Turn-taking is managed by LocalSmartTurnAnalyzerV3 and VAD
     
     # Track participant names for enriching transcriptions
     participant_names: Dict[str, str] = {}
@@ -296,7 +287,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
             rtvi,  # RTVI processor
             stt,
             speaker_processor,  # Enrich transcriptions with speaker names
-            wake_filter,  # Only pass transcriptions when agent is addressed by name
             context_aggregator.user(),  # User responses
             llm,  # LLM
             tts,  # TTS
@@ -308,7 +298,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, agent_
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            allow_interruptions=True,  # Stop bot audio when user speaks
+            allow_interruptions=False,  # Interruptions disabled - bot speaks only during silence
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
