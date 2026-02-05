@@ -1,0 +1,11 @@
+{
+  "owner": "ampedfinance",
+  "slug": "amped-defi-plugin",
+  "displayName": "Amped Defi Plugin",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770262783774,
+    "commit": null
+  },
+  "history": []
+}
