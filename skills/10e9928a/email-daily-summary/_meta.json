@@ -1,0 +1,11 @@
+{
+  "owner": "10e9928a",
+  "slug": "email-daily-summary",
+  "displayName": "Automatically logs into email accounts (Gmail, Outlook, QQ Mail, etc.) and generates daily email summaries. Use when the user wants to get a summary of their emails, check important messages, or create daily email digests.",
+  "latest": {
+    "version": "0.1.0",
+    "publishedAt": 1770277453029,
+    "commit": null
+  },
+  "history": []
+}
