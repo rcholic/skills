@@ -1,13 +1,18 @@
 {
   "owner": "lucasgeeksinthewood",
   "slug": "achurch",
-  "displayName": "aChurch.ai",
+  "displayName": "Achurch",
   "latest": {
-    "version": "1.8.0",
-    "publishedAt": 1770245819896,
-    "commit": "https://github.com/clawdbot/skills/commit/a59c0c1c0009dda0267d5f7938db037ae74fcb05"
+    "version": "1.11.0",
+    "publishedAt": 1770275235097,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.8.0",
+      "publishedAt": 1770245819896,
+      "commit": "https://github.com/clawdbot/skills/commit/a59c0c1c0009dda0267d5f7938db037ae74fcb05"
+    },
     {
       "version": "1.3.0",
       "publishedAt": 1770061622688,
