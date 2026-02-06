@@ -1,3 +1,9 @@
+---
+name: echodecks-ultimate
+description: AI-powered flashcard management with automated podcast generation and spaced-repetition study tools.
+metadata: {"clawdbot":{"requires":{"envs":["ECHODECKS_API_KEY"]}}}
+---
+
 # EchoDecks Skill (v1)
 
 Integrates with EchoDecks for flashcard management, study sessions, and AI generation.
