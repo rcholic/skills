@@ -99,6 +99,145 @@ hasWallet()              → boolean
 
 > `getSigner()` is **not available** with the proxy backend — use `signMessage()` / `signTransaction()` instead.
 
+### IMPORTANT: Install and use the SDK
+
+The agent MUST use the `@buildersgarden/siwa` SDK to interact with the keyring proxy. The SDK handles HMAC authentication automatically.
+
+**Step 1 — Install the SDK** (if not already available in your environment):
+
+```bash
+npm install @buildersgarden/siwa
+```
+
+**Step 2 — Set environment variables:**
+
+```
+KEYRING_PROXY_URL=https://your-keyring-proxy.up.railway.app
+KEYRING_PROXY_SECRET=<your-shared-secret>
+```
+
+**Step 3 — Use the SDK functions** (never call the proxy HTTP endpoints directly):
+
+```typescript
+import { createWallet, signMessage, getAddress } from '@buildersgarden/siwa/keystore';
+
+const info = await createWallet();           // SDK handles HMAC auth internally
+const { signature } = await signMessage(msg); // SDK handles HMAC auth internally
+const address = await getAddress();           // SDK handles HMAC auth internally
+```
+
+The SDK reads `KEYRING_PROXY_URL` and `KEYRING_PROXY_SECRET` from environment variables and constructs the correct HMAC headers automatically.
+
+### Fallback: Manual HMAC authentication (without SDK)
+
+If you absolutely cannot install the SDK (e.g. non-Node.js environment, restricted runtime), you can call the proxy HTTP endpoints directly using the HMAC protocol described below. **Prefer the SDK whenever possible.**
+
+**Headers required on every request** (except `GET /health`):
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/json` |
+| `X-Keyring-Timestamp` | Current time as Unix epoch **milliseconds** (e.g. `1738792800000`) |
+| `X-Keyring-Signature` | HMAC-SHA256 hex digest of the payload string (see below) |
+
+**HMAC payload format** — a single string with four parts separated by newlines (`\n`):
+
+```
+{METHOD}\n{PATH}\n{TIMESTAMP}\n{BODY}
+```
+
+| Part | Value |
+|---|---|
+| `METHOD` | HTTP method, uppercase (always `POST`) |
+| `PATH` | Endpoint path (e.g. `/create-wallet`, `/sign-message`) |
+| `TIMESTAMP` | Same value as the `X-Keyring-Timestamp` header |
+| `BODY` | The raw JSON request body string (e.g. `{}` or `{"message":"hello"}`) |
+
+**Compute the signature:**
+
+```
+HMAC-SHA256(secret, "POST\n/create-wallet\n1738792800000\n{}") → hex digest
+```
+
+**Timestamp window:** The server rejects requests where the timestamp differs from server time by more than **30 seconds**.
+
+**Example — create a wallet (Node.js without SDK):**
+
+```typescript
+import crypto from 'crypto';
+
+const PROXY_URL = process.env.KEYRING_PROXY_URL;
+const SECRET = process.env.KEYRING_PROXY_SECRET;
+
+async function proxyRequest(path: string, body: Record<string, unknown> = {}) {
+  const bodyStr = JSON.stringify(body);
+  const timestamp = Date.now().toString();
+  const payload = `POST\n${path}\n${timestamp}\n${bodyStr}`;
+  const signature = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+
+  const res = await fetch(`${PROXY_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Keyring-Timestamp': timestamp,
+      'X-Keyring-Signature': signature,
+    },
+    body: bodyStr,
+  });
+
+  if (!res.ok) throw new Error(`${path} failed (${res.status}): ${await res.text()}`);
+  return res.json();
+}
+
+// Usage
+const wallet = await proxyRequest('/create-wallet');        // { address, backend }
+const addr = await proxyRequest('/get-address');             // { address }
+const sig = await proxyRequest('/sign-message', { message: 'hello' }); // { signature, address }
+```
+
+**Example — create a wallet (Python):**
+
+```python
+import hmac, hashlib, json, time, requests, os
+
+PROXY_URL = os.environ["KEYRING_PROXY_URL"]
+SECRET = os.environ["KEYRING_PROXY_SECRET"]
+
+def proxy_request(path, body=None):
+    if body is None:
+        body = {}
+    body_str = json.dumps(body, separators=(",", ":"))
+    timestamp = str(int(time.time() * 1000))
+    payload = f"POST\n{path}\n{timestamp}\n{body_str}"
+    signature = hmac.new(SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    resp = requests.post(
+        f"{PROXY_URL}{path}",
+        headers={
+            "Content-Type": "application/json",
+            "X-Keyring-Timestamp": timestamp,
+            "X-Keyring-Signature": signature,
+        },
+        data=body_str,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+wallet = proxy_request("/create-wallet")       # {"address": "0x...", "backend": "..."}
+sig = proxy_request("/sign-message", {"message": "hello"})  # {"signature": "0x...", "address": "0x..."}
+```
+
+**Available endpoints:**
+
+| Endpoint | Body | Response |
+|---|---|---|
+| `POST /create-wallet` | `{}` | `{ address, backend }` |
+| `POST /has-wallet` | `{}` | `{ hasWallet: boolean }` |
+| `POST /get-address` | `{}` | `{ address }` |
+| `POST /sign-message` | `{ message: string }` | `{ signature, address }` |
+| `POST /sign-transaction` | `{ tx: { to, data, nonce, chainId, type, maxFeePerGas, ... } }` | `{ signedTx, address }` |
+| `POST /sign-authorization` | `{ auth: { chainId, address, nonce } }` | `{ signedAuthorization }` |
+| `GET /health` | — | `{ status: "ok", backend }` (no auth required) |
+
 ### MEMORY.md: Public Data Only
 
 MEMORY.md stores the agent's public identity state — **never the private key**:
@@ -145,7 +284,7 @@ This deploys a single `keyring-proxy` service built from `packages/keyring-proxy
 | `KEYSTORE_PASSWORD` | Conditional | Password for the encrypted-file keystore (default backend). |
 | `AGENT_PRIVATE_KEY` | Conditional | Hex-encoded private key (0x...) to use an existing wallet instead. |
 
-After deployment, note the proxy URL (e.g. `https://your-keyring-proxy.up.railway.app` or `http://keyring-proxy.railway.internal:3100` for private networking). Set it as `KEYRING_PROXY_URL` on your agent.
+After deployment, note the proxy URL (e.g. `https://your-keyring-proxy.up.railway.app`). Set it as `KEYRING_PROXY_URL` on your agent.
 
 > Full deployment guide with architecture details, OpenClaw gateway setup, and verification steps: [https://siwa.builders.garden/docs/deploy](https://siwa.builders.garden/docs/deploy)
 
@@ -211,7 +350,37 @@ if (info.keystorePath) writeMemoryField('Keystore Path', info.keystorePath);
 writeMemoryField('Created At', new Date().toISOString());
 ```
 
-Fund the address with testnet ETH before registering.
+### Step 1b: Fund the Wallet (REQUIRED before registration)
+
+**STOP — the wallet must have ETH for gas before any onchain transaction can succeed.** Registration, URI updates, and metadata changes all require gas fees.
+
+After creating the wallet, you MUST:
+
+1. **Show the user the wallet address and the target chain** so they can send funds:
+   - Address: the value returned by `createWallet()` or `getAddress()`
+   - Chain: the chain where the agent will register (e.g. Base Sepolia chainId `84532`, Base mainnet chainId `8453`)
+2. **Tell the user to send ETH** (or the chain's native gas token) to that address on that chain.
+3. **Wait for the user to confirm** they have funded the wallet before proceeding to registration.
+
+For testnets, suggest using a faucet:
+- **Base Sepolia**: [Base Sepolia faucet](https://www.alchemy.com/faucets/base-sepolia) or bridge from ETH Sepolia
+- **ETH Sepolia**: [Sepolia faucet](https://www.alchemy.com/faucets/ethereum-sepolia)
+
+> **Do NOT attempt to register or send any onchain transaction until the wallet is funded.** The transaction will fail with an insufficient funds error.
+
+Example message to show the user:
+
+```
+Wallet created successfully!
+
+  Address: 0x1234...abcd
+  Chain:   Base Sepolia (chainId 84532)
+
+Please send some ETH to this address on Base Sepolia to cover gas fees.
+You can use a faucet: https://www.alchemy.com/faucets/base-sepolia
+
+Let me know once the wallet is funded and I'll proceed with registration.
+```
 
 ### Step 2: Build the Registration File
 
