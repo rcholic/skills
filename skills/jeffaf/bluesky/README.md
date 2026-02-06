@@ -1,6 +1,6 @@
 # 🦋 Bluesky CLI
 
-[![Version](https://img.shields.io/badge/version-1.5.1-blue.svg)](https://github.com/jeffaf/bluesky-skill)
+[![Version](https://img.shields.io/badge/version-1.5.3-blue.svg)](https://github.com/jeffaf/bluesky-skill)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-yellow.svg)](https://python.org)
 
@@ -123,7 +123,7 @@ bsky notifications --json
 ### For OpenClaw
 
 ```bash
-clawdhub install bluesky
+clawhub install bluesky
 ```
 
 ### Manual
