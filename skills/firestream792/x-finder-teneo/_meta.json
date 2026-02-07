@@ -3,11 +3,16 @@
   "slug": "x-finder-teneo",
   "displayName": "X Finder - powered by Teneo Protocol",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1770302225263,
-    "commit": "https://github.com/clawdbot/skills/commit/433f35cdf1428d648c733f92fe0c4e092d0d30c3"
+    "version": "1.0.4",
+    "publishedAt": 1770448444407,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1770302225263,
+      "commit": "https://github.com/clawdbot/skills/commit/433f35cdf1428d648c733f92fe0c4e092d0d30c3"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1770216691056,
