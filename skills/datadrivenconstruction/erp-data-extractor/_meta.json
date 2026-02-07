@@ -1,0 +1,11 @@
+{
+  "owner": "datadrivenconstruction",
+  "slug": "erp-data-extractor",
+  "displayName": "Erp Data Extractor",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770475677393,
+    "commit": null
+  },
+  "history": []
+}
