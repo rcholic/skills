@@ -1,5 +1,5 @@
 ---
-name: googlecontacts
+name: google-contacts
 description: |
   Google Contacts API integration with managed OAuth. Manage contacts, contact groups, and search your address book.
   Use this skill when users want to create, read, update, or delete contacts, manage contact groups, or search for people in their Google account.

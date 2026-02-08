@@ -3,9 +3,15 @@
   "slug": "google-contacts",
   "displayName": "Google Contacts",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1770463319244,
-    "commit": "https://github.com/openclaw/skills/commit/d59472bf5ccab71f301b4b9260641761a596480d"
+    "version": "1.0.1",
+    "publishedAt": 1770496614403,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770463319244,
+      "commit": "https://github.com/openclaw/skills/commit/d59472bf5ccab71f301b4b9260641761a596480d"
+    }
+  ]
 }
