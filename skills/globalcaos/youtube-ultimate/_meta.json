@@ -1,13 +1,18 @@
 {
   "owner": "globalcaos",
   "slug": "youtube-ultimate",
-  "displayName": "YouTube Ultimate",
+  "displayName": "Youtube Ultimate",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770411784028,
-    "commit": "https://github.com/openclaw/skills/commit/c7ed2d6220010bcff478e1443fab3a8b0c384fcb"
+    "version": "1.0.2",
+    "publishedAt": 1770527450967,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770411784028,
+      "commit": "https://github.com/openclaw/skills/commit/c7ed2d6220010bcff478e1443fab3a8b0c384fcb"
+    },
     {
       "version": "2.0.0",
       "publishedAt": 1770357301367,
