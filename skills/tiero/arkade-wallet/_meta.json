@@ -1,0 +1,11 @@
+{
+  "owner": "tiero",
+  "slug": "arkade-wallet",
+  "displayName": "Bitcoin and Tether on Arkade",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1770518581553,
+    "commit": null
+  },
+  "history": []
+}
