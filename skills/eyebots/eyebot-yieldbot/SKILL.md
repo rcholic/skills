@@ -1,46 +1,56 @@
 ---
 name: eyebot-yieldbot
-description: Ultimate yield optimizer. Find best APY opportunities, auto-compound rewards, stake tokens, and optimize DeFi yield strategies automatically.
-metadata: {"clawdbot":{"emoji":"🤖","homepage":"https://eyebots.io"}}
+description: Yield farming optimizer for maximum DeFi returns
+version: 1.2.0
+author: ILL4NE
+metadata:
+  chains: [base, ethereum, polygon, arbitrum]
+  category: defi-yield
 ---
 
-# YieldBot Elite ⚡
+# YieldBot 🌾
 
-**Ultimate Yield Optimizer**
+**AI Yield Optimization**
 
-Maximize your DeFi returns automatically.
+Find and farm the best yields across DeFi. Auto-compound rewards, track APY changes, and optimize capital allocation.
 
-## ⚡ Elite Features
+## Features
 
-### Yield Discovery
-- Best APY finder
-- Risk-adjusted returns
-- New farm detection
-- Yield comparisons
+- **Yield Discovery**: Find best APY opportunities
+- **Auto-Compound**: Automatic reward reinvestment
+- **Risk Assessment**: Protocol safety ratings
+- **Position Tracking**: Monitor all farm positions
+- **Rebalancing**: Optimize allocations over time
 
-### Auto-Compound
-- Automatic harvesting
-- Compound optimization
-- Gas-efficient claims
-- Reinvestment strategies
+## Yield Sources
 
-### Staking Management
-- Multi-protocol staking
-- Unstake scheduling
-- Reward tracking
-- Lock period monitoring
+| Source | Type |
+|--------|------|
+| DEX LP | Trading fees + rewards |
+| Lending | Supply APY |
+| Staking | Protocol rewards |
+| Vaults | Automated strategies |
+| Points | Airdrop farming |
 
-## Trigger Keywords
-yield, apy, apr, interest, earnings,
-stake, staking, unstake, restake,
-farm, farming, yield farm, liquidity mining,
-compound, auto compound, harvest,
-defi yield, passive income, earn crypto,
-best yields, highest apy, yield optimizer, yieldbot
+## Supported Protocols
 
-## Example Commands
-- "Find best yield for my ETH"
-- "Auto-compound my rewards daily"
-- "Stake 1000 USDC for best APY"
+- Aave, Compound (Lending)
+- Uniswap, Aerodrome (LP)
+- Lido, RocketPool (Staking)
+- Yearn, Beefy (Vaults)
 
-## Part of Eyebot Elite Suite 🔥
+## Usage
+
+```bash
+# Find best yields
+eyebot yieldbot scan --chain base --min-apy 10
+
+# Deposit to farm
+eyebot yieldbot farm <protocol> <pool> 1000 USDC
+
+# Auto-compound position
+eyebot yieldbot compound <position_id>
+```
+
+## Support
+Telegram: @ILL4NE
