@@ -7,7 +7,7 @@ description: >
   people mentioned, locations, aircraft, evidence types, and source references.
 metadata:
   author: project-einstein
-  version: "1.0.0"
+  version: "1.1.0"
   clawdbot:
     emoji: "📂"
     homepage: "https://emc2ai.io"
@@ -81,7 +81,7 @@ node scripts/epstein.mjs stats
 
 ## Output Format
 
-Search results are returned as JSON to stdout (for easy piping and parsing). Status messages go to stderr.
+Search results are returned as JSON to stdout (for easy piping and parsing). Status messages and **Quick Links** (direct PDF URLs) go to stderr for easy viewing.
 
 ### Search Result Shape
 
@@ -102,10 +102,20 @@ Search results are returned as JSON to stdout (for easy piping and parsing). Sta
       "aircraft": ["N908JE"],
       "evidence_types": ["financial_record"],
       "source": "DOJ Release Jan 2026",
-      "indexed_at": "2026-01-31T..."
+      "indexed_at": "2026-01-31T...",
+      "doj_url": "https://www.justice.gov/epstein/files/DataSet%209/EFTA-00001234.pdf",
+      "doj_listing_url": "https://www.justice.gov/epstein/doj-disclosures/data-set-9-files"
     }
   ]
 }
+```
+
+**New in v1.1.0:** Each result now includes `doj_url` (direct PDF link) and `doj_listing_url` (dataset page). The CLI also displays Quick Links in stderr output:
+
+```
+--- Quick Links ---
+1. EFTA-00001234: https://www.justice.gov/epstein/files/DataSet%209/EFTA-00001234.pdf
+2. EFTA-00001235: https://www.justice.gov/epstein/files/DataSet%209/EFTA-00001235.pdf
 ```
 
 ### Stats Shape

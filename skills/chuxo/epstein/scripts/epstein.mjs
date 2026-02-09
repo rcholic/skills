@@ -66,7 +66,19 @@ async function search(query, limit) {
   };
 
   console.log(JSON.stringify(result, null, 2));
+
+  // Print human-readable summary to stderr
   process.stderr.write(`\nFound ${result.totalHits} documents (showing ${hits.length})\n`);
+  if (hits.length > 0) {
+    process.stderr.write('\n--- Quick Links ---\n');
+    hits.forEach((doc, i) => {
+      const id = doc.efta_id || doc.id;
+      const url = doc.doj_url;
+      if (url) {
+        process.stderr.write(`${i + 1}. ${id}: ${url}\n`);
+      }
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
