@@ -1,0 +1,11 @@
+{
+  "owner": "anton-abyzov",
+  "slug": "sw-jira-sync",
+  "displayName": "Jira Sync",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770713713060,
+    "commit": null
+  },
+  "history": []
+}
