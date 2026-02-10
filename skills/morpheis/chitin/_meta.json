@@ -3,11 +3,16 @@
   "slug": "chitin",
   "displayName": "Chitin",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770409959384,
-    "commit": "https://github.com/openclaw/skills/commit/ff5939b0b72c130a54055bbb9db7b567bcf23027"
+    "version": "1.0.3",
+    "publishedAt": 1770747797126,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770409959384,
+      "commit": "https://github.com/openclaw/skills/commit/ff5939b0b72c130a54055bbb9db7b567bcf23027"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770240528936,
