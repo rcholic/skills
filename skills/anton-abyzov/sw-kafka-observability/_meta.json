@@ -1,0 +1,11 @@
+{
+  "owner": "anton-abyzov",
+  "slug": "sw-kafka-observability",
+  "displayName": "Kafka Observability",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1770713741989,
+    "commit": null
+  },
+  "history": []
+}
