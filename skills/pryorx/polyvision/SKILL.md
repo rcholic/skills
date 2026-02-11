@@ -3,7 +3,8 @@ name: polyvision
 description: Analyze Polymarket prediction market wallets — get copy trading scores (1-10), P&L, win rate, risk metrics (Sharpe ratio, Sortino ratio, max drawdown), red flags, position sizing, market category performance, recent performance (7d/30d/90d), and streak analysis. Connects via MCP server or REST API. Use when evaluating whether to copy trade a Polymarket trader, comparing multiple wallets side-by-side, screening for elite prediction market performers, checking if a wallet has bot-like trading patterns or hidden losses, or researching a trader's risk profile before following their positions. Free API key, no daily limits, 6-hour result caching.
 homepage: https://polyvisionx.com
 license: MIT
-metadata: {"openclaw":{"emoji":"📊","requires":{"env":["POLYVISION_API_KEY"]}}}
+disable-model-invocation: true
+metadata: {"clawdis":{"emoji":"📊","primaryEnv":"POLYVISION_API_KEY","requires":{"env":["POLYVISION_API_KEY"]}}}
 ---
 
 # PolyVision — Polymarket Wallet Analyzer
@@ -33,22 +34,6 @@ Add to your MCP client configuration (e.g. `claude_desktop_config.json`, Cursor,
       "url": "https://api.polyvisionx.com/mcp",
       "headers": {
         "Authorization": "Bearer ${POLYVISION_API_KEY}"
-      }
-    }
-  }
-}
-```
-
-**Alternative — stdio transport** (requires local install + database):
-
-```json
-{
-  "mcpServers": {
-    "polyvision": {
-      "command": "polyvision-mcp",
-      "env": {
-        "POLYVISION_API_KEY": "pv_live_...",
-        "DATABASE_URL": "postgresql://..."
       }
     }
   }
