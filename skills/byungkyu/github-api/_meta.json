@@ -3,11 +3,16 @@
   "slug": "github-api",
   "displayName": "GitHub",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770380279869,
-    "commit": "https://github.com/openclaw/skills/commit/affa9dd3dc903f1c7e9a99387c94637f45f1667d"
+    "version": "1.0.3",
+    "publishedAt": 1770756522010,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770380279869,
+      "commit": "https://github.com/openclaw/skills/commit/affa9dd3dc903f1c7e9a99387c94637f45f1667d"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770350703641,
