@@ -1,6 +1,6 @@
 ---
 name: openclaw-checkpoint
-description: Backup and restore OpenClaw workspace state across machines using git. Enables disaster recovery by syncing SOUL.md, MEMORY.md, memory files, cron jobs, and configuration to a remote repository. Use when user wants to checkpoint their OpenClaw state, restore on a new machine, migrate between computers, or protect against data loss. Provides commands checkpoint-setup (interactive onboarding), checkpoint-backup, checkpoint-resume, checkpoint-schedule (auto-backup), checkpoint-stop, checkpoint-status, checkpoint-init, and checkpoint-reset. Automatically backs up cron jobs to memory/cron-jobs-backup.json on each checkpoint-backup.
+description: Backup and restore OpenClaw workspace state across machines using git. Enables disaster recovery by syncing SOUL.md, MEMORY.md, memory files, cron jobs, and configuration to a remote repository. Use when user wants to checkpoint their OpenClaw state, restore on a new machine, migrate between computers, or protect against data loss. Provides commands checkpoint (help overview), checkpoint-setup (interactive onboarding), checkpoint-backup, checkpoint-restore (with interactive checkpoint selection or --latest for most recent), checkpoint-schedule (auto-backup), checkpoint-stop, checkpoint-status, checkpoint-init, and checkpoint-reset. Automatically backs up cron jobs to memory/cron-jobs-backup.json on each checkpoint-backup.
 ---
 
 # OpenClaw Checkpoint Skill
@@ -50,6 +50,20 @@ curl -fsSL https://raw.githubusercontent.com/AnthonyFrancis/openclaw-checkpoint/
 This runs the install script -- review it first if you prefer to inspect before executing.
 
 ## Commands
+
+### checkpoint
+**Show all available commands and usage examples.**
+
+```bash
+checkpoint
+```
+
+**What it does:**
+- Displays a quick reference of all checkpoint commands with descriptions and examples
+
+**When to use:**
+- When you can't remember the exact command name
+- Quick reference for available options
 
 ### checkpoint-setup
 **Interactive onboarding flow for first-time setup.**
@@ -163,12 +177,13 @@ checkpoint-status
 - Troubleshooting backup issues
 - Regular health checks
 
-### checkpoint-resume
-Restore state from remote repository, with first-time onboarding.
+### checkpoint-restore
+Restore state from remote repository, with checkpoint selection and first-time onboarding.
 
 ```bash
-checkpoint-resume          # Normal resume (or onboarding if not set up)
-checkpoint-resume --force  # Discard local changes, pull remote
+checkpoint-restore            # Select from recent checkpoints (interactive)
+checkpoint-restore --latest   # Restore most recent checkpoint (skip selection)
+checkpoint-restore --force    # Discard local changes before restoring
 ```
 
 **What it does:**
@@ -177,18 +192,25 @@ checkpoint-resume --force  # Discard local changes, pull remote
   - Lets you specify your existing backup repository
   - Verifies access and restores your checkpoint
   - Handles merge/replace options if local files exist
-- **Returning users:** Fetches and pulls latest changes from remote
-
-**After restoring, re-create cron jobs from the backup:**
-```bash
-openclaw cron restore memory/cron-jobs-backup.json
-```
+  - Shows available checkpoints to pick from (if the repo has more than one commit)
+  - Offers to restore cron jobs from backup
+- **Returning users:** Shows a list of the 10 most recent checkpoints to choose from
+  - Pick the latest or any older checkpoint to restore
+  - Current checkpoint is marked in the list
+  - Restoring an older checkpoint warns that the next backup will overwrite newer remote checkpoints
+  - Use `--latest` flag to skip the interactive selection and restore the most recent checkpoint automatically
+- **Uncommitted changes:** If you have local uncommitted changes, you're prompted to:
+  1. Save changes first (runs `checkpoint-backup`)
+  2. Discard local changes and continue restoring
+  3. Cancel
+- **Cron jobs:** Automatically offers to restore cron jobs from `memory/cron-jobs-backup.json` after restoring (requires OpenClaw gateway to be running)
 
 **When to use:**
 - Starting OpenClaw on a new machine
 - After hardware failure/disaster
 - When resuming work on different computer
 - First-time restore from an existing backup
+- Rolling back to a previous checkpoint after unwanted changes
 
 **Onboarding flow triggers when:**
 - No workspace exists
@@ -283,8 +305,8 @@ checkpoint-backup
 # Install the checkpoint skill first
 curl -fsSL https://raw.githubusercontent.com/AnthonyFrancis/openclaw-checkpoint/main/scripts/install-openclaw-checkpoint.sh | bash
 
-# Run checkpoint-resume - it will guide you through the entire process
-checkpoint-resume
+# Run checkpoint-restore - it will guide you through the entire process
+checkpoint-restore
 ```
 
 This will:
@@ -358,7 +380,7 @@ brew install openclaw  # or your install method
 
 # 2. Install checkpoint skill and run interactive restore
 curl -fsSL https://raw.githubusercontent.com/AnthonyFrancis/openclaw-checkpoint/main/scripts/install-openclaw-checkpoint.sh | bash
-checkpoint-resume
+checkpoint-restore
 # Follow the interactive prompts to:
 # - Authenticate with GitHub
 # - Enter your backup repository (e.g., YOURUSER/openclaw-state)
@@ -372,8 +394,8 @@ EOF
 # 4. Start OpenClaw
 openclaw gateway start
 
-# 5. Restore your cron jobs (scheduled tasks)
-openclaw cron restore ~/.openclaw/workspace/memory/cron-jobs-backup.json
+# 5. Cron jobs are restored automatically during checkpoint-restore
+# (if the gateway is running and cron backup exists)
 
 # 6. Enable automatic backups on this machine
 checkpoint-schedule hourly
@@ -430,17 +452,20 @@ The skill does **not** install any background daemons, system services, or root-
 ## Troubleshooting
 
 ### "Not a git repository" or "'origin' does not appear to be a git repository"
-Running `checkpoint-resume` will now automatically start the interactive restore onboarding flow to help you connect to your backup repository. Alternatively, run `checkpoint-setup` to create a new backup from scratch.
+Running `checkpoint-restore` will now automatically start the interactive restore onboarding flow to help you connect to your backup repository. Alternatively, run `checkpoint-setup` to create a new backup from scratch.
 
 ### "Failed to push checkpoint"
-Another machine pushed changes. Run `checkpoint-resume` first, then `checkpoint-backup`.
+Another machine pushed changes. Run `checkpoint-restore` first, then `checkpoint-backup`.
 
 ### "You have uncommitted changes"
-You have local work that isn't checkpointed. Either:
-- Run `checkpoint-backup` to save it first
-- Or `checkpoint-resume --force` to discard it
+`checkpoint-restore` will prompt you to choose:
+1. Save changes first (runs `checkpoint-backup`)
+2. Discard local changes and continue
+3. Cancel
 
-### Behind remote after resume
+You can also skip the prompt with `checkpoint-restore --force` to discard changes directly.
+
+### Behind remote after restore
 This is expected if another machine checkpointed since you last synced.
 
 ### GitHub prompting for username/password
