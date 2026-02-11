@@ -3,9 +3,15 @@
   "slug": "project-cerebro",
   "displayName": "Project Cerebro - Control Surface",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770768268108,
-    "commit": "https://github.com/openclaw/skills/commit/54328be76881012c0d83ccdf97934024b81728c4"
+    "version": "1.0.2",
+    "publishedAt": 1770830788299,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770768268108,
+      "commit": "https://github.com/openclaw/skills/commit/54328be76881012c0d83ccdf97934024b81728c4"
+    }
+  ]
 }
