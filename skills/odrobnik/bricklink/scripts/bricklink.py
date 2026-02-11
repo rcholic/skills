@@ -14,11 +14,31 @@ import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 import html as _html
 
 
 API_BASE_DEFAULT = "https://api.bricklink.com/api/store/v1"
+
+
+def _find_workspace_root() -> Path:
+    """Walk up from script location to find workspace root (parent of 'skills/')."""
+    env = os.environ.get("BRICKLINK_WORKSPACE")
+    if env:
+        return Path(env)
+    
+    # Prefer CWD if it looks like a workspace (handles symlinks correctly)
+    cwd = Path.cwd()
+    if (cwd / "skills").is_dir():
+        return cwd
+
+    d = Path(__file__).resolve().parent
+    for _ in range(6):
+        if (d / "skills").is_dir() and d != d.parent:
+            return d
+        d = d.parent
+    return Path.cwd()
 
 # Quiet broken pipe behavior when piping to `head` etc.
 try:
@@ -178,7 +198,7 @@ def load_creds(args) -> Creds:
     # 1) Optional: config JSON
     cfg = getattr(args, "config", None) or _env("BRICKLINK_CONFIG")
     if not cfg:
-        default_cfg = os.path.expanduser("~/clawd/bricklink/config.json")
+        default_cfg = str(_find_workspace_root() / "bricklink" / "config.json")
         if os.path.exists(default_cfg):
             cfg = default_cfg
     if cfg:
