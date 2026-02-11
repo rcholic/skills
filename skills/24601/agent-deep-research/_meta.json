@@ -3,11 +3,16 @@
   "slug": "agent-deep-research",
   "displayName": "Deep Research (Gemini)",
   "latest": {
-    "version": "1.2.3",
-    "publishedAt": 1770730639349,
-    "commit": "https://github.com/openclaw/skills/commit/88b086f0c1fb0abd15db134d54ff21502f36e763"
+    "version": "1.3.0",
+    "publishedAt": 1770775962808,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.3",
+      "publishedAt": 1770730639349,
+      "commit": "https://github.com/openclaw/skills/commit/88b086f0c1fb0abd15db134d54ff21502f36e763"
+    },
     {
       "version": "1.2.2",
       "publishedAt": 1770657551291,
