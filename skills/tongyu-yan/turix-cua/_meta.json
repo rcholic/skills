@@ -1,13 +1,18 @@
 {
   "owner": "tongyu-yan",
   "slug": "turix-cua",
-  "displayName": "TuriX-Computer-Use",
+  "displayName": "TuriX Computer Use",
   "latest": {
-    "version": "1.0.7",
-    "publishedAt": 1770470885645,
-    "commit": "https://github.com/openclaw/skills/commit/bece2c8374c81db5d6e8873e61ba481fe6c6d0d1"
+    "version": "1.0.8",
+    "publishedAt": 1770776648817,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.7",
+      "publishedAt": 1770470885645,
+      "commit": "https://github.com/openclaw/skills/commit/bece2c8374c81db5d6e8873e61ba481fe6c6d0d1"
+    },
     {
       "version": "1.0.6",
       "publishedAt": 1769940388395,
