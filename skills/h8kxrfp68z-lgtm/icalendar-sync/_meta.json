@@ -3,9 +3,15 @@
   "slug": "icalendar-sync",
   "displayName": "iCalendar Sync",
   "latest": {
-    "version": "2.2.3",
-    "publishedAt": 1770842589527,
-    "commit": "https://github.com/openclaw/skills/commit/86a4b21c06adaf0d2ddfbd5dff663983280ddd71"
+    "version": "2.2.18",
+    "publishedAt": 1770923627134,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "2.2.3",
+      "publishedAt": 1770842589527,
+      "commit": "https://github.com/openclaw/skills/commit/86a4b21c06adaf0d2ddfbd5dff663983280ddd71"
+    }
+  ]
 }

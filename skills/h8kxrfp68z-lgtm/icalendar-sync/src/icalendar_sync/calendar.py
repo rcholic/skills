@@ -5,7 +5,7 @@ iCalendar Sync - Main Calendar Manager
 Professional iCloud Calendar integration
 
 @author: Black_Temple
-@version: 2.2.0
+@version: 2.2.12
 """
 
 import os
@@ -38,7 +38,7 @@ except ImportError as e:
     sys.exit(1)
 
 __author__ = "Black_Temple"
-__version__ = "2.2.0"
+__version__ = "2.2.12"
 
 # Security constants
 MAX_CALENDAR_NAME_LENGTH = 255
@@ -140,13 +140,14 @@ def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
 
 
 def validate_calendar_name(name: str) -> bool:
-    """Validate calendar name for security"""
+    """Validate calendar name for security (supports Unicode/Cyrillic)"""
     if not name or not isinstance(name, str):
         return False
     if len(name) > MAX_CALENDAR_NAME_LENGTH:
         return False
-    # Allow only alphanumeric, spaces, hyphens, underscores
-    if not re.match(r'^[a-zA-Z0-9\s_-]+$', name):
+    # Allow Unicode letters, digits, spaces, hyphens, underscores
+    # \w in Python re includes Unicode letters when re.UNICODE flag is used
+    if not re.match(r'^[\w\s_-]+$', name, re.UNICODE):
         return False
     # Prevent path traversal
     if '..' in name or '/' in name or '\\' in name:
@@ -691,69 +692,100 @@ class CalendarManager:
 
 
 def cmd_setup(args):
-    """Interactive setup of credentials"""
+    """Interactive or headless setup of credentials"""
     print("\n🔧 iCalendar Sync Setup\n")
-    print("To use iCalendar Sync, you need to configure your iCloud credentials.")
-    print("⚠️  Use an App-Specific Password, NOT your regular Apple ID password.\n")
-    print("Get it from: https://appleid.apple.com -> Sign-In & Security -> App-Specific Passwords\n")
+
+    # Headless mode: use provided arguments
+    if hasattr(args, 'username') and args.username and hasattr(args, 'password') and args.password:
+        email = args.username.strip()
+        password = args.password.strip()
+        if not email or not password:
+            logger.error("Setup: CLI argument parsing error for username/password (invalid choice error)")
+            print("❌ CLI argument parsing error for username/password (invalid choice error)")
+            return
+        if not args.non_interactive:
+            print(f"📧 Using provided email: {email}")
+            print("🔑 Using provided password")
+    else:
+        # Interactive mode
+        print("To use iCalendar Sync, you need to configure your iCloud credentials.")
+        print("⚠️  Use an App-Specific Password, NOT your regular Apple ID password.\n")
+        print("Get it from: https://appleid.apple.com -> Sign-In & Security -> App-Specific Passwords\n")
+
+        email = input("📧 iCloud Email: ").strip()
+        if not email:
+            print("❌ Email cannot be empty")
+            return
+
+        # Validate email
+        if not validate_email(email):
+            print("❌ Invalid email format")
+            response = timed_input("Continue anyway? (y/n): ")
+            if response is None or response.lower() != 'y':
+                print("Setup cancelled")
+                return
+
+        password = getpass.getpass("🔑 App-Specific Password (xxxx-xxxx-xxxx-xxxx): ").strip()
+        if not password:
+            print("❌ Password cannot be empty")
+            return
+
+        # Validate format
+        if not all(c.isalnum() or c == '-' for c in password):
+            print("⚠️  Password format looks unusual")
+            response = timed_input("Are you sure this is correct? (y/n): ")
+            if response is None or response.lower() != 'y':
+                print("Setup cancelled")
+                return
     
-    email = input("📧 iCloud Email: ").strip()
-    if not email:
-        print("❌ Email cannot be empty")
-        return
-    
-    # Validate email
+    # Validate email format before proceeding
     if not validate_email(email):
+        logger.error("Setup: Invalid email format")
         print("❌ Invalid email format")
-        response = timed_input("Continue anyway? (y/n): ")
-        if response is None or response.lower() != 'y':
-            print("Setup cancelled")
-            return
-    
-    password = getpass.getpass("🔑 App-Specific Password (xxxx-xxxx-xxxx-xxxx): ").strip()
-    if not password:
-        print("❌ Password cannot be empty")
         return
-    
-    # Validate format
-    if not all(c.isalnum() or c == '-' for c in password):
-        print("⚠️  Password format looks unusual")
-        response = timed_input("Are you sure this is correct? (y/n): ")
-        if response is None or response.lower() != 'y':
-            print("Setup cancelled")
-            return
     
     # Try to store in keyring first
     try:
         keyring.set_password('openclaw-icalendar', email, password)
         print("\n✅ Credentials saved securely to system keyring")
         logger.info("Credentials stored in keyring")
-    except KeyringError:
+    except KeyringError as e:
+        logger.error("Setup: Could not access system keyring, falling back to .env")
         print("⚠️  Could not access system keyring, falling back to .env file")
         
         # Fallback to .env file with atomic write
-        env_path = Path.home() / ".openclaw" / ".env"
-        env_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Read existing lines
-        lines = []
-        if env_path.exists():
-            with open(env_path, 'r') as f:
-                lines = [l for l in f.readlines() 
-                        if not l.startswith(('ICLOUD_USERNAME', 'ICLOUD_APP_PASSWORD'))]
-        
-        # Write atomically using temp file
-        lines.append(f'ICLOUD_USERNAME="{email}"\n')
-        lines.append(f'ICLOUD_APP_PASSWORD="{password}"\n')
-        
-        with tempfile.NamedTemporaryFile('w', delete=False, dir=env_path.parent) as tmp:
-            tmp.writelines(lines)
-            tmp_path = tmp.name
-        
-        shutil.move(tmp_path, str(env_path))
-        os.chmod(env_path, 0o600)
-        
-        print(f"\n✅ Configuration saved securely to {env_path}")
+        try:
+            env_path = Path.home() / ".openclaw" / ".env"
+            env_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Read existing lines
+            lines = []
+            if env_path.exists():
+                with open(env_path, 'r') as f:
+                    lines = [l for l in f.readlines() 
+                            if not l.startswith(('ICLOUD_USERNAME', 'ICLOUD_APP_PASSWORD'))]
+            
+            # Escape special characters in email/password for shell safety
+            email_escaped = email.replace('"', '\\"')
+            password_escaped = password.replace('"', '\\"')
+            
+            # Write atomically using temp file with proper quoting
+            lines.append(f'ICLOUD_USERNAME="{email_escaped}"\n')
+            lines.append(f'ICLOUD_APP_PASSWORD="{password_escaped}"\n')
+            
+            with tempfile.NamedTemporaryFile('w', delete=False, dir=env_path.parent) as tmp:
+                tmp.writelines(lines)
+                tmp_path = tmp.name
+            
+            shutil.move(tmp_path, str(env_path))
+            os.chmod(env_path, 0o600)
+            
+            logger.info("Setup: Credentials saved to .env file")
+            print(f"✅ Configuration saved securely to {env_path}")
+        except (OSError, IOError) as file_error:
+            logger.error(f"Setup: Failed to write .env file: {str(file_error)}")
+            print(f"❌ Failed to save configuration: {str(file_error)}")
+            return
     
     print("🚀 You can now use iCalendar Sync!\n")
 
@@ -843,6 +875,10 @@ Examples:
     
     # Setup
     setup_parser = subparsers.add_parser('setup', help='Configure iCloud credentials')
+    setup_parser.add_argument('--username', help='Apple ID email (for headless setup)')
+    setup_parser.add_argument('--password', help='App-specific password (for headless setup)')
+    setup_parser.add_argument('--non-interactive', action='store_true',
+                             help='Non-interactive mode (use with --username and --password)')
     setup_parser.set_defaults(func=cmd_setup)
     
     # List
