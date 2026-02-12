@@ -1,0 +1,11 @@
+{
+  "owner": "aimlapihello",
+  "slug": "aiml-llm-reasoning",
+  "displayName": "AI/ML API LLM + Reasoning for OpenClaw",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1770821519502,
+    "commit": null
+  },
+  "history": []
+}
