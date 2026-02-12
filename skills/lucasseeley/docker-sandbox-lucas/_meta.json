@@ -1,0 +1,11 @@
+{
+  "owner": "lucasseeley",
+  "slug": "docker-sandbox-lucas",
+  "displayName": "Docker Sandbox Lucas",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1770851402700,
+    "commit": null
+  },
+  "history": []
+}
