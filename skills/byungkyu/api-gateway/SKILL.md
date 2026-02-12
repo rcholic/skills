@@ -191,9 +191,12 @@ If omitted, the gateway uses the default (oldest) active connection for that app
 | ClickFunnels | `clickfunnels` | `{subdomain}.myclickfunnels.com` |
 | ClickSend | `clicksend` | `rest.clicksend.com` |
 | ClickUp | `clickup` | `api.clickup.com` |
+| Coda | `coda` | `coda.io` |
+| CompanyCam | `companycam` | `api.companycam.com` |
 | Cognito Forms | `cognito-forms` | `www.cognitoforms.com` |
 | Constant Contact | `constant-contact` | `api.cc.email` |
 | Dropbox | `dropbox` | `api.dropboxapi.com` |
+| ElevenLabs | `elevenlabs` | `api.elevenlabs.io` |
 | Eventbrite | `eventbrite` | `www.eventbriteapi.com` |
 | Fathom | `fathom` | `api.fathom.ai` |
 | Fireflies | `fireflies` | `api.fireflies.ai` |
@@ -217,16 +220,19 @@ If omitted, the gateway uses the default (oldest) active connection for that app
 | Google Tasks | `google-tasks` | `tasks.googleapis.com` |
 | Google Workspace Admin | `google-workspace-admin` | `admin.googleapis.com` |
 | HubSpot | `hubspot` | `api.hubapi.com` |
+| Instantly | `instantly` | `api.instantly.ai` |
 | Jira | `jira` | `api.atlassian.com` |
 | Jobber | `jobber` | `api.getjobber.com` |
 | JotForm | `jotform` | `api.jotform.com` |
 | Keap | `keap` | `api.infusionsoft.com` |
 | Kit | `kit` | `api.kit.com` |
 | Klaviyo | `klaviyo` | `a.klaviyo.com` |
+| Lemlist | `lemlist` | `api.lemlist.com` |
 | Linear | `linear` | `api.linear.app` |
 | LinkedIn | `linkedin` | `api.linkedin.com` |
 | Mailchimp | `mailchimp` | `{dc}.api.mailchimp.com` |
 | MailerLite | `mailerlite` | `connect.mailerlite.com` |
+| Mailgun | `mailgun` | `api.mailgun.net` |
 | ManyChat | `manychat` | `api.manychat.com` |
 | Microsoft Excel | `microsoft-excel` | `graph.microsoft.com` |
 | Microsoft To Do | `microsoft-to-do` | `graph.microsoft.com` |
@@ -282,9 +288,12 @@ See [references/](references/) for detailed routing guides per provider:
 - [ClickFunnels](references/clickfunnels.md) - Contacts, products, orders, courses, webhooks
 - [ClickSend](references/clicksend.md) - SMS, MMS, voice messages, contacts, lists
 - [ClickUp](references/clickup.md) - Tasks, lists, folders, spaces, webhooks
+- [Coda](references/coda.md) - Docs, pages, tables, rows, formulas, controls
+- [CompanyCam](references/companycam.md) - Projects, photos, users, tags, groups, documents
 - [Cognito Forms](references/cognito-forms.md) - Forms, entries, documents, files
 - [Constant Contact](references/constant-contact.md) - Contacts, email campaigns, lists, segments
 - [Dropbox](references/dropbox.md) - Files, folders, search, metadata, revisions, tags
+- [ElevenLabs](references/elevenlabs.md) - Text-to-speech, voice cloning, sound effects, audio processing
 - [Eventbrite](references/eventbrite.md) - Events, venues, tickets, orders, attendees
 - [Fathom](references/fathom.md) - Meeting recordings, transcripts, summaries, webhooks
 - [Fireflies](references/fireflies.md) - Meeting transcripts, summaries, AskFred AI, channels
@@ -308,16 +317,19 @@ See [references/](references/) for detailed routing guides per provider:
 - [Google Tasks](references/google-tasks.md) - Task lists, tasks, subtasks
 - [Google Workspace Admin](references/google-workspace-admin.md) - Users, groups, org units, domains, roles
 - [HubSpot](references/hubspot.md) - Contacts, companies, deals
+- [Instantly](references/instantly.md) - Campaigns, leads, accounts, email outreach
 - [Jira](references/jira.md) - Issues, projects, JQL queries
 - [Jobber](references/jobber.md) - Clients, jobs, invoices, quotes (GraphQL)
 - [JotForm](references/jotform.md) - Forms, submissions, webhooks
 - [Keap](references/keap.md) - Contacts, companies, tags, tasks, opportunities, campaigns
 - [Kit](references/kit.md) - Subscribers, tags, forms, sequences, broadcasts
 - [Klaviyo](references/klaviyo.md) - Profiles, lists, campaigns, flows, events
+- [Lemlist](references/lemlist.md) - Campaigns, leads, activities, schedules, unsubscribes
 - [Linear](references/linear.md) - Issues, projects, teams, cycles (GraphQL)
 - [LinkedIn](references/linkedin.md) - Profile, posts, shares, media uploads
 - [Mailchimp](references/mailchimp.md) - Audiences, campaigns, templates, automations
 - [MailerLite](references/mailerlite.md) - Subscribers, groups, campaigns, automations, forms
+- [Mailgun](references/mailgun.md) - Email sending, domains, routes, templates, mailing lists, suppressions
 - [ManyChat](references/manychat.md) - Subscribers, tags, flows, messaging
 - [Microsoft Excel](references/microsoft-excel.md) - Workbooks, worksheets, ranges, tables, charts
 - [Microsoft To Do](references/microsoft-to-do.md) - Task lists, tasks, checklist items, linked resources
