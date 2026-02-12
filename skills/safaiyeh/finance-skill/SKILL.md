@@ -93,6 +93,7 @@ User says "I spent $X at Y" → append to transactions.json
 5. Agent: reads store, filters, answers
 
 ## Dependencies
+- `jq` — for JSON transaction storage and querying (`apt install jq` / `brew install jq`)
 - `pypdf` — for full PDF text extraction (`pip3 install pypdf`)
 
 ## Lessons Learned

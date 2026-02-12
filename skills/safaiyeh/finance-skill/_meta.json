@@ -3,9 +3,15 @@
   "slug": "finance-skill",
   "displayName": "Finance Skill",
   "latest": {
-    "version": "0.1.0",
-    "publishedAt": 1770687690011,
-    "commit": "https://github.com/openclaw/skills/commit/d1c54257b300c082bd7fce8fef22cde08e0a7cb5"
+    "version": "0.1.2",
+    "publishedAt": 1770816253795,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.0",
+      "publishedAt": 1770687690011,
+      "commit": "https://github.com/openclaw/skills/commit/d1c54257b300c082bd7fce8fef22cde08e0a7cb5"
+    }
+  ]
 }
