@@ -1,38 +1,47 @@
 #!/usr/bin/env python3
 """
 Send WhatsApp Message Helper
-Wrapper around A2A Client for the most common task.
+Simple wrapper for the most common task — sending a text message via the REST API.
 """
 import argparse
+import os
 import sys
 import json
-from a2a_client import A2AClient
+import requests
+
+BASE_URL = os.environ.get("MOLTFLOW_API_URL", "https://apiv2.waiflow.app")
+API_KEY = os.environ.get("MOLTFLOW_API_KEY")
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Send WhatsApp message via A2A.")
-    parser.add_argument("--url", required=True, help="Full A2A API URL")
-    parser.add_argument("--key", required=True, help="API Key")
-    parser.add_argument("--to", required=True, help="Target phone number (e.g. 1234567890)")
+    parser = argparse.ArgumentParser(description="Send a WhatsApp message via MoltFlow API.")
+    parser.add_argument("--session", required=True, help="Session UUID")
+    parser.add_argument("--to", required=True, help="Target chat ID (e.g. 1234567890@c.us)")
     parser.add_argument("--text", required=True, help="Message text content")
-    
+    parser.add_argument("--key", default=API_KEY, help="API key (default: MOLTFLOW_API_KEY env)")
+
     args = parser.parse_args()
-    
-    client = A2AClient(args.url, args.key)
-    
-    # Construct standard A2A message payload
-    params = {
-        "phone": args.to,
-        "text": args.text
-    }
-    
-    response = client.send_rpc("message/send", params)
-    
-    # Output result
-    print(json.dumps(response, indent=2))
-    
-    # Exit code based on success
-    if "error" in response:
+
+    if not args.key:
+        print("Error: provide --key or set MOLTFLOW_API_KEY env var")
         sys.exit(1)
+
+    response = requests.post(
+        f"{BASE_URL}/api/v2/messages/send",
+        headers={"X-API-Key": args.key, "Content-Type": "application/json"},
+        json={
+            "session_id": args.session,
+            "chat_id": args.to,
+            "message": args.text,
+        },
+    )
+
+    result = response.json()
+    print(json.dumps(result, indent=2))
+
+    if not response.ok:
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

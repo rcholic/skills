@@ -1,12 +1,20 @@
 {
   "name": "@moltflow/skills",
-  "version": "1.5.0",
-  "description": "MoltFlow — complete WhatsApp automation platform: sessions, messaging, groups, labels, anti-spam rules, safeguards, AI replies, feedback collection, A2A protocol.",
+  "version": "2.0.0",
+  "description": "MoltFlow — complete WhatsApp automation platform: bulk messaging, scheduled messages, custom groups, lead detection & CRM, AI replies with style cloning, knowledge base (RAG), voice transcription, group monitoring, labels, anti-spam, content safeguards, review collection, webhooks, GDPR compliance, and agent-to-agent protocol. 90+ API endpoints.",
   "license": "MIT",
   "private": false,
   "files": [
     "SKILL.md",
-    "scripts/"
+    "CHANGELOG.md",
+    "scripts/",
+    "moltflow/",
+    "moltflow-ai/",
+    "moltflow-a2a/",
+    "moltflow-reviews/",
+    "moltflow-outreach/",
+    "moltflow-leads/",
+    "moltflow-admin/"
   ],
   "keywords": [
     "moltflow",
@@ -17,7 +25,13 @@
     "a2a",
     "ai",
     "reviews",
-    "crm"
+    "crm",
+    "bulk-messaging",
+    "scheduled-messages",
+    "leads",
+    "rag",
+    "knowledge-base",
+    "gdpr"
   ],
   "publishConfig": {
     "access": "public"

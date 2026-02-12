@@ -6,7 +6,7 @@ import os
 import requests
 
 API_KEY = os.environ.get("MOLTFLOW_API_KEY")
-BASE_URL = os.environ.get("MOLTFLOW_API_URL", "https://api.moltflow.com")
+BASE_URL = os.environ.get("MOLTFLOW_API_URL", "https://apiv2.waiflow.app")
 
 if not API_KEY:
     print("Error: MOLTFLOW_API_KEY environment variable not set")
@@ -35,11 +35,9 @@ def list_api_keys(token: str):
     return r.json()
 
 
-def create_api_key(token: str, name: str, description: str = None, expires_in_days: int = None):
+def create_api_key(token: str, name: str, expires_in_days: int = None):
     """Create a new API key (requires JWT)."""
     data = {"name": name}
-    if description:
-        data["description"] = description
     if expires_in_days:
         data["expires_in_days"] = expires_in_days
     r = requests.post(

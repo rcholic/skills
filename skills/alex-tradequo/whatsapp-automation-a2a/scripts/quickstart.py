@@ -6,11 +6,11 @@ import os
 import requests
 
 API_KEY = os.environ.get("MOLTFLOW_API_KEY")
-BASE_URL = os.environ.get("MOLTFLOW_API_URL", "https://api.moltflow.com")
+BASE_URL = os.environ.get("MOLTFLOW_API_URL", "https://apiv2.waiflow.app")
 
 if not API_KEY:
     print("Error: MOLTFLOW_API_KEY environment variable not set")
-    print("Get your API key at https://moltflow.com")
+    print("Get your API key at https://waiflow.app")
     exit(1)
 
 headers = {"X-API-Key": API_KEY, "Content-Type": "application/json"}
