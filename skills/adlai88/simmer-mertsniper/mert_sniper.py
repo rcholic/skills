@@ -3,7 +3,7 @@
 Mert Sniper - Near-Expiry Conviction Trading
 
 Snipe Polymarket markets about to resolve when odds are heavily skewed.
-Strategy by @0xMert_: https://x.com/mert/status/2020216613279060433
+Strategy by @mert: https://x.com/mert/status/2020216613279060433
 
 Usage:
     python mert_sniper.py              # Dry run (show opportunities, no trades)
@@ -23,6 +23,9 @@ from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
+
+# Force line-buffered stdout so output is visible in non-TTY environments (cron, Docker, OpenClaw)
+sys.stdout.reconfigure(line_buffering=True)
 
 # =============================================================================
 # Configuration (config.json > env vars > defaults)
