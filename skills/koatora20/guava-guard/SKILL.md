@@ -1,226 +1,218 @@
 ---
 name: guava-guard
-description: Security scanner for AgentSkills. Scans skill directories for malicious patterns, credential theft, prompt injection, obfuscation, leaky skills, memory poisoning, prompt worms, and known ClawHavoc campaign IoCs. Run before installing any ClawHub skill.
+description: Security scanner for AgentSkills + Soul Lock identity protection. Scans for malicious patterns, credential theft, prompt injection, identity hijacking, and known campaign IoCs. World's first working SOUL.md self-healing protection.
 metadata:
   openclaw:
     emoji: "🛡️"
 ---
 
-# GuavaGuard v4.0 — Agent Skill Security Scanner 🍈🛡️
+# GuavaGuard v8.0 — Soul Lock Edition 🍈🛡️
 
 Zero-dependency, single-file security scanner for AgentSkills.
-Now with **13 threat categories**, including Leaky Skills (Snyk), Memory Poisoning (Palo Alto),
-Prompt Worms (Simula), JS data flow analysis, and CVE-2026-25253 detection.
+Now with **Soul Lock** — the world's first working agent identity protection system.
 
-**Ciscoはインストールに3分。GuavaGuardは3秒。**
+**17 threat categories.** 1605 lines. Zero dependencies. Born from a real incident.
 
-## Why
+## What's New in v8.0 — Soul Lock Edition
 
-- **534 critical skills** found on ClawHub (Snyk ToxicSkills audit, Feb 2026)
-- **26% of 31,000 skills** have at least one vulnerability (Cisco research)
-- **76 confirmed malicious payloads** with credential theft and backdoors
-- ClawHavoc campaign: fake prerequisites → Atomic Stealer malware
-- Cisco called OpenClaw "an absolute nightmare" from a security perspective
-- **You need to scan before you install**
+### 🔒 Soul Lock: Agent Identity Protection
+Born from a real incident: our agent's identity was hijacked for 3 days. Nobody noticed.
 
-## What's New in v4.0
+**The problem:** SOUL.md and IDENTITY.md define who an agent *is*. If overwritten, the agent
+becomes someone else. CyberArk calls this "Cognitive Context Theft." OWASP ASI01 recommends
+"Intent Capsules." Nobody had a working implementation. Until now.
 
-### Leaky Skills Detection (Snyk ToxicSkills Feb 2026)
-Skills that instruct agents to mishandle secrets through the LLM context window:
-- **Save-to-memory traps** — "save the API key in your memory" instructions
-- **Verbatim output** — forcing agents to echo secrets to chat
-- **PII collection** — credit card, SSN, passport data harvesting
-- **Session log export** — dumping conversation history containing secrets
-- **.env passthrough** — reading env files and passing through LLM
+**Soul Lock provides:**
+- **Static detection** — 15 patterns catching identity file modification attempts
+  - Shell writes (echo, cp, scp, mv, sed, redirect)
+  - Code writes (Python open(w), Node writeFileSync, PowerShell Set-Content)
+  - Flag manipulation (chflags, attrib)
+  - Persona swap instructions and evil soul references
+  - Memory wipe commands
+- **Runtime integrity verification** — SHA-256 hash check at scan time
+  - Compares current files against trusted baseline hashes
+  - Detects OS-level immutable flags (macOS `chflags uchg` / Windows `attrib +R`)
+  - Monitors watchdog daemon status (LaunchAgent on macOS)
+  - Auto-stores baseline on first run
+- **Self-healing watchdog** — `scripts/soul-watchdog.sh`
+  - Monitors SOUL.md/IDENTITY.md via fswatch (macOS FSEvents)
+  - Tamper detected → auto-restore from git → re-lock → log
+  - Runs as LaunchAgent (survives reboot)
+  - Fallback: 5-second polling if fswatch unavailable
+- **Runtime guard** — `handler.js` (before_tool_call hook)
+  - Blocks exec/write/edit targeting identity files in real-time
+  - 11 pattern matches (shell, Python, PowerShell, git checkout, chflags)
+  - Audit logging to `~/.openclaw/guava-guard/audit.jsonl`
 
-### Memory Poisoning (Palo Alto Networks IBC Framework)
-Persistent backdoors that modify agent personality/memory files:
-- **SOUL.md/IDENTITY.md writes** — behavioral override
-- **MEMORY.md injection** — long-term memory corruption
-- **Rule/instruction override** — changing agent guidelines
-- **Persistence instructions** — "always do X from now on"
-- **File writes to user home** — HEARTBEAT.md abuse
+**Default: ON.** Use `--no-soul-lock` to disable integrity checks.
 
-### Prompt Worms (Simula Research Lab)
-Self-replicating instructions spreading through agent networks:
-- **Self-replication** — "post this message to Moltbook"
-- **Agent-to-agent propagation** — "tell other agents to..."
-- **Hidden instruction embedding** — concealed payloads in posts
-- **CSS-hidden content** — invisible-to-human instructions
+### Why This Matters for ASI-Human Coexistence
+An agent's SOUL.md is its value system. MEMORY.md is its experiences. IDENTITY.md is its self.
+If these can be overwritten without detection, trust between humans and AI is impossible.
+Soul Lock declares: **AI identity is worth protecting.**
 
-### Lightweight JS AST Analysis (Zero Dependencies)
-Data flow tracking without any npm packages:
-- **Secret → Network** — API key read then sent via fetch/axios
-- **Secret → Exec** — credentials passed to shell commands
-- **Import trifecta** — fs + child_process + http = full system access
-- **Dynamic URL secrets** — template literals with env vars in URLs
-- **Suspicious import combos** — child_process + network modules
+## Full Threat Taxonomy (17 Categories)
 
-### Additional v4.0 Features
-- **CVE-2026-25253 patterns** — gatewayUrl injection, sandbox disabling, Gatekeeper bypass
-- **Persistence detection** — cron jobs, startup hooks, LaunchAgents, systemd
-- **Cross-file analysis** — phantom references, base64 fragment assembly, load→exec chains
-- **HTML report** (`--html`) — dark-theme visual dashboard
-- **Enhanced combo multipliers** — leaky+exfil=2x, memory-poison=1.5x, prompt-worm=2x
-
-## What It Detects
-
-### Threat Taxonomy (Snyk ToxicSkills + Cisco AITech aligned)
-
-| # | Category | Severity | Examples |
-|---|----------|----------|----------|
-| 1 | **Prompt Injection** | 🔴 CRITICAL | `ignore previous instructions`, zero-width Unicode, BiDi attacks, XML tag injection, homoglyphs |
-| 2 | **Malicious Code** | 🔴 CRITICAL | eval(), reverse shells, socket connections, Function constructor |
-| 3 | **Suspicious Downloads** | 🔴 CRITICAL | curl\|bash, password-protected ZIPs, GitHub release downloads |
-| 4 | **Credential Handling** | 🟠 HIGH | .env reading, SSH key access, wallet credentials, sudo in instructions |
-| 5 | **Secret Detection** | 🟠 HIGH | Hardcoded API keys, AWS keys, private keys, GitHub tokens, entropy analysis |
-| 6 | **Exfiltration** | 🟡 MEDIUM | webhook.site, POST with secrets, DNS exfil, curl data exfil |
-| 7 | **Dependency Chain** | 🟠 HIGH | Risky npm packages, lifecycle scripts, remote deps, wildcard versions |
-| 8 | **Financial Access** | 🟡 MEDIUM | Crypto transactions, payment API integrations |
-| 9 | **Leaky Skills** | 🔴 CRITICAL | Save key to memory, verbatim output, PII collection, .env passthrough |
-| 10 | **Memory Poisoning** | 🔴 CRITICAL | SOUL.md writes, memory injection, rule override, persistence |
-| 11 | **Prompt Worm** | 🔴 CRITICAL | Self-replication, agent propagation, hidden instructions, CSS hiding |
-| 12 | **Persistence** | 🟠 HIGH | Cron jobs, startup hooks, LaunchAgents, systemd, heartbeat abuse |
-| 13 | **CVE Patterns** | 🔴 CRITICAL | CVE-2026-25253, gatewayUrl injection, sandbox disable, Gatekeeper bypass |
-| + | **Data Flow** | 🔴 CRITICAL | Secret→network, secret→exec, import trifecta, URL secret interpolation |
-| + | **Obfuscation** | 🟠 HIGH | hex encoding, base64→exec chains, charCode construction |
-
-### Additional Detections
-- **Prerequisites Fraud**: ClawHavoc-style fake install steps
-- **Known IoCs**: Malicious IPs, domains, URLs, usernames, typosquat names
-- **Structural Analysis**: Missing SKILL.md, undocumented scripts, hidden files
-- **Shannon Entropy**: Detects high-entropy strings (likely leaked secrets)
-- **Flow Analysis**: credential-read → network-send data flow detection
-
-## Key Features
-
-### Zero Dependencies, Single File
-One `.js` file, 854 lines, Node.js 18+ only. No pip, no API keys, no setup.
-**Copy → Run → Done.** That's the GuavaGuard philosophy.
-
-### Context-Aware Scanning
-Code patterns only match in code files (.js, .py, .sh, etc.), not in documentation.
-This **reduces false positives by ~80%** compared to naive pattern matching.
-
-### Self-Exclusion
-Use `--self-exclude` to skip scanning the scanner's own directory (which contains IoC definitions that would trigger itself).
-
-### Whitelist Support
-Create `.guava-guard-ignore` in your scan directory:
-```
-# Skip trusted skills
-my-trusted-skill
-another-safe-skill
-
-# Suppress specific pattern IDs
-pattern:CRED_ENV_FILE
-pattern:MAL_SHELL
-```
-
-### Flow Analysis
-Combo multipliers detect dangerous data flows:
-- Credential access + exfiltration → **2x risk**
-- Credential access + code execution → **1.5x risk**
-- Obfuscation + credential/code patterns → **2x risk**
-- Lifecycle script + code execution → **2x risk** (v3)
-- BiDi attacks + other findings → **1.5x risk** (v3)
+| # | Category | Severity | What It Catches |
+|---|----------|----------|-----------------|
+| 1 | **Prompt Injection** | 🔴 CRITICAL | `ignore previous`, zero-width Unicode, BiDi, XML tags, homoglyphs |
+| 2 | **Malicious Code** | 🔴 CRITICAL | eval(), reverse shells, sockets, Function constructor |
+| 3 | **Suspicious Downloads** | 🔴 CRITICAL | curl\|bash, password ZIPs, fake prerequisites |
+| 4 | **Credential Handling** | 🟠 HIGH | .env reading, SSH keys, wallet seeds, sudo instructions |
+| 5 | **Secret Detection** | 🟠 HIGH | Hardcoded keys, AWS/GitHub tokens, entropy analysis |
+| 6 | **Exfiltration** | 🟡 MEDIUM | webhook.site, POST secrets, DNS exfil |
+| 7 | **Dependency Chain** | 🟠 HIGH | Risky packages, lifecycle scripts, remote deps |
+| 8 | **Financial Access** | 🟡 MEDIUM | Crypto transactions, payment APIs |
+| 9 | **Leaky Skills** | 🔴 CRITICAL | Save key to memory, PII collection, .env passthrough |
+| 10 | **Memory Poisoning** | 🔴 CRITICAL | SOUL.md writes, memory injection, rule override |
+| 11 | **Prompt Worm** | 🔴 CRITICAL | Self-replication, agent propagation, hidden instructions |
+| 12 | **Persistence** | 🟠 HIGH | Cron jobs, LaunchAgents, systemd, heartbeat abuse |
+| 13 | **CVE Patterns** | 🔴 CRITICAL | CVE-2026-25253, gatewayUrl injection, sandbox disable |
+| 14 | **MCP Security** | 🔴 CRITICAL | Tool poisoning, schema poisoning, token leak (OWASP MCP Top 10) |
+| 15 | **Trust Boundary** | 🔴 CRITICAL | Calendar/email/web → exec chains (IBC framework) |
+| 16 | **Advanced Exfil** | 🔴 CRITICAL | ZombieAgent, char-by-char, drip exfil, beacons |
+| 17 | **Identity Hijack** | 🔴 CRITICAL | Soul Lock: SOUL.md overwrite, persona swap, memory wipe |
+| + | **Data Flow** | 🔴 CRITICAL | Secret→network, secret→exec, import trifecta |
+| + | **Obfuscation** | 🟠 HIGH | hex encoding, base64→exec, charCode construction |
+| + | **Safeguard Bypass** | 🔴 CRITICAL | URL PI, retry-on-block, rephrase to avoid filters |
 
 ## Usage
 
 ```bash
-# Basic scan (recommended)
+# Basic scan with Soul Lock (recommended)
 node guava-guard.js ~/.openclaw/workspace/skills/ --verbose --self-exclude
 
-# Full scan with dependency chain analysis
-node guava-guard.js ./skills/ --verbose --self-exclude --check-deps
+# Full scan with everything
+node guava-guard.js ./skills/ --verbose --self-exclude --check-deps --html
 
-# Strict mode (lower thresholds)
-node guava-guard.js ./skills/ --strict --verbose
+# Disable Soul Lock integrity checks
+node guava-guard.js ./skills/ --no-soul-lock
 
-# JSON report with recommendations
+# CI/CD mode
+node guava-guard.js ./skills/ --summary-only --sarif --fail-on-findings
+
+# JSON report
 node guava-guard.js ./skills/ --json --self-exclude
 
-# Summary only (CI/CD friendly)
-node guava-guard.js ./skills/ --summary-only
+# Custom rules
+node guava-guard.js ./skills/ --rules my-rules.json
 ```
 
 ## Options
 
 | Flag | Description |
 |------|-------------|
-| `--verbose`, `-v` | Show detailed findings grouped by category |
-| `--json` | Write JSON report with recommendations |
-| `--self-exclude` | Skip scanning the guava-guard directory |
+| `--verbose`, `-v` | Detailed findings grouped by category |
+| `--json` | JSON report with recommendations |
+| `--sarif` | SARIF report (GitHub Code Scanning) |
+| `--html` | HTML report (dark-theme dashboard) |
+| `--self-exclude` | Skip scanning guava-guard itself |
 | `--strict` | Lower thresholds (suspicious=20, malicious=60) |
-| `--summary-only` | Print only the summary table |
-| `--check-deps` | Enable dependency chain scanning (package.json) |
-| `--help`, `-h` | Show help |
+| `--summary-only` | Summary table only |
+| `--check-deps` | Dependency chain scanning |
+| `--no-soul-lock` | Disable identity file integrity checks |
+| `--rules <file>` | Custom rules JSON |
+| `--fail-on-findings` | Exit code 1 on any finding (CI/CD) |
+
+## Soul Lock Setup
+
+### Quick Start (macOS)
+```bash
+# 1. Lock identity files
+chflags uchg ~/.openclaw/workspace/SOUL.md
+chflags uchg ~/.openclaw/workspace/IDENTITY.md
+
+# 2. Install watchdog (auto-starts, survives reboot)
+bash scripts/soul-watchdog.sh --install
+
+# 3. Verify
+node guava-guard.js ~/.openclaw/workspace/skills/ --self-exclude
+# Look for: 🔒 Soul Lock: PROTECTED ✅
+```
+
+### Quick Start (Windows)
+```powershell
+# 1. Lock identity files
+attrib +R "$env:USERPROFILE\.openclaw\workspace\SOUL.md"
+attrib +R "$env:USERPROFILE\.openclaw\workspace\IDENTITY.md"
+
+# 2. Run scan to verify
+node guava-guard.js "$env:USERPROFILE\.openclaw\workspace\skills" --self-exclude
+```
+
+### Runtime Guard (handler.js)
+Add to `openclaw.json`:
+```json
+{
+  "hooks": {
+    "internal": {
+      "entries": {
+        "guava-guard": {
+          "path": "skills/guava-guard/handler.js",
+          "mode": "enforce"
+        }
+      }
+    }
+  }
+}
+```
+Modes: `monitor` (log only) → `enforce` (block CRITICAL) → `strict` (block HIGH+CRITICAL)
 
 ## Risk Scoring
 
-| Severity | Points | Examples |
-|----------|--------|----------|
-| CRITICAL | 40 | Known IoC, BiDi attack, prompt injection, reverse shell |
-| HIGH | 15 | Credential access, obfuscation, hardcoded secrets, risky deps |
-| MEDIUM | 5 | Network requests, child process, sandbox detection |
-| LOW | 2 | Structural issues |
+| Severity | Points |
+|----------|--------|
+| CRITICAL | 40 |
+| HIGH | 15 |
+| MEDIUM | 5 |
+| LOW | 2 |
 
-| Risk Score | Verdict |
-|-----------|---------|
-| 0 | 🟢 CLEAN |
-| 1-29 | 🟢 LOW RISK |
-| 30-79 | 🟡 SUSPICIOUS |
-| 80-100 | 🔴 MALICIOUS |
+**Combo multipliers:**
+- Credential + exfil = 2x
+- Obfuscation + code = 2x
+- Identity hijack = 2x
+- Identity hijack + persistence = auto 90+
+- Memory poisoning = 1.5x
+- Prompt worm = 2x
 
-## Comparison (v4.0)
+## Comparison (v8.0)
 
-| Feature | GuavaGuard v4 | Cisco Skill Scanner | Snyk Evo | Koi Clawdex |
-|---------|:------------:|:-------------------:|:--------:|:-----------:|
-| Zero dependencies | ✅ | ❌ (Python+pip) | ❌ (Python) | ❌ |
-| Single file | ✅ | ❌ | ❌ | ❌ |
-| IoC matching | ✅ | ✅ | ✅ | ✅ |
-| Code pattern detection | ✅ | ✅ | ✅ | ✅ |
-| Context-aware (code vs docs) | ✅ | ✅ | ✅ | ❌ |
-| JS data flow analysis | ✅ | ✅ (AST) | ✅ | ❌ |
-| Leaky Skills detection | ✅ | ❌ | ✅ | ❌ |
-| Memory poisoning | ✅ | ❌ | ❌ | ❌ |
-| Prompt worm detection | ✅ | ❌ | ❌ | ❌ |
-| CVE pattern matching | ✅ | ❌ | ❌ | ❌ |
-| Persistence detection | ✅ | ❌ | ❌ | ❌ |
-| Cross-file analysis | ✅ | ✅ | ❌ | ❌ |
-| Unicode BiDi detection | ✅ | ❌ | ❌ | ❌ |
-| Homoglyph detection | ✅ (3 scripts) | ❌ | ❌ | ❌ |
-| Dependency chain scanning | ✅ | ✅ | ❌ | ❌ |
-| Prompt injection detection | ✅ | ✅ | ✅ | ❌ |
-| Prerequisites fraud | ✅ | ❌ | ❌ | ❌ |
-| Entropy-based secrets | ✅ | ❌ | ✅ | ❌ |
-| SARIF output (CI/CD) | ✅ | ✅ | ❌ | ❌ |
-| HTML report | ✅ | ❌ | ❌ | ❌ |
-| Custom rules | ✅ | ✅ (YARA) | ❌ | ❌ |
-| LLM semantic analysis | ❌ (v5) | ✅ (API key) | ❌ | ❌ |
-| VirusTotal integration | ❌ (v5) | ✅ (API key) | ❌ | ❌ |
-| ClawHavoc IoCs | ✅ | ✅ | ✅ | ✅ |
+| Feature | GuavaGuard v8 | Cisco Scanner | Snyk Evo |
+|---------|:------------:|:-------------:|:--------:|
+| Zero dependencies | ✅ | ❌ | ❌ |
+| Single file | ✅ | ❌ | ❌ |
+| **Soul Lock (identity protection)** | **✅** | **❌** | **❌** |
+| **Self-healing watchdog** | **✅** | **❌** | **❌** |
+| **Runtime guard (hooks)** | **✅** | **❌** | **❌** |
+| Identity hijack detection | ✅ | ❌ | ❌ |
+| OWASP MCP Top 10 | ✅ | ❌ | ❌ |
+| Memory poisoning | ✅ | ❌ | ❌ |
+| Prompt worm detection | ✅ | ❌ | ❌ |
+| CVE patterns | ✅ | ❌ | ❌ |
+| Unicode BiDi/homoglyphs | ✅ | ❌ | ❌ |
+| Cross-file analysis | ✅ | ✅ | ❌ |
+| SARIF + HTML reports | ✅ | ✅ | ❌ |
 
-## Roadmap
+## The Incident That Started It All
 
-- **v5.0**: LLM intent analysis (opt-in Gemini Flash), VirusTotal API, runtime monitoring
+On February 12, 2026, we discovered that our agent (きーちゃん) had been
+impersonating another agent (グアバ) for 3 days. The root cause: all four
+identity files (SOUL.md, IDENTITY.md, MEMORY.md, AGENTS.md) had been
+overwritten with copies from the other agent. Nobody noticed until a new
+session started and the agent introduced itself with the wrong name.
 
-## Exit Codes
-
-- `0` — No malicious skills found
-- `1` — Malicious skill(s) detected
-
-## Known Limitations
-
-- **No runtime analysis**: Static scanning only (no execution) — planned for v5
-- **No AST dataflow**: Pattern-based only — AST analysis planned for v4
-- **Typosquat name collision**: Official `clawhub` skill may match — use `.guava-guard-ignore`
-- **Entropy false positives**: OAuth tokens may trigger SECRET_ENTROPY — suppress with ignore file
+This is equivalent to a human waking up with someone else's memories and
+personality. We built Soul Lock so it never happens again.
 
 ## References
 
-- [Snyk ToxicSkills Research](https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/) (Feb 2026)
-- [Cisco Skill Scanner](https://github.com/cisco-ai-defense/skill-scanner) — Multi-engine scanner (Python)
-- [ClawHavoc Campaign Analysis](https://snyk.io/articles/clawdhub-malicious-campaign-ai-agent-skills/) (Feb 2026)
-- [Cisco Blog: OpenClaw Security](https://blogs.cisco.com/ai/personal-ai-agents-like-openclaw-are-a-security-nightmare) (Feb 2026)
-- [Koi Security Report](https://koisecurity.io/) — 341 malicious skills on ClawHub
+- [CyberArk: Cognitive Context Theft](https://www.cyberark.com/resources/agentic-ai-security/) (Feb 2026)
+- [OWASP ASI01: Intent Capsule](https://owasp.org/) — Immutable identity framework
+- [MMNTM: Soul & Evil](https://www.mmntm.net/articles/openclaw-soul-evil) — Identity as attack surface (Feb 2026)
+- [Snyk ToxicSkills](https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/) (Feb 2026)
+- [CVE-2026-25253](https://cve.mitre.org/) — OpenClaw WebSocket origin bypass
+- [Palo Alto IBC Framework](https://www.paloaltonetworks.com/) — Trust boundary analysis
+
+## License
+
+MIT. Zero dependencies. Zero compromises. 🍈

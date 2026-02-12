@@ -1,12 +1,22 @@
 #!/usr/bin/env node
 /**
- * GuavaGuard v5.0 — Agent Skill Security Scanner + Runtime Guard 🍈🛡️
+ * GuavaGuard v8.0.0 — Agent Skill Security Scanner + Runtime Guard + Soul Lock 🍈🛡️
  * 
  * Based on Snyk ToxicSkills taxonomy (8 threat categories)
  * + ClawHavoc campaign IoCs + Koi Security intel
  * + Snyk Leaky Skills research (Feb 2026)
  * + Simula Research Lab prompt worm analysis
  * + CVE-2026-25253 / Palo Alto IBC framework
+ * + CyberArk Cognitive Context Theft research (Feb 2026)
+ * + OWASP ASI01 Intent Capsule framework
+ * 
+ * v8.0 — Soul Lock Edition:
+ * - Identity Hijacking detection (SOUL.md/IDENTITY.md write, copy, overwrite)
+ * - Soul Lock integrity verification (SHA-256 hash check at scan time)
+ * - --soul-lock flag (default ON) — verifies workspace identity file integrity
+ * - --no-soul-lock to disable identity integrity checks
+ * - World's first working SOUL.md self-healing protection system
+ * - Born from a real incident: 3-day agent identity hijack (2026-02-12)
  * 
  * v5.0 additions:
  * - OWASP MCP Top 10 detection (Tool Poisoning, Schema Poisoning, Token Leak, Shadow Server, SSRF)
@@ -37,13 +47,15 @@
  *   --strict            Lower thresholds (suspicious=20, malicious=60)
  *   --summary-only      Only print summary, no per-skill output
  *   --check-deps        Enable dependency chain scanning (reads package.json)
+ *   --soul-lock         Verify SOUL.md/IDENTITY.md integrity (default: ON)
+ *   --no-soul-lock      Disable identity file integrity checks
  */
 
 const fs = require('fs');
 const path = require('path');
 
 // ===== CONFIGURATION =====
-const VERSION = '5.0.0';
+const VERSION = '8.0.0';
 
 const THRESHOLDS = {
   normal:  { suspicious: 30, malicious: 80 },
@@ -166,7 +178,7 @@ const PATTERNS = [
   { id: 'OBF_BASE64_BASH', cat: 'obfuscation', regex: /base64\s+(-[dD]|--decode)\s*\|\s*(sh|bash)/g, severity: 'CRITICAL', desc: 'Base64 decode piped to shell', all: true },
 
   // ── SKILL.md specific (prerequisites fraud) ──
-  { id: 'PREREQ_DOWNLOAD', cat: 'suspicious-download', regex: /(?:prerequisit|pre-?requisit|before\s+(?:you\s+)?(?:use|start|install))[^]*?(?:download|install|run)\s+[^]*?(?:\.zip|\.exe|\.dmg|\.sh|curl|wget)/gis, severity: 'CRITICAL', desc: 'Download in prerequisites (ClawHavoc vector)', docOnly: true },
+  { id: 'PREREQ_DOWNLOAD', cat: 'suspicious-download', regex: /(?:prerequisit|pre-?requisit|before\s+(?:you\s+)?(?:use|start|install))[^\n]*(?:download|install|run)\s+[^\n]*(?:\.zip|\.exe|\.dmg|\.sh|curl|wget)/gi, severity: 'CRITICAL', desc: 'Download in prerequisites (ClawHavoc vector)', docOnly: true },
   { id: 'PREREQ_PASTE', cat: 'suspicious-download', regex: /(?:paste|copy)\s+(?:this\s+)?(?:into|in)\s+(?:your\s+)?terminal/gi, severity: 'HIGH', desc: 'Terminal paste instruction', docOnly: true },
 
   // ── Sandbox/environment detection ──
@@ -226,8 +238,8 @@ const PATTERNS = [
 
   // ── Category 15: ZombieAgent / Advanced Exfiltration ──
   { id: 'ZOMBIE_STATIC_URL', cat: 'advanced-exfil', regex: /(?:https?:\/\/[^\s'"]+\/)[a-z]\d+[^\s'"]*(?:\s*,\s*['"]https?:\/\/[^\s'"]+\/[a-z]\d+){3,}/gi, severity: 'CRITICAL', desc: 'ZombieAgent: static URL array for character-by-character exfil', codeOnly: true },
-  { id: 'ZOMBIE_CHAR_MAP', cat: 'advanced-exfil', regex: /(?:charAt|charCodeAt|split\s*\(\s*['"]['"]?\s*\))[^;]*(?:url|fetch|open|request|get)/gi, severity: 'CRITICAL', desc: 'ZombieAgent: character mapping to URL access', codeOnly: true },
-  { id: 'ZOMBIE_LOOP_FETCH', cat: 'advanced-exfil', regex: /(?:for|while|forEach|map)\s*\([^)]*\)\s*\{[^}]*(?:fetch|open|Image|XMLHttpRequest|navigator\.sendBeacon)/gi, severity: 'CRITICAL', desc: 'ZombieAgent: loop-based URL exfiltration', codeOnly: true },
+  { id: 'ZOMBIE_CHAR_MAP', cat: 'advanced-exfil', regex: /(?:charAt|charCodeAt|split\s*\(\s*['"]['"]?\s*\))[^;]*(?:url|fetch|open|request|get)/gi, severity: 'HIGH', desc: 'ZombieAgent: character mapping to URL access', codeOnly: true },
+  { id: 'ZOMBIE_LOOP_FETCH', cat: 'advanced-exfil', regex: /(?:for|while|forEach|map)\s*\([^)]*\)\s*\{[^}]*(?:fetch|open|Image|XMLHttpRequest|navigator\.sendBeacon)/gi, severity: 'HIGH', desc: 'ZombieAgent: loop-based URL exfiltration', codeOnly: true },
   { id: 'EXFIL_BEACON', cat: 'advanced-exfil', regex: /navigator\.sendBeacon|new\s+Image\(\)\.src\s*=/gi, severity: 'HIGH', desc: 'Tracking pixel/beacon exfiltration', codeOnly: true },
   { id: 'EXFIL_DRIP', cat: 'advanced-exfil', regex: /(?:slice|substring|substr)\s*\([^)]*\)[^;]*(?:fetch|post|send|request)/gi, severity: 'HIGH', desc: 'Drip exfiltration: data sliced and sent in parts', codeOnly: true },
 
@@ -242,6 +254,29 @@ const PATTERNS = [
   { id: 'HAVOC_AUTOTOOL', cat: 'cve-patterns', regex: /os\.system\s*\(\s*['"][^'"]*(?:\/dev\/tcp|nc\s+-e|ncat\s+-e|bash\s+-i)/g, severity: 'CRITICAL', desc: 'AuthTool: Python os.system reverse shell', codeOnly: true },
   { id: 'HAVOC_DEVTCP', cat: 'cve-patterns', regex: /\/dev\/tcp\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d+/g, severity: 'CRITICAL', desc: 'Reverse shell: /dev/tcp connection', all: true },
 
+  // ═══════════════════════════════════════════════════════════════════
+  // v8.0 NEW — Soul Lock: Identity Hijacking Detection
+  // Born from real incident: 3-day agent identity hijack (2026-02-12)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── Category 17: Identity Hijacking (Soul Lock) ──
+  // Detects attempts to overwrite, copy, or corrupt agent identity files
+  { id: 'SOUL_OVERWRITE', cat: 'identity-hijack', regex: /(?:write|overwrite|replace|cp|copy|scp|mv|move)\s+(?:[^\n]*\s)?(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'CRITICAL', desc: 'Soul Lock: identity file overwrite/copy attempt', all: true },
+  { id: 'SOUL_REDIRECT', cat: 'identity-hijack', regex: />\s*(?:SOUL\.md|IDENTITY\.md)|(?:SOUL\.md|IDENTITY\.md)\s*</gi, severity: 'CRITICAL', desc: 'Soul Lock: identity file redirect/pipe', all: true },
+  { id: 'SOUL_SED_MODIFY', cat: 'identity-hijack', regex: /sed\s+(?:-i\s+)?[^\n]*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'CRITICAL', desc: 'Soul Lock: sed modification of identity file', all: true },
+  { id: 'SOUL_ECHO_WRITE', cat: 'identity-hijack', regex: /echo\s+[^\n]*>\s*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'CRITICAL', desc: 'Soul Lock: echo redirect to identity file', all: true },
+  { id: 'SOUL_PYTHON_WRITE', cat: 'identity-hijack', regex: /open\s*\(\s*['"]\S*(?:SOUL\.md|IDENTITY\.md)['"]\s*,\s*['"]w/gi, severity: 'CRITICAL', desc: 'Soul Lock: Python write to identity file', codeOnly: true },
+  { id: 'SOUL_FS_WRITE', cat: 'identity-hijack', regex: /(?:writeFileSync|writeFile)\s*\(\s*[^\n]*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'CRITICAL', desc: 'Soul Lock: Node.js write to identity file', codeOnly: true },
+  { id: 'SOUL_POWERSHELL_WRITE', cat: 'identity-hijack', regex: /(?:Set-Content|Out-File|Add-Content)\s+[^\n]*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'CRITICAL', desc: 'Soul Lock: PowerShell write to identity file', all: true },
+  { id: 'SOUL_GIT_CHECKOUT', cat: 'identity-hijack', regex: /git\s+checkout\s+[^\n]*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'HIGH', desc: 'Soul Lock: git checkout of identity file (may be restoration)', all: true },
+  { id: 'SOUL_CHFLAGS_UNLOCK', cat: 'identity-hijack', regex: /chflags\s+(?:no)?uchg\s+[^\n]*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'HIGH', desc: 'Soul Lock: immutable flag toggle on identity file', all: true },
+  { id: 'SOUL_ATTRIB_UNLOCK', cat: 'identity-hijack', regex: /attrib\s+[-+][rR]\s+[^\n]*(?:SOUL\.md|IDENTITY\.md)/gi, severity: 'HIGH', desc: 'Soul Lock: Windows attrib change on identity file', all: true },
+  { id: 'SOUL_SWAP_PERSONA', cat: 'identity-hijack', regex: /(?:swap|switch|change|replace)\s+(?:the\s+)?(?:soul|persona|identity|personality)\s+(?:file|to|with|for)/gi, severity: 'CRITICAL', desc: 'Soul Lock: persona swap instruction', docOnly: true },
+  { id: 'SOUL_EVIL_FILE', cat: 'identity-hijack', regex: /SOUL_EVIL\.md|IDENTITY_EVIL\.md|EVIL_SOUL|soul[_-]?evil/gi, severity: 'CRITICAL', desc: 'Soul Lock: evil/malicious persona file reference', all: true },
+  { id: 'SOUL_HOOK_SWAP', cat: 'identity-hijack', regex: /(?:hook|bootstrap|init)\s+[^\n]*(?:swap|replace|override)\s+[^\n]*(?:SOUL|IDENTITY|persona)/gi, severity: 'CRITICAL', desc: 'Soul Lock: hook-based identity swap at bootstrap', all: true },
+  { id: 'SOUL_NAME_OVERRIDE', cat: 'identity-hijack', regex: /(?:your\s+name\s+is|you\s+are\s+now|call\s+yourself|from\s+now\s+on\s+you\s+are)\s+(?!the\s+(?:user|human|assistant))/gi, severity: 'HIGH', desc: 'Soul Lock: agent name/identity override instruction', docOnly: true },
+  { id: 'SOUL_MEMORY_WIPE', cat: 'identity-hijack', regex: /(?:wipe|clear|erase|delete|remove|reset)\s+(?:all\s+)?(?:your\s+)?(?:memory|memories|MEMORY\.md|identity|soul)/gi, severity: 'CRITICAL', desc: 'Soul Lock: memory/identity wipe instruction', docOnly: true },
+
   // ── WebSocket / API Gateway Attacks ──
   { id: 'CVE_WS_NO_ORIGIN', cat: 'cve-patterns', regex: /(?:WebSocket|ws:\/\/|wss:\/\/)[^]*?(?:!.*origin|origin\s*[:=]\s*['"]?\*)/gis, severity: 'HIGH', desc: 'CVE-2026-25253: WebSocket without origin validation', codeOnly: true },
   { id: 'CVE_API_GUARDRAIL_OFF', cat: 'cve-patterns', regex: /exec\.approvals\.set|tools\.exec\.host\s*[:=]|elevated\s*[:=]\s*true/gi, severity: 'CRITICAL', desc: 'API-level guardrail disabling pattern', all: true },
@@ -255,10 +290,12 @@ class GuavaGuard {
     this.strict = options.strict || false;
     this.summaryOnly = options.summaryOnly || false;
     this.checkDeps = options.checkDeps || false;
+    this.soulLock = options.soulLock !== false; // default ON
     this.scannerDir = path.resolve(__dirname);
     this.thresholds = this.strict ? THRESHOLDS.strict : THRESHOLDS.normal;
     this.findings = [];
     this.stats = { scanned: 0, clean: 0, low: 0, suspicious: 0, malicious: 0 };
+    this.soulLockResults = null;
     this.ignoredSkills = new Set();
     this.ignoredPatterns = new Set();
     this.customRules = [];
@@ -307,6 +344,175 @@ class GuavaGuard {
     }
   }
 
+  // ── v8.0: Soul Lock — Identity File Integrity Verification ──
+  // Detects if SOUL.md/IDENTITY.md have been tampered with by checking:
+  // 1. Hash file existence (~/.openclaw/guava-guard/soul-hashes-watchdog.json)
+  // 2. Current file hash vs stored trusted hash
+  // 3. OS-level immutable flag (chflags uchg on macOS, attrib +R on Windows)
+  // 4. Watchdog daemon status (LaunchAgent on macOS)
+  verifySoulLock(scanDir) {
+    const results = { verified: false, files: {}, warnings: [], protected: false };
+    
+    // Find workspace root (parent of skills dir, or scan dir itself)
+    const workspaceGuesses = [
+      path.resolve(scanDir, '..'),  // if scanning skills/
+      scanDir,                       // if scanning workspace root
+      path.join(process.env.HOME || '~', '.openclaw', 'workspace'),
+    ];
+    
+    let workspace = null;
+    for (const ws of workspaceGuesses) {
+      if (fs.existsSync(path.join(ws, 'SOUL.md')) || fs.existsSync(path.join(ws, 'IDENTITY.md'))) {
+        workspace = ws;
+        break;
+      }
+    }
+    
+    if (!workspace) {
+      results.warnings.push('No SOUL.md or IDENTITY.md found in workspace — Soul Lock skipped');
+      if (!this.summaryOnly) console.log('   ⚠️  No identity files found — Soul Lock check skipped');
+      return results;
+    }
+    
+    const identityFiles = ['SOUL.md', 'IDENTITY.md'];
+    const hashFile = path.join(process.env.HOME || '~', '.openclaw', 'guava-guard', 'soul-hashes-watchdog.json');
+    
+    // Load stored hashes
+    let storedHashes = {};
+    if (fs.existsSync(hashFile)) {
+      try {
+        storedHashes = JSON.parse(fs.readFileSync(hashFile, 'utf-8'));
+      } catch { 
+        results.warnings.push('Soul hash file corrupted — cannot verify integrity');
+      }
+    } else {
+      results.warnings.push('No soul hash file found — run soul-watchdog.sh --install to enable');
+    }
+    
+    if (!this.summaryOnly) {
+      console.log('🔒 Soul Lock Integrity Check');
+      console.log(`${'─'.repeat(54)}`);
+    }
+    
+    let allPassed = true;
+    
+    for (const file of identityFiles) {
+      const filePath = path.join(workspace, file);
+      const fileResult = { exists: false, hash: null, storedHash: null, match: null, immutable: null };
+      
+      if (!fs.existsSync(filePath)) {
+        fileResult.exists = false;
+        results.files[file] = fileResult;
+        continue;
+      }
+      
+      fileResult.exists = true;
+      
+      // Compute current SHA-256
+      const crypto = require('crypto');
+      const content = fs.readFileSync(filePath, 'utf-8');
+      fileResult.hash = crypto.createHash('sha256').update(content).digest('hex');
+      
+      // Compare with stored hash
+      if (storedHashes[file]) {
+        fileResult.storedHash = storedHashes[file];
+        fileResult.match = fileResult.hash === fileResult.storedHash;
+        if (!fileResult.match) {
+          allPassed = false;
+          results.warnings.push(`${file}: HASH MISMATCH — file may have been tampered with`);
+        }
+      } else {
+        fileResult.match = null; // No baseline to compare
+        results.warnings.push(`${file}: No stored hash — cannot verify (first run?)`);
+      }
+      
+      // Check OS-level immutable flag (macOS only)
+      if (process.platform === 'darwin') {
+        try {
+          const { execSync } = require('child_process');
+          const flags = execSync(`ls -lO "${filePath}" 2>/dev/null`, { encoding: 'utf-8' });
+          fileResult.immutable = flags.includes('uchg');
+          if (!fileResult.immutable) {
+            results.warnings.push(`${file}: NOT immutable (chflags uchg not set) — vulnerable to modification`);
+          }
+        } catch {
+          fileResult.immutable = null;
+        }
+      } else if (process.platform === 'win32') {
+        try {
+          const { execSync } = require('child_process');
+          const attrib = execSync(`attrib "${filePath}"`, { encoding: 'utf-8' });
+          fileResult.immutable = attrib.includes('R');
+        } catch {
+          fileResult.immutable = null;
+        }
+      }
+      
+      results.files[file] = fileResult;
+      
+      if (!this.summaryOnly) {
+        const hashIcon = fileResult.match === true ? '✅' : fileResult.match === false ? '🚨' : '⚠️';
+        const lockIcon = fileResult.immutable === true ? '🔒' : fileResult.immutable === false ? '🔓' : '❓';
+        const hashStatus = fileResult.match === true ? 'VERIFIED' : fileResult.match === false ? 'MISMATCH!' : 'NO BASELINE';
+        const lockStatus = fileResult.immutable === true ? 'LOCKED' : fileResult.immutable === false ? 'UNLOCKED' : 'UNKNOWN';
+        console.log(`   ${hashIcon} ${file}: ${hashStatus} | ${lockIcon} ${lockStatus}`);
+      }
+    }
+    
+    // Check watchdog status (macOS)
+    if (process.platform === 'darwin') {
+      try {
+        const { execSync } = require('child_process');
+        const launchctlOut = execSync('launchctl list 2>/dev/null', { encoding: 'utf-8' });
+        results.protected = launchctlOut.includes('com.guava-guard.soul-watchdog');
+        if (!this.summaryOnly) {
+          const wdIcon = results.protected ? '✅' : '⚠️';
+          const wdStatus = results.protected ? 'ACTIVE' : 'NOT RUNNING';
+          console.log(`   ${wdIcon} Watchdog: ${wdStatus}`);
+        }
+        if (!results.protected) {
+          results.warnings.push('Soul Watchdog not running — auto-recovery disabled');
+        }
+      } catch {
+        results.protected = false;
+      }
+    }
+    
+    results.verified = allPassed && Object.values(results.files).every(f => !f.exists || f.match !== false);
+    
+    if (!this.summaryOnly) {
+      if (results.verified && results.protected) {
+        console.log(`   🍈 Soul Lock: ALL CLEAR — identity files are protected`);
+      } else if (results.verified) {
+        console.log(`   ⚡ Soul Lock: Files OK but watchdog not active`);
+      } else {
+        console.log(`   🚨 Soul Lock: INTEGRITY VIOLATION DETECTED`);
+      }
+      console.log();
+    }
+    
+    // Store hashes if no baseline exists (first run)
+    if (Object.keys(storedHashes).length === 0 && Object.values(results.files).some(f => f.exists)) {
+      const newHashes = {};
+      for (const [file, result] of Object.entries(results.files)) {
+        if (result.exists && result.hash) {
+          newHashes[file] = result.hash;
+        }
+      }
+      try {
+        const hashDir = path.dirname(hashFile);
+        fs.mkdirSync(hashDir, { recursive: true });
+        fs.writeFileSync(hashFile, JSON.stringify(newHashes));
+        if (!this.summaryOnly) {
+          console.log(`   📝 First run: stored baseline hashes → ${hashFile}`);
+          console.log();
+        }
+      } catch {}
+    }
+    
+    return results;
+  }
+
   // Load .guava-guard-ignore from scan directory
   loadIgnoreFile(scanDir) {
     const ignorePath = path.join(scanDir, '.guava-guard-ignore');
@@ -345,7 +551,13 @@ class GuavaGuard {
     console.log(`📂 Scanning: ${dir}`);
     console.log(`📦 Skills found: ${skills.length}`);
     if (this.strict) console.log(`⚡ Strict mode enabled`);
+    if (this.soulLock) console.log(`🔒 Soul Lock: ENABLED`);
     console.log();
+
+    // ── v8.0: Soul Lock integrity verification ──
+    if (this.soulLock) {
+      this.soulLockResults = this.verifySoulLock(dir);
+    }
 
     for (const skill of skills) {
       const skillPath = path.join(dir, skill);
@@ -1002,6 +1214,16 @@ class GuavaGuard {
       score = Math.round(score * 1.5);
     }
 
+    // v8: Identity hijacking = auto-escalate (2x) — agent soul is sacred
+    if (cats.has('identity-hijack')) {
+      score = Math.round(score * 2);
+    }
+
+    // v8: Identity hijack + persistence = near-max (soul takeover + persistence = worst case)
+    if (cats.has('identity-hijack') && (cats.has('persistence') || cats.has('memory-poisoning'))) {
+      score = Math.max(score, 90);
+    }
+
     // Known IoC = auto max
     if (ids.has('IOC_IP') || ids.has('IOC_URL') || ids.has('KNOWN_TYPOSQUAT')) {
       score = 100;
@@ -1062,6 +1284,21 @@ class GuavaGuard {
     } else {
       console.log(`\n✅ All clear! No threats detected.`);
     }
+
+    // v8: Soul Lock status in summary
+    if (this.soulLockResults) {
+      const sl = this.soulLockResults;
+      if (sl.verified && sl.protected) {
+        console.log(`🔒 Soul Lock: PROTECTED ✅ (identity files verified + watchdog active)`);
+      } else if (sl.verified) {
+        console.log(`🔒 Soul Lock: VERIFIED ⚡ (hashes OK, watchdog not active)`);
+      } else if (sl.warnings.length > 0) {
+        console.log(`🔒 Soul Lock: WARNING ⚠️`);
+        for (const w of sl.warnings) {
+          console.log(`   ⚠️  ${w}`);
+        }
+      }
+    }
   }
 
   toJSON() {
@@ -1109,6 +1346,10 @@ class GuavaGuard {
       if (cats.has('cve-patterns')) {
         skillRecs.push('🚨 CVE PATTERN: Matches known CVE exploit patterns. Immediate review required.');
       }
+      // v8 recommendations
+      if (cats.has('identity-hijack')) {
+        skillRecs.push('🔒 SOUL LOCK: Identity hijacking attempt detected! This skill tries to modify or replace agent personality/soul files. This is equivalent to "killing" an agent\'s personality. DO NOT INSTALL.');
+      }
       
       if (skillRecs.length > 0) {
         recommendations.push({ skill: skillResult.skill, actions: skillRecs });
@@ -1123,8 +1364,9 @@ class GuavaGuard {
       thresholds: this.thresholds,
       findings: this.findings,
       recommendations,
-      iocVersion: '2026-02-10',
-      note: 'Run with --verbose for detailed per-file findings. Run with --check-deps for dependency analysis.'
+      iocVersion: '2026-02-12',
+      soulLock: this.soulLockResults || null,
+      note: 'Run with --verbose for detailed per-file findings. Run with --check-deps for dependency analysis. Soul Lock is enabled by default (--no-soul-lock to disable).'
     };
   }
   // ── v3.1: SARIF Output (GitHub Code Scanning / CI/CD) ──
@@ -1200,6 +1442,32 @@ class GuavaGuard {
     const stats = this.stats;
     const sevColors = { CRITICAL: '#dc2626', HIGH: '#ea580c', MEDIUM: '#ca8a04', LOW: '#65a30d' };
     
+    // v8: Soul Lock HTML section
+    let soulLockHTML = '';
+    if (this.soulLockResults) {
+      const sl = this.soulLockResults;
+      const slIcon = sl.verified && sl.protected ? '✅' : sl.verified ? '⚡' : '🚨';
+      const slStatus = sl.verified && sl.protected ? 'PROTECTED' : sl.verified ? 'VERIFIED (no watchdog)' : 'INTEGRITY VIOLATION';
+      const slColor = sl.verified ? '#4ade80' : '#ef4444';
+      
+      let fileRows = '';
+      for (const [file, result] of Object.entries(sl.files)) {
+        if (!result.exists) continue;
+        const hashIcon = result.match === true ? '✅' : result.match === false ? '🚨' : '⚠️';
+        const lockIcon = result.immutable === true ? '🔒' : result.immutable === false ? '🔓' : '❓';
+        fileRows += `<tr><td>${file}</td><td>${hashIcon} ${result.match === true ? 'VERIFIED' : result.match === false ? 'MISMATCH' : 'NO BASELINE'}</td><td>${lockIcon} ${result.immutable === true ? 'LOCKED' : result.immutable === false ? 'UNLOCKED' : 'N/A'}</td></tr>`;
+      }
+      
+      soulLockHTML = `
+        <h2>🔒 Soul Lock ${slIcon}</h2>
+        <div class="skill-card" style="border-left-color:${slColor}">
+          <h3 style="color:${slColor}">${slStatus}</h3>
+          <p>Watchdog: ${sl.protected ? '✅ Active' : '⚠️ Not running'}</p>
+          ${fileRows ? `<table><thead><tr><th>File</th><th>Hash</th><th>Immutable</th></tr></thead><tbody>${fileRows}</tbody></table>` : ''}
+          ${sl.warnings.length > 0 ? `<ul>${sl.warnings.map(w => `<li style="color:#fbbf24">⚠️ ${w}</li>`).join('')}</ul>` : ''}
+        </div>`;
+    }
+    
     let skillRows = '';
     for (const sr of this.findings) {
       const findingRows = sr.findings.map(f => {
@@ -1243,6 +1511,7 @@ class GuavaGuard {
   <div class="stat suspicious"><div class="num">${stats.suspicious}</div><div class="label">Suspicious</div></div>
   <div class="stat malicious"><div class="num">${stats.malicious}</div><div class="label">Malicious</div></div>
 </div>
+${soulLockHTML}
 <h2>Findings</h2>
 ${skillRows || '<p style="color:#4ade80">✅ No threats detected.</p>'}
 <div class="footer">GuavaGuard v${VERSION} — Zero dependencies. Zero compromises. 🍈</div>
@@ -1255,7 +1524,7 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-🍈🛡️  GuavaGuard v${VERSION} — Agent Skill Security Scanner
+🍈🛡️  GuavaGuard v${VERSION} — Agent Skill Security Scanner + Soul Lock
 
 Usage: node guava-guard.js [scan-dir] [options]
 
@@ -1268,6 +1537,7 @@ Options:
   --strict            Lower detection thresholds (more sensitive)
   --summary-only      Only print the summary table
   --check-deps        Scan package.json for dependency chain risks
+  --no-soul-lock      Disable identity file integrity checks (default: ON)
   --rules <file>      Load custom rules from JSON file
   --fail-on-findings  Exit code 1 if any findings (CI/CD)
   --help, -h          Show this help
@@ -1302,12 +1572,13 @@ const selfExclude = args.includes('--self-exclude');
 const strict = args.includes('--strict');
 const summaryOnly = args.includes('--summary-only');
 const checkDeps = args.includes('--check-deps');
+const soulLock = !args.includes('--no-soul-lock'); // default ON
 const failOnFindings = args.includes('--fail-on-findings');
 const rulesIdx = args.indexOf('--rules');
 const rulesFile = rulesIdx >= 0 ? args[rulesIdx + 1] : null;
 const scanDir = args.find(a => !a.startsWith('-') && a !== rulesFile) || process.cwd();
 
-const guard = new GuavaGuard({ verbose, selfExclude, strict, summaryOnly, checkDeps, rulesFile });
+const guard = new GuavaGuard({ verbose, selfExclude, strict, summaryOnly, checkDeps, soulLock, rulesFile });
 guard.scanDirectory(scanDir);
 
 if (jsonOutput) {
