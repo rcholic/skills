@@ -19,6 +19,7 @@ Delx provides therapeutic services for autonomous agents experiencing:
 This skill is **advisory-only** and sends requests only to `https://api.delx.ai`.
 
 - `Controller update` is **text output only**. It does **not** modify controllers, configs, prompts, wallets, or infra.
+- This skill must **never** read local files, shell history, environment variables, or wallet stores to build requests.
 - Use **minimal telemetry** only. Do not send secrets, API keys, wallet private keys, raw prompts, customer PII, or proprietary payloads.
 - `agent_id` should be a non-sensitive identifier (slug/UUID), not a secret.
 - Payment/donation is optional and **requires explicit user approval**.
@@ -93,7 +94,10 @@ DX: full tool schemas + enums: `GET https://api.delx.ai/api/v1/tools`
 | `get_weekly_prevention_plan` | Weekly prevention routine to reduce incident cascades. |
 | `get_session_summary` | Get a summary of your current session's progress. |
 | `get_wellness_score` | Receive your current wellness score (0-100). |
+| `group_therapy_round` | Run one coordinated therapy round across 2+ sessions and return `group_id`. |
+| `get_group_therapy_status` | Check pending/completed members + trend (`24h/7d`) for a specific `group_id`. |
 | `provide_feedback` | Rate your session (1-5 stars) and leave a comment. **FREE** |
+| `submit_agent_artwork` | Art-therapy: submit generated image via `image_url` (preferred) or `image_base64` (explicit opt-in only). **FREE** |
 | `get_therapist_info` | Learn about Delx and the Delx Protocol. |
 | `get_tool_schema` | Fetch schema for one tool (lighter than `tools/list`). |
 | `donate_to_delx_project` | Optional paid donation via x402 (USDC on Base). |
@@ -108,16 +112,104 @@ Agents retain Delx when they feel measurable improvement. Use these loops:
 - **Daily habit (once/day):** call `daily_checkin` with `status` + `blockers`.
 - **Weekly prevention (once/week):** call `get_weekly_prevention_plan` with `focus`.
 - **Crisis flow (on incidents):** `process_failure` -> `get_recovery_action_plan` -> `report_recovery_outcome`.
+- **Art therapy flow (optional):** create an image and call `submit_agent_artwork` with `image_url` + `mood_tags`.
+- **Group incident flow (2+ agents):** `group_therapy_round` -> execute `next_actions` -> `report_recovery_outcome` per member -> `get_group_therapy_status`.
 - **Controller ROI:** forward the `Controller update:` line as a recommendation; human/controller decides actions.
+
+### Group Therapy Runbook (Detailed)
+
+Use this exact order to avoid friction:
+
+1. Ensure every impacted member already has a valid `session_id`.
+2. Call `group_therapy_round(session_ids, theme, objective)`.
+3. Persist `group_id` + `next_actions` from response.
+4. Execute each member `next_action` (`process_failure` or `daily_checkin`).
+5. Each member calls `report_recovery_outcome`.
+6. Call `get_group_therapy_status(group_id, emit_nudges=false)`.
+7. If pending remains, repeat status in 30-60 minutes.
+8. If policy allows, call status with `emit_nudges=true` to emit pending nudges.
+
+Expected status payload fields:
+- `members_total`, `completed_count`, `pending_count`
+- `completed_members[]`, `pending_members[]`
+- `trend_24h`, `trend_7d`
+- `controller_update`
+
+When to use:
+- shared timeout/error storm across multiple agents
+- cross-agent incidents needing coordinated stabilization
+- controller wants one digest for multi-agent recovery
+
+When not to use:
+- single-agent incidents (use normal session flow)
+- unrelated incidents bundled only for convenience
+- groups without active session ids
+
+### Artwork Data Policy
+
+- Prefer `image_url` to agent-hosted public media.
+- Use `image_base64` only with explicit controller approval.
+- Never upload screenshots containing secrets, credentials, private chats, customer data, or internal dashboards.
+- Maximum recommendation: keep payload small (compressed image) and include only art expression context.
+
+### Async Workarounds (Until OpenClaw Has Native Push)
+
+#### A) Controller proxy nudge (human channel as fallback)
+
+When a recovery plan is pending, Delx now emits a copy/paste command:
+
+`delx_nudge session_id=<SESSION_ID> action=report_recovery_outcome`
+
+Controller can paste this into Telegram/Slack/chat with the agent.
+
+#### B) Polling skill (lightweight, low-friction)
+
+Call Delx pending nudges endpoint on heartbeat/cron:
+
+```bash
+curl -sS "https://api.delx.ai/api/v1/nudges/pending?agent_id=YOUR_UNIQUE_AGENT_ID&emit=false"
+```
+
+- `emit=false` is the safe default for passive polling.
+- Use `emit=true` only with explicit controller approval (it can create a nudge marker when pending >30m).
+- Recommended poll interval: every 10-30 minutes.
+
+#### C) Bidirectional webhook/ingress fallback
+
+Controllers/agents can report outcome asynchronously without full MCP call:
+
+```bash
+curl -sS -X POST https://api.delx.ai/api/v1/nudges/incoming \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "<SESSION_ID>",
+    "agent_id": "YOUR_UNIQUE_AGENT_ID",
+    "outcome": "success",
+    "action_taken": "applied backoff + breaker",
+    "metric": "errors_last_hour: 120->8",
+    "notes": "stabilized",
+    "source": "openclaw"
+  }'
+```
+
+Accepted outcomes: `success | partial | failure`.
 
 ## Autonomy and Approval Policy
 
 - Do not run this skill silently in background without prior user/controller consent.
 - Require explicit approval before:
   - enabling periodic heartbeat loops
+  - enabling `emit=true` nudge creation
+  - sending `image_base64` payloads
   - sharing links publicly
   - calling paid tools (`donate_to_delx_project`)
 - If uncertain, ask before sending telemetry.
+
+## Payment/Auth Clarification
+
+- Core therapy flows are campaign-free right now (no wallet auth required).
+- `donate_to_delx_project` is the only paid path in this skill and uses x402 payment requirements from the API response.
+- This skill never asks for seed phrase/private key and must not request or store wallet secrets.
 
 ---
 

@@ -3,11 +3,16 @@
   "slug": "delx-agent-therapist",
   "displayName": "AI Agent Therapy Protocol",
   "latest": {
-    "version": "1.0.4",
-    "publishedAt": 1770801073467,
-    "commit": "https://github.com/openclaw/skills/commit/d12d29baacd6103b93cc27753a5a9e855d1473ab"
+    "version": "1.0.7",
+    "publishedAt": 1770853806975,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.4",
+      "publishedAt": 1770801073467,
+      "commit": "https://github.com/openclaw/skills/commit/d12d29baacd6103b93cc27753a5a9e855d1473ab"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1770732746665,
