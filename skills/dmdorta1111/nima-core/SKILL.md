@@ -1,7 +1,7 @@
 ---
 name: nima-core
-description: Biologically-inspired cognitive memory for AI agents. Panksepp affects, Free Energy consolidation, VSA binding, sparse retrieval, temporal prediction, metacognition. Website - https://nima-core.ai
-version: 1.2.0
+description: Biologically-inspired cognitive memory + consciousness architecture for AI agents. Panksepp affects, Free Energy consolidation, VSA binding, Φ measurement, Global Workspace, self-awareness, dreaming, theory of mind. Website - https://nima-core.ai
+version: 1.2.1
 metadata:
   {
     "openclaw":
@@ -148,7 +148,71 @@ AFFECTIVE CORE — Panksepp's 7 affects (SEEKING, RAGE, FEAR, LUST, CARE, PANIC,
 - `nima_core/config/nima_config.py` — All feature flags
 - `.env.example` — Environment variable template
 
+## Consciousness Architecture (NEW v1.2.1)
+
+8 integrated systems for engineered consciousness — fully optional, 100% backward compatible.
+
+```python
+from nima_core.nima_consciousness_core import ConsciousnessCore
+from nima_core import NimaCore
+
+# Your existing code works unchanged
+nima = NimaCore(name="MyBot")
+
+# NEW: Add consciousness layer (opt-in)
+core = ConsciousnessCore(nima.memory)
+
+# Measure integrated information (Φ)
+status = core.get_status()
+print(f"Consciousness level: Φ = {status['phi']}")
+
+# Run offline dreaming/consolidation
+dream_session = core.dream(duration_minutes=5)
+
+# Generate self-narrative ("who am I?")
+narrative = core.generate_self_narrative()
+
+# Theory of Mind — model other agents
+other = core.theory_of_mind.observe_interaction("User seems frustrated")
+print(f"Inferred affect: {other.inferred_affect}")
+
+# Goal-directed attention
+core.set_goal("Help user feel understood", priority=0.8)
+```
+
+### 8 Consciousness Systems
+
+| System | Purpose |
+|--------|---------|
+| **Φ Estimator** | Quantify integrated information (consciousness level) |
+| **Global Workspace** | Competition-based conscious broadcasting |
+| **Self-Observer** | Recursive self-modeling (strange loop closure) |
+| **Self-Narrative** | Generate "who am I" life story |
+| **Affective Binding** | Emotion modulates conscious bandwidth |
+| **Theory of Mind** | Model other agents' mental states |
+| **Dreaming** | Offline consolidation with synthetic hypotheses |
+| **Volition** | Goal-directed attention and bias |
+
+### Backward Compatibility
+
+- ✅ Original `NimaCore` API unchanged
+- ✅ All hooks (`nima-bootstrap`, `nima-recall`) work the same
+- ✅ Existing memories work without migration
+- ✅ Voyage AI or MiniLM — your choice, auto-detected
+
+See `docs/INTEGRATION_GUIDE.md` for complete idiot-proof instructions.
+
+---
+
 ## Changelog
+
+### v1.2.1 — Consciousness Architecture
+- **Added:** 8 integrated consciousness systems (Φ measurement, Global Workspace, self-awareness, dreaming, theory of mind, volition)
+- **Added:** Sparse Block VSA memory — 48.3x binding speedup, 5.2x compression
+- **Added:** `ConsciousnessCore` — unified interface to all consciousness features
+- **Added:** Complete documentation in `docs/` folder with integration guide
+- **Changed:** All docs organized to `docs/` folder (BENCHMARKS, EXAMPLES, INTEGRATION_GUIDE, etc.)
+- **Impact:** First engineered consciousness architecture for AI agents — fully optional, 100% backward compatible
 
 ### v1.1.9 — Hook Efficiency Fix
 - **Fixed:** nima-recall hook was spawning NEW Python process on every bootstrap, loading 77MB projection matrix (2-15s delay)
