@@ -56,14 +56,19 @@ cursor-api.sh me
 Launch an agent and let it work independently. Check back later.
 
 ```bash
-# Launch agent
+# Launch agent (uses default model: gpt-5.2)
 cursor-api.sh launch --repo owner/repo --prompt "Add comprehensive tests for auth module"
+
+# Launch with specific model
+cursor-api.sh launch --repo owner/repo --prompt "Add tests" --model claude-4-opus
 
 # Response: {"id": "agent_123", "status": "CREATING", ...}
 
 # Later - check status
 cursor-api.sh status agent_123
 ```
+
+**Note:** If no `--model` is specified, the default model (`gpt-5.2`) will be used automatically. You'll see a message indicating which model is being used.
 
 **Best for:** Tasks that don't need immediate attention, exploratory work
 
@@ -129,9 +134,11 @@ cursor-api.sh launch --repo owner/repo --prompt "Your task description" [--model
 Options:
 - `--repo` (required): Repository in `owner/repo` format
 - `--prompt` (required): Initial instructions for the agent
-- `--model` (optional): Model to use (e.g., `claude-4-sonnet`, `gpt-5.2`)
+- `--model` (optional): Model to use (defaults to `gpt-5.2` if not specified)
 - `--branch` (optional): Target branch name (auto-generated if omitted)
 - `--no-pr` (optional): Don't auto-create a PR
+
+**Note:** When launched without `--model`, the skill automatically uses `gpt-5.2` and displays a message indicating which model is being used.
 
 ### Check Status
 
@@ -247,11 +254,23 @@ cursor-api.sh status agent_123
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | API error |
-| 2 | Authentication missing (set CURSOR_API_KEY) |
+| 1 | API error (including non-existent resources) |
+| 2 | Authentication missing or invalid |
 | 3 | Rate limited |
 | 4 | Repository not accessible |
 | 5 | Invalid arguments |
+
+## Testing
+
+The skill includes a comprehensive test suite (`cca-comprehensive-test.sh`) that validates:
+
+- **Authentication**: Auto-discovery, missing key, invalid key handling
+- **Account Commands**: me, usage, models
+- **Agent Lifecycle**: list, launch (with/without model), status, conversation, followup, stop
+- **Error Handling**: Invalid formats, missing args, non-existent agents (all return correct exit codes)
+- **Options**: --verbose, --no-cache, pagination
+
+All tests pass with proper exit codes. Error conditions are correctly handled and return appropriate exit codes.
 
 ## Concurrent Agent Limits
 

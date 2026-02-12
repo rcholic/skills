@@ -159,7 +159,7 @@ if [[ $ERRORS -eq 0 ]]; then
     echo -e "${GREEN}Validation passed!${NC} ($WARNINGS warnings)"
     echo ""
     echo "Ready to publish to clawdhub with:"
-    echo "  openclaw skill publish"
+    echo "  clawhub publish"
     exit 0
 else
     echo -e "${RED}Validation failed!${NC} ($ERRORS errors, $WARNINGS warnings)"

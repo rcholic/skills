@@ -365,6 +365,17 @@ api_request() {
         429)
             error "Rate limited by API" "$E_RATE_LIMITED"
             ;;
+        400)
+            # Handle 400 errors with API error details
+            # Provide more context if available in response
+            if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
+                local api_error
+                api_error=$(echo "$response" | jq -r '.error')
+                error "API error: $api_error (HTTP 400)" "$E_API_ERROR"
+            else
+                error "API error: Bad request (HTTP 400)" "$E_API_ERROR"
+            fi
+            ;;
         4*|5*)
             error "API error: HTTP $http_code" "$E_API_ERROR"
             ;;
@@ -471,15 +482,25 @@ cmd_launch() {
 
     repo=$(sanitize_repo "$repo")
 
-    # Build request body using jq (PAR-140, PAR-149)
+    # Use default model if not specified
+    if [[ -z "$model" ]]; then
+        model="gpt-5.2"
+        verbose "No model specified, using default: $model"
+        echo "Using default model: $model (specify --model to override)" >&2
+    else
+        verbose "Using specified model: $model"
+        echo "Using model: $model" >&2
+    fi
+
+    # Build request body using jq
     # API expects: source.repository (full URL), prompt.text (object)
     local body
     body=$(jq -n \
         --arg repo "github.com/$repo" \
         --arg prompt "$prompt" \
-        '{source: {repository: $repo}, prompt: {text: $prompt}}')
+        --arg model "$model" \
+        '{source: {repository: $repo}, prompt: {text: $prompt}, model: $model}')
 
-    [[ -n "$model" ]] && body=$(echo "$body" | jq --arg m "$model" '.model = $m')
     [[ -n "$branch" ]] && body=$(echo "$body" | jq --arg b "$branch" '.target.branchName = $b')
     [[ "$auto_create_pr" == "true" ]] && body=$(echo "$body" | jq '.target.autoCreatePr = true')
 
@@ -505,6 +526,24 @@ cmd_followup() {
     local agent_id
     agent_id=$(sanitize_id "$1")
     shift
+
+    # Check agent state before attempting followup
+    local agent_status
+    agent_status=$(api_request "GET" "/agents/${agent_id}" "" "false" 2>/dev/null | jq -r '.status // empty' 2>/dev/null || echo "")
+
+    if [[ -n "$agent_status" ]]; then
+        case "$agent_status" in
+            FINISHED|STOPPED|ERROR)
+                error "Cannot send followup to agent in '$agent_status' state. Agent must be RUNNING or CREATING." "$E_API_ERROR"
+                ;;
+            RUNNING|CREATING)
+                # OK to proceed
+                ;;
+            *)
+                verbose "Unknown agent status: $agent_status, attempting followup anyway"
+                ;;
+        esac
+    fi
 
     local prompt=""
 
@@ -621,9 +660,11 @@ usage() {
     cat << 'EOF'
 Usage: cursor-api.sh [options] <command> [args]
 
+Note: Global options (--verbose, --no-cache) must come BEFORE the command.
+
 Options:
-  --no-cache    Disable response caching
-  --verbose     Enable verbose output
+  --no-cache    Disable response caching (must come before command)
+  --verbose     Enable verbose output (must come before command)
   --help        Show this help
 
 Commands:
