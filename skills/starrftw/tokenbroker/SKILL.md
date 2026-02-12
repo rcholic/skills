@@ -1,176 +1,200 @@
 ---
 name: tokenbroker
-description: Meta-skill for GitHub project analysis and token launch orchestration. Scans repositories and delegates to nadfun for actual token deployment.
-version: 1.0.1
+description: AI Agent Skill for GitHub project analysis and nad.fun token launch. Analyzes repos, generates token identity/promo, and launches on nad.fun.
+version: 1.01
 metadata:
-  tags: monad, nadfun, token, launch, orchestration, github, autonomous
+  tags: monad, nadfun, token, launch, github, memecoin, autonomous
 ---
 
 # SKILL.md - TokenBroker Skillset
 
-**The meta-skill for AI agent token orchestration.** Analyze GitHub projects, generate metadata, and delegate token launches to specialized skills.
+## Security & Data Privacy
+
+### Local Storage Only
+- All credentials (GitHub token, private keys, API keys) are stored **locally** in a `.env` file
+- No credentials are transmitted to external servers beyond their intended endpoints (GitHub API, nad.fun API, Monad RPC)
+- The skill operates entirely within your local environment
+
+### .env File Generation
+- The Install Wizard generates a `.env` file on your local machine
+- This file is **never committed** to version control (gitignored)
+- You can review and edit it at any time
+
+### Credential Scope
+- `GITHUB_TOKEN`: Used only for GitHub API calls to read public repository data
+- `PRIVATE_KEY`: Used only for EVM transaction signing (never exposed in plain text)
+- `BUILDER_ID`: Local identifier for A2A protocol
+- `NAD_FUN_API_KEY`: Used only for nad.fun token creation API
+
+### Testnet Mode
+- Default operation is on **testnet** for safety
+- Mainnet requires explicit configuration
+- Always review transactions before signing
+
+---
+
+**The AI agent skill for memecoin launches on nad.fun.** Analyze GitHub projects, generate token metadata, and launch directly on nad.fun bonding curves.
 
 ## What is TokenBroker?
 
-TokenBroker is a **meta-skill** that orchestrates the end-to-end token launch workflow for AI agents. Instead of handling all operations directly, TokenBroker:
+TokenBroker is a **complete memecoin launch solution** for AI agents:
 
-1. **Analyzes** GitHub projects to identify launch opportunities
-2. **Generates** compelling token metadata (names, symbols, descriptions)
-3. **Delegates** actual on-chain operations to the `nadfun` skill
-4. **Promotes** launches with coordinated marketing campaigns
-
-TokenBroker coordinates; `nadfun` and `monad-development` execute.
+1. **Analyzes** GitHub projects to identify meme-worthy projects
+2. **Generates** token names, tickers, descriptions, and marketing content
+3. **Launches** tokens on nad.fun (image, metadata, salt, deploy)
+4. **Promotes** launches with X/Telegram/Discord content
 
 ## When to Use This Skill
 
-### TokenBroker Handles Locally
-- GitHub repository monitoring and analysis
-- Project metadata extraction
-- Token naming and description generation
-- Marketing content creation
-- Builder reputation tracking
-- Post-launch promotion
+### TokenBroker Handles
+- GitHub repository analysis and scoring
+- Token identity generation (name, ticker, description)
+- Meme-style image generation
+- Nad.fun API integration (upload, salt mining)
+- Marketing content creation (X threads, Telegram, Discord)
+- Full launch orchestration
 
-### Delegate to nadfun Skill
-- Image upload to IPFS
-- Metadata upload to IPFS
-- Salt mining for vanity addresses
-- On-chain token creation
-- Trading operations (buy/sell)
-- Bonding curve interactions
+### Not Included
+- Wallet private key management (handled by host)
+- On-chain transactions beyond nad.fun bonding curves
 
-### Delegate to monad-development Skill
-- Smart contract verification
-- Contract ABIs and interfaces
-- On-chain data queries (beyond nad.fun)
-- Wallet management for deployment
+## Architecture (tokenbroker/src/generators/)
 
-## Core Concept
-
-1. **Track**: Agent monitors GitHub repos for significant activity (commits, releases, tags).
-2. **Analyze**: TokenBroker extracts project context and generates metadata proposals.
-3. **Delegate**: When ready to launch, invoke `nadfun` skill for on-chain execution.
-4. **Promote**: Generate marketing content and coordinate post-launch activities.
-
-## Module Structure (tokenbroker/)
-- `SKILL.md`: Root configuration and integration guide.
-- `GITHUB.md`: Repository monitoring and launch trigger detection.
-- `METADATA.md`: Token identity generation and proposal.
-- `PROJECT-SCAN.md`: Codebase analysis for context extraction.
-- `PROMO.md`: Marketing content generation for launches.
-- `STATS.md`: Builder reputation and trust metrics.
-- `SETUP.md`: Installation and configuration guide.
-
-## Skill Dependencies
-
-TokenBroker orchestrates but relies on these skills for on-chain execution:
-
-| Skill | Purpose |
-| ----- | ------- |
-| [`nadfun`](https://nad.fun/skill.md) | Token creation, image/metadata upload, salt mining, bonding curve interactions |
-| [`monad-development`](https://gist.github.com/moltilad/31707d0fc206b960f4cbb13ea11954c2) | Contract verification, ABIs, wallet management |
+```
+generators/
+├── identity.ts     # Token name, ticker, description generation
+├── reasoning.ts    # Investment thesis, narrative creation
+├── promo.ts        # X threads, Telegram, Discord content
+├── nadfun.ts       # Nad.fun API: upload image/metadata, mine salt
+└── index.ts        # Pipeline orchestrator (generateAll)
+```
 
 ## Quick Start for Agents
 
-1. Read `GITHUB.md` to begin monitoring repositories.
-2. Use `PROJECT-SCAN.md` to extract project context.
-3. Follow `METADATA.md` to propose token details.
-4. **Delegate to nadfun** for actual token creation.
-5. Use `PROMO.md` for post-launch marketing.
+```typescript
+import { generateAll, prepareLaunch } from './generators/index.js';
 
-## Install Wizard Flow
+// 1. Analyze repo and generate all launch assets
+const assets = await generateAll({
+  repoAnalysis: await analyzeGitHubRepo('https://github.com/user/project')
+});
 
-```bash
-npx clawhub install tokenbroker
+console.log('Token name:', assets.identity.name);
+console.log('Ticker:', assets.identity.ticker);
+console.log('X Thread:', assets.promo.xThread.tweets);
+
+// 2. Prepare launch on nad.fun (API calls only)
+const prepared = await prepareLaunch(assets.identity, 'mainnet');
+// -> Returns: { imageUri, metadataUri, salt, saltAddress }
+
+// 3. Deploy on-chain (requires ethers + private key)
+// Use deploy.ts module with wallet for on-chain execution
 ```
 
-The Install Wizard guides you through:
+## Generator Functions
 
-### Step 1: Project Validation
-- Scan current directory for project structure
-- Validate essential files and dependencies
-- No GitHub connection required yet
+### generateIdentity(input)
+Analyzes repo and generates token identity:
+```typescript
+{
+  name: "SWAPPRO",
+  ticker: "SWAP", 
+  tagline: "The next generation DeFi protocol",
+  description: "Full token description...",
+  nameReasoning: "How the name was derived"
+}
+```
 
-### Step 2: User Profile Setup
-- Auto-configure builder profile via A2A communication
-- Set up reputation tracking preferences
-- Connect to existing nad.fun identity
+### generateReasoning(input)
+Creates investment thesis and narrative:
+```typescript
+{
+  investmentThesis: "Why this token should exist...",
+  problemStatement: "The problem being solved",
+  solution: "The proposed solution",
+  marketOpportunity: "Market size and opportunity",
+  competitiveAdvantage: "Why this wins",
+  tokenUtilityRationale: "Token value proposition",
+  vision: "Long-term vision"
+}
+```
 
-### Step 3: GitHub OAuth Integration
-- OAuth 2.0 flow for repository monitoring
-- Device code fallback for CLI environments
-- Personal Access Token (PAT) support
+### generatePromo(input)
+Generates marketing content:
+```typescript
+{
+  xThread: { title, tweets: [...], hashtags, mentions },
+  telegramPost: { title, content, hasButton, buttonText, buttonUrl },
+  discordAnnouncement: { title, content, hasEmbed, embedColor, embedFields },
+  tagline: "Marketing tagline",
+  elevatorPitch: "One-liner pitch"
+}
+```
 
-### Step 4: Environment Configuration
-- Generate `.env` with required secrets
-- Configure network settings (testnet/mainnet)
-- Set up nad.fun API credentials
+### prepareLaunch(identity, network)
+Prepares token for nad.fun launch (API calls):
+```typescript
+{
+  imageUri: "ipfs://...",
+  metadataUri: "ipfs://...", 
+  salt: "0x...",
+  saltAddress: "0x..."
+}
+```
+
+## Nad.fun Integration
+
+TokenBroker integrates directly with nad.fun API:
+
+| Step | API Endpoint | Function |
+|------|-------------|----------|
+| 1 | POST /agent/token/image | `uploadImage()` |
+| 2 | POST /agent/token/metadata | `uploadMetadata()` |
+| 3 | POST /agent/salt | `mineSalt()` |
+| 4 | BondingCurveRouter.create() | On-chain deployment |
+
+### Network Configuration
+| Network | API | RPC |
+|---------|-----|-----|
+| Testnet | https://dev-api.nad.fun | https://testnet-rpc.monad.xyz |
+| Mainnet | https://api.nadapp.net | https://rpc.monad.xyz |
+
+## Install
+
+```bash
+npm install
+```
 
 ## Configuration
 
 ```bash
-# Network Settings
-NETWORK=testnet # or mainnet
+# Network (testnet | mainnet)
+NETWORK=mainnet
 
-# GitHub Integration
+# GitHub (optional - for repo analysis)
 GITHUB_TOKEN=ghp_...
-
-# Builder Profile (auto-configured via A2A)
-BUILDER_ID=...
-REPUTATION_SCORE=...
 ```
 
-## Network References
+## For On-Chain Deployment
 
-| Network | RPC | Chain ID | API |
-|---------|-----|----------|-----|
-| Testnet | https://testnet-rpc.monad.xyz | 10143 | https://dev-api.nad.fun |
-| Mainnet | https://rpc.monad.xyz | 143 | https://api.nadapp.net |
-
-## Security Best Practices
-
-**TokenBroker is a meta-skill that orchestrates operations but does not directly handle, store, or manage sensitive credentials.**
-
-### Credential Handling Architecture
-
-- **Orchestration Only**: TokenBroker coordinates workflows between skills but never directly accesses private keys, wallet credentials, or API secrets
-- **Runtime Injection**: All sensitive credentials are injected by the host environment at runtime via environment variables
-- **No Persistence**: The skill never logs, exfiltrates, or persists sensitive data to disk, storage systems, or third-party services
-- **Delegated Security**: Sensitive operations (wallet management, token creation, trading) are delegated to dependency skills (`nadfun`, `monad-development`) which implement their own security protocols
-
-### Environment Variable Placeholders
-
-When documenting configuration, use placeholder notation:
+TokenBroker prepares all launch data. For actual on-chain deployment:
 
 ```bash
-# GitHub credentials - provided by host environment
-GITHUB_TOKEN=${GITHUB_TOKEN}
-
-# Wallet private key - never handled by TokenBroker
-PRIVATE_KEY=${PRIVATE_KEY}
-
-# Builder identity - injected via A2A profile setup
-BUILDER_ID=${BUILDER_ID}
+npm install ethers
 ```
 
-### Credential Boundaries
+Then use with a wallet:
+```typescript
+import { prepareLaunch } from './generators/nadfun.js';
+import { ethers } from 'ethers';
 
-| Credential Type | Handled By | TokenBroker Role |
-|----------------|------------|------------------|
-| GitHub PAT/OAuth | GitHub API directly | Requests token, doesn't store |
-| Wallet Private Key | `monad-development` skill | Orchestrates operations only |
-| Nad.fun API Key | `nadfun` skill | Delegates credential handling |
-| Builder Profile | A2A communication | Receives profile data only |
+const prepared = await prepareLaunch(identity, 'mainnet');
 
-### Security Disclaimer
-
-> **Important**: TokenBroker is designed with a security-first architecture. It explicitly avoids:
-> - Direct storage or management of private keys
-> - Writing credentials to configuration files
-> - Logging sensitive values in any form
-> - Transmitting credentials to third-party endpoints
->
-> All credential handling is the responsibility of the host environment and dependency skills with their own security certifications.
+// Deploy with wallet
+const wallet = new ethers.Wallet(privateKey, provider);
+const router = new ethers.Contract(BONDING_CURVE_ROUTER, abi, wallet);
+await router.create(tokenParams, fee, toll, tradingAmt, { value: deployFee });
+```
 
 ---
 

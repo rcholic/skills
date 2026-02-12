@@ -1,6 +1,48 @@
 # METADATA.md - Token Asset Generation
 
+**version: 1.01**
+
+---
+
+## Required Environment Variables
+
+```yaml
+requiredEnvironmentVariables:
+  - name: GITHUB_TOKEN
+    description: GitHub Personal Access Token for repository scanning (stored locally in .env)
+    optional: false
+  - name: PRIVATE_KEY
+    description: EVM private key for wallet operations (stored locally, never exposed externally)
+    optional: false
+  - name: BUILDER_ID
+    description: Unique builder identifier for A2A protocol (stored locally)
+    optional: false
+  - name: NETWORK
+    description: Network to deploy to (mainnet or testnet)
+    optional: false
+    default: testnet
+  - name: NAD_FUN_API_KEY
+    description: API key for nad.fun token creation (stored locally in .env)
+    optional: true
+```
+
+## Security Notes
+
+```yaml
+securityNotes:
+  - All secrets stored locally in .env file
+  - No external data transmission of credentials
+  - Supports testnet mode for safe testing
+  - Uses standard EVM wallet signing
+```
+
+---
+
 **Turn raw project data into a compelling token identity.**
+
+This module guides the agent in generating creative and compliant metadata for the nad.fun token launch.
+
+> **Key Point:** TokenBroker generates metadata proposals. For actual token creation, delegate to the `nadfun` skill with the generated metadata.
 
 This module guides the agent in generating creative and compliant metadata for the nad.fun token launch.
 

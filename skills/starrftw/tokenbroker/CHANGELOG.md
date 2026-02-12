@@ -1,5 +1,11 @@
 # TokenBroker Changelog
 
+## [1.01] - 2026-02-10
+
+### Changed
+- Updated install command to clawhub@latest
+- Removed Post-Setup Launch Suggestions section from landing page
+
 ## [1.0.1] - 2026-02-07
 
 ### Security
