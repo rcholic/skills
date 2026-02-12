@@ -9,16 +9,18 @@
 """
 Ad-Ready: Generate advertising images from product URLs using brand-aware AI pipeline.
 
-IMPORTANT: All inputs should be provided for best results:
-  --product-image  Product photo (download from product page)
-  --logo           Brand logo (download from brand website)
-  --reference      Reference ad for style cloning
+IMPORTANT inputs:
+  --product-image  Product photo (download from product page) — REQUIRED
+  --logo           Brand logo — OPTIONAL (use only if found easily in good quality)
+  --reference      Reference ad to clone — OPTIONAL (only when explicitly requested)
   --brand-profile  Brand profile (NEVER leave as "No Brand" if brand is known)
   --prompt-profile Funnel stage (match to campaign objective)
 
+Note: logo and reference use server-side bypass. Empty string = not used.
+
 Usage:
     uv run generate.py --product-url "https://shop.example.com/product" \
-        --product-image product.jpg --logo logo.png --reference ref-ad.jpg \
+        --product-image product.jpg --logo logo.png \
         --brand-profile Nike --prompt-profile Master_prompt_05_Conversion \
         --output ad.png
 
@@ -55,8 +57,42 @@ PROMPT_PROFILES = [
     "Master_prompt_05_Conversion",
     "Master_prompt_06_Retention",
     "Master_prompt_07_Loyalty",
-    "Master_prompt_08_Advocacy"
+    "Master_prompt_08_Advocacy",
+    "Master_prompt_09_Morfeo_Creative"
 ]
+
+# Stage selection guide — use this to choose the right profile for each request
+# ┌─────────────────────┬──────────────────────────────────────────────────────────────────┐
+# │ Stage               │ Best For                                                         │
+# ├─────────────────────┼──────────────────────────────────────────────────────────────────┤
+# │ 01_Awareness        │ Brand discovery, first impressions. Dynamic scenes, world-build  │
+# │                     │ -ing, high-concept creativity. Scroll-stopping visuals.           │
+# │ 02_Interest         │ Sustained attention, introduce value. Clear visual idea with a   │
+# │                     │ micro-world hinting at use-case. "Learn More" CTAs.              │
+# │ 03_Consideration    │ Informed evaluation. Communicate WHAT product does, key          │
+# │                     │ differentiator, proof cues. Structured and informative.           │
+# │ 04_Evaluation       │ Validate purchase decision. Trust anchors, proof, authority.     │
+# │                     │ Reviews, certifications, quality signals.                         │
+# │ 05_Conversion       │ Trigger purchase action. Clean, minimal, CTA-dominant.           │
+# │                     │ ⚠️ WARNING: Produces minimal/sterile visuals by design.           │
+# │ 06_Retention        │ Post-purchase confidence. "You made the right choice."           │
+# │                     │ Gentle guidance, onboarding feel.                                │
+# │ 07_Loyalty          │ Emotional bond over time. Lifestyle, identity, belonging.        │
+# │                     │ Editorial and aspirational.                                       │
+# │ 08_Advocacy         │ Turn customers into ambassadors. Share-worthy, community,        │
+# │                     │ signal belonging. Organic, social-native feel.                    │
+# │ 09_Morfeo_Creative  │ 🎨 CREATIVE MODE. Cinematic, narrative-rich, slightly surreal.   │
+# │                     │ Best for visually striking ads. NEVER white backgrounds.          │
+# │                     │ Think: movie stills + magical realism + high fashion.             │
+# └─────────────────────┴──────────────────────────────────────────────────────────────────┘
+#
+# DEFAULT SELECTION LOGIC:
+# - If user says "ad" or "anuncio" without specifying → use 09_Morfeo_Creative
+# - If user asks for "awareness" / "brand discovery" → use 01_Awareness
+# - If user asks for "conversion" / "compra" / "CTA" → use 05_Conversion
+# - If user asks for creative/original/surreal → use 09_Morfeo_Creative
+# - If user asks for "lifestyle" / "editorial" → use 07_Loyalty
+# - When in doubt, prefer 09_Morfeo_Creative over 05_Conversion
 
 ASPECT_RATIOS = ["1:1", "4:5", "5:4", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "21:9"]
 
@@ -305,12 +341,6 @@ def validate_inputs(args) -> list[str]:
     if not args.product_image and not args.auto_fetch:
         warnings.append("⚠️  No --product-image provided. Scraping is fragile — provide one for best results.")
 
-    if not args.logo and not args.auto_fetch:
-        warnings.append("⚠️  No --logo provided. Brand logo is important for brand-consistent output.")
-
-    if not args.reference:
-        warnings.append("💡 No --reference provided. A style reference image improves output quality significantly.")
-
     return warnings
 
 
@@ -322,7 +352,7 @@ def main():
 Examples:
   # Full generation with all inputs:
   uv run generate.py --product-url "https://..." --product-image product.jpg \\
-    --logo logo.png --reference ref.jpg --brand-profile Nike \\
+    --logo logo.png --brand-profile Nike \\
     --prompt-profile Master_prompt_05_Conversion --output ad.png
 
   # Auto-fetch product image and logo:
@@ -334,14 +364,18 @@ Examples:
     parser.add_argument("--product-url", required=True, help="Product page URL to scrape")
     parser.add_argument("--product-image", help="Product image (local path or URL). RECOMMENDED.")
     parser.add_argument("--model", "-m", help="Model/talent face image (local path or URL)")
-    parser.add_argument("--reference", help="Reference/style ad image (local path or URL). Improves quality.")
-    parser.add_argument("--logo", help="Brand logo image (local path or URL). RECOMMENDED.")
+    parser.add_argument("--reference", help="Reference ad to clone (local path or URL). OPTIONAL — only when explicitly requested.")
+    parser.add_argument("--logo", help="Brand logo image (local path or URL). OPTIONAL — use if found easily in good quality.")
     parser.add_argument("--brand-profile", default="No Brand",
                        help="Brand profile name from catalog. Use brand-analyzer to create new ones.")
-    parser.add_argument("--prompt-profile", default="Master_prompt_05_Conversion",
-                       help="Funnel stage prompt profile (default: Conversion)")
+    parser.add_argument("--prompt-profile", default="Master_prompt_09_Morfeo_Creative",
+                       help="Funnel stage prompt profile (default: Morfeo Creative)")
     parser.add_argument("--aspect-ratio", default="4:5", choices=ASPECT_RATIOS,
                        help="Output aspect ratio (default: 4:5)")
+    parser.add_argument("--language", default="es",
+                       help="Output language for ad copy/CTA (default: es)")
+    parser.add_argument("--creative-brief", default="",
+                       help="Creative direction text: describe scene, mood, style concept")
     parser.add_argument("--output", "-o", required=True, help="Output filename")
     parser.add_argument("--api-key", help="ComfyDeploy API key (or set COMFY_DEPLOY_API_KEY)")
     parser.add_argument("--auto-fetch", action="store_true",
@@ -430,8 +464,6 @@ Examples:
 
         if args.logo:
             marca_url = resolve_image(client, api_key, args.logo)
-        else:
-            print("  ⚠ No brand logo — output may lack brand consistency", flush=True)
 
         inputs = {
             "producto": producto_url,
@@ -441,25 +473,32 @@ Examples:
             "marca": marca_url,
             "brand_profile": args.brand_profile,
             "prompt_profile": args.prompt_profile,
-            "aspect_ratio": args.aspect_ratio
+            "aspect_ratio": args.aspect_ratio,
         }
+
+        # Only include language and creative_brief when explicitly provided (on-demand)
+        if args.language and args.language != "es":
+            inputs["language"] = args.language
+        if args.creative_brief:
+            inputs["creative_brief"] = args.creative_brief
 
         print(f"\n🎯 Generation Settings:", flush=True)
         print(f"  Product URL:  {args.product_url[:70]}{'...' if len(args.product_url) > 70 else ''}", flush=True)
         print(f"  Brand:        {args.brand_profile}", flush=True)
         print(f"  Funnel Stage: {args.prompt_profile.split('_')[-1]}", flush=True)
         print(f"  Aspect Ratio: {args.aspect_ratio}", flush=True)
+        print(f"  Language:     {args.language}", flush=True)
+        if args.creative_brief:
+            print(f"  Brief:        {args.creative_brief[:60]}{'...' if len(args.creative_brief) > 60 else ''}", flush=True)
         print(f"  Product Img:  {'✓' if producto_url else '✗ (none)'}", flush=True)
-        print(f"  Logo:         {'✓' if marca_url else '✗ (none)'}", flush=True)
-        print(f"  Reference:    {'✓' if referencia_url else '✗ (none)'}", flush=True)
+        print(f"  Logo:         {'✓' if marca_url else '— (skipped)'}", flush=True)
+        print(f"  Reference:    {'✓' if referencia_url else '— (off)'}", flush=True)
         print(f"  Model:        {'✓' if model_url else '— (no talent)'}", flush=True)
 
         # Check for critical missing inputs
         missing_critical = []
         if not producto_url:
             missing_critical.append("product image")
-        if not marca_url:
-            missing_critical.append("brand logo")
         if args.brand_profile == "No Brand":
             missing_critical.append("brand profile")
 

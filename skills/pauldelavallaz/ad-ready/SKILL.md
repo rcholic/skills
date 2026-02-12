@@ -1,6 +1,24 @@
 ---
 name: ad-ready
-description: Generate professional advertising images from product URLs using the Ad-Ready pipeline on ComfyDeploy. Use when the user wants to create ads for any product by providing a URL, optionally with a brand profile (70+ brands) and funnel stage targeting. Supports model/talent integration, brand-aware creative direction, and multi-format output. Differs from Morpheus (manual fashion photography) — Ad-Ready is URL-driven, brand-intelligent, and funnel-stage aware.
+description: |
+  Generate advertising images automatically from a product URL + brand profile.
+  
+  ✅ USE WHEN:
+  - User provides a product URL (e-commerce link)
+  - Want automated product scraping + image generation
+  - Have a brand profile to apply (70+ brands available)
+  - Need funnel-stage targeting (awareness/consideration/conversion)
+  - Want AI to auto-select model, scene, lighting based on brand
+  
+  ❌ DON'T USE WHEN:
+  - User provides local product image file → use morpheus-fashion-design
+  - Don't need a person in the image → use nano-banana-pro
+  - Want manual control over model, scene, packs → use morpheus-fashion-design
+  - Already have hero image, need variations → use multishot-ugc
+  - Need video output → use veed-ugc after image generation
+  
+  INPUT: Product URL + brand name (optional) + funnel stage (optional)
+  OUTPUT: PNG advertising image with product + model
 ---
 
 # Ad-Ready: AI Advertising Image Generator
@@ -76,37 +94,35 @@ Master prompt files are included at `{baseDir}/configs/Product_to_Ads/`.
 
 ### Reference Analyzer
 
-When reference images (pose, style, location) are provided, they're analyzed with forensic precision:
+Reference images (`referencia`) are **optional** and **off by default**. The pipeline generates creative direction internally from Brand Identity + Campaign Brief. Only use a reference when the user explicitly asks to clone a specific ad's style.
 
-- **POSE_REF** → Body position, limbs, weight, gaze, micro-gestures → replicated EXACTLY
-- **PHOTO_STYLE_REF** → Camera, lens, lighting, grading, grain → derived parameters
-- **LOCATION_REF** → Setting, materials, colors, mood → similar but creatively enhanced
-
-The reference analysis prompt is at `{baseDir}/configs/Reference_Analyzer/reference_analysis_prompt.txt`.
+When used, the reference is analyzed for pose, photographic style, and location cues.
 
 ---
 
 ## ⚠️ CRITICAL: Required Inputs Checklist
 
-Before running ANY ad generation, ensure ALL of these are provided:
+Before running ANY ad generation, ensure these are provided:
 
 | Input | Required? | How to Get It |
 |-------|-----------|---------------|
 | `--product-url` | ✅ ALWAYS | User provides the product page URL |
 | `--product-image` | ✅ ALWAYS | Download from the product page, or user provides |
-| `--logo` | ✅ ALWAYS | Download from brand website or search online. MUST be an image file |
-| `--reference` | ✅ RECOMMENDED | An existing ad whose style we want to clone. Search online or use previously generated images |
 | `--brand-profile` | ✅ NEVER EMPTY | Pick from catalog or run brand-analyzer first. NEVER leave as "No Brand" if a brand is known |
 | `--prompt-profile` | ✅ ALWAYS | Choose based on campaign objective |
 | `--aspect-ratio` | Default: 4:5 | Change if needed for platform |
-| `--model` | ✅ RECOMMENDED | Model/talent face. Ads with talent perform much better |
+| `--model` | 🔶 OPTIONAL | Model/talent face. Ads with talent perform much better. Empty = product-only ad (no person). When used, pick from `~/clawd/models-catalog/catalog/images/` (114 models available) |
+| `--logo` | 🔶 OPTIONAL | Try to find it. Use if good quality & easy to get. Skip if low-res or hard to find. Empty = bypassed |
+| `--reference` | 🔶 OPTIONAL (off) | Only when user explicitly asks to clone a reference ad. Empty = bypassed |
+| `--creative-brief` | 🔶 ON-DEMAND | Only when user gives explicit creative direction. Omit to let pipeline auto-generate from brand profile |
+| `--language` | 🔶 ON-DEMAND | Only when user requests a specific language. Omit to use default (es) |
 
 ### 🚨 NEVER Skip These Steps:
 
 1. **Product image** — Download the main product photo from the product URL. The scraper is fragile; always provide a product image explicitly.
-2. **Brand logo** — Download the logo from the brand's official website or search for "{brand name} logo" online. Must be a clean logo image (PNG preferred).
-3. **Brand profile** — If the brand doesn't exist in the catalog, run `brand-analyzer` skill FIRST to generate one. Never submit with "No Brand" when a brand is known.
-4. **Reference image** — Search for an existing ad or visual with a style that matches what we're generating. This dramatically improves output quality.
+2. **Brand profile** — If the brand doesn't exist in the catalog, run `brand-analyzer` skill FIRST to generate one. Never submit with "No Brand" when a brand is known.
+3. **Brand logo** — TRY to find it (Clearbit, logo.dev, brand website). Use if good quality. If not found or low-res, skip it — the variable accepts empty string (bypassed server-side).
+4. **Reference** — Do NOT search for references by default. Only provide when the user explicitly asks to clone a specific ad or says "find a good ad to clone".
 
 ---
 
@@ -131,22 +147,32 @@ When the user asks to generate an ad:
    → Download clean logo image
    → Save to /tmp/ad-ready-logo.png
 
-5. FIND reference image:
-   → Search for "{brand name} advertisement" or similar
-   → Or use a previously generated ad that has the right style
-   → Save to /tmp/ad-ready-reference.jpg
+5. SELECT prompt profile based on objective:
+   → 🎨 Morfeo_Creative: DEFAULT — cinematic, narrative-rich, slightly surreal. Best visuals.
+   → Awareness: brand discovery, dynamic scenes, world-building, scroll-stoppers
+   → Interest: sustained attention, micro-world hinting at use-case
+   → Consideration: feature communication, proof cues, informative
+   → Evaluation: trust, authority, reviews, certifications
+   → Conversion: ⚠️ MINIMAL by design — clean, CTA-dominant, white backgrounds
+   → Retention: post-purchase confidence, onboarding
+   → Loyalty: editorial, lifestyle, emotional bond
+   → Advocacy: share-worthy, community, belonging
 
-6. SELECT prompt profile based on objective:
-   → Awareness: brand discovery, first impressions
-   → Interest: engagement, curiosity
-   → Consideration: comparison, features
-   → Evaluation: deep dive, trust, proof
-   → Conversion: purchase intent, CTAs (most common)
-   → Retention: post-purchase confidence
-   → Loyalty: emotional bond, lifestyle
-   → Advocacy: social amplification, community
+   DEFAULT SELECTION LOGIC:
+   - Generic "generate an ad" → Morfeo_Creative (09)
+   - "awareness" / "brand discovery" → Awareness (01)
+   - "conversion" / "buy now" / CTA-focused → Conversion (05)
+   - "creative" / "original" / "surreal" → Morfeo_Creative (09)
+   - "lifestyle" / "editorial" → Loyalty (07)
+   - When in doubt → Morfeo_Creative (09), NOT Conversion
 
-7. RUN the generation with ALL inputs filled
+5b. SELECT MODEL (optional):
+   → If user wants a person in the ad: pick from ~/clawd/models-catalog/catalog/images/model_XX.jpg (114 available)
+   → If user wants product-only ad (no person): leave --model empty
+   → If user doesn't specify: ASK if they want a model or product-only
+   → Catalog preview: catalog.json at ~/clawd/models-catalog/catalog/catalog.json
+
+6. RUN the generation with ALL inputs filled
 ```
 
 ---
@@ -159,11 +185,21 @@ COMFY_DEPLOY_API_KEY="$KEY" uv run {baseDir}/scripts/generate.py \
   --product-url "https://shop.example.com/product" \
   --product-image "/tmp/product-photo.jpg" \
   --logo "/tmp/brand-logo.png" \
-  --reference "/tmp/reference-ad.jpg" \
   --model "models-catalog/catalog/images/model_15.jpg" \
   --brand-profile "Nike" \
   --prompt-profile "Master_prompt_05_Conversion" \
   --aspect-ratio "4:5" \
+  --output "ad-output.png"
+```
+
+### With reference (only when explicitly requested):
+```bash
+COMFY_DEPLOY_API_KEY="$KEY" uv run {baseDir}/scripts/generate.py \
+  --product-url "https://shop.example.com/product" \
+  --product-image "/tmp/product-photo.jpg" \
+  --reference "/tmp/reference-ad.jpg" \
+  --brand-profile "Nike" \
+  --prompt-profile "Master_prompt_01_Awareness" \
   --output "ad-output.png"
 ```
 
@@ -195,12 +231,14 @@ uv run {baseDir}/scripts/generate.py --list-brands
 |----------|------|-------------|
 | `product_url` | string | Product page URL to scrape |
 | `producto` | image URL | Product image (uploaded to ComfyDeploy) |
-| `model` | image URL | Model/talent face reference |
-| `referencia` | image URL | Style reference ad image (used for both pose + location) |
-| `marca` | image URL | Brand logo image |
+| `model` | image URL | Model/talent face reference. **OPTIONAL** — empty = product-only ad without a person. When used, select from models catalog (`~/clawd/models-catalog/catalog/images/model_XX.jpg`, 114 available) |
+| `referencia` | image URL | Style reference ad — OPTIONAL, empty = bypassed. Only when user asks to clone a reference |
+| `marca` | image URL | Brand logo — OPTIONAL, empty = bypassed. Use if found easily in good quality |
 | `brand_profile` | enum | Brand name from catalog (70+ brands) |
 | `prompt_profile` | enum | Funnel stage master prompt |
 | `aspect_ratio` | enum | Output format (1:1, 4:5, 5:4, 9:16, etc.) |
+| `language` | string | **ON-DEMAND ONLY.** Output language for ad copy/CTA. Default: `es`. Only send when the user explicitly requests a different language. Otherwise, DO NOT include this parameter — let the pipeline use its default. |
+| `creative_brief` | string | **ON-DEMAND ONLY.** Free-text creative direction override. Only use when the user explicitly asks for a specific creative direction, scene, mood, or concept. Otherwise, DO NOT include this parameter — let the pipeline generate its own brief from the Brand Identity profile automatically. |
 
 ---
 
@@ -263,6 +301,20 @@ uv run {baseDir}/scripts/generate.py --list-brands
 **CTA:** Optional or absent: Join the Movement, Part of Us
 **Visual Hierarchy:** Mood → Talent (identity proxy) → Product (symbol) → Brand
 
+### 09 — Morfeo Creative 🎨 (DEFAULT)
+**Goal:** Maximum visual impact, narrative-rich, cinematic quality
+**Reject:** White backgrounds, studio shots, "product on table", generic poses, sterile compositions
+**Strategy:** Build immersive WORLDS, not backgrounds. Talent is a CHARACTER with emotion and action. Subtle surreal/magical elements elevate the mundane. Think movie stills + magical realism + high fashion.
+**CTA:** Present but integrated into scene aesthetics
+**Visual Hierarchy:** Scene → Talent (as character) → Product (organic in scene) → CTA
+**Creative Philosophy:**
+- NEVER a white background or studio
+- Every image has depth (foreground/midground/background layers)
+- Lighting is narrative (golden hour, practicals, colored atmosphere)
+- One subtle surreal element per scene (impossible beauty, dream-logic detail)
+- Wardrobe is costume design, not "simple clothes"
+- Camera has personality (specific film stocks, intentional imperfections)
+
 ---
 
 ## Creating New Ad Types
@@ -280,13 +332,14 @@ To create a new funnel stage or specialized ad type:
 
 ### Key Evolution Pattern Across Stages:
 
-| Aspect | Early (01-02) | Mid (03-05) | Late (06-08) |
-|--------|--------------|-------------|--------------|
-| Talent role | Attention anchor | Credibility anchor | Identity mirror |
-| Product role | Secondary hero | Evaluation hero | Familiar symbol |
-| CTA | Soft/exploratory | Proof-led → Decisive | Guidance → Optional |
-| Copy voice | Intriguing | Clarity, proof, action | Supportive → Proud |
-| Visual density | High-concept | Structured, scannable | Editorial, spacious |
+| Aspect | Early (01-02) | Mid (03-05) | Late (06-08) | Morfeo (09) |
+|--------|--------------|-------------|--------------|-------------|
+| Talent role | Attention anchor | Credibility anchor | Identity mirror | Character in story |
+| Product role | Secondary hero | Evaluation hero | Familiar symbol | Organic in world |
+| CTA | Soft/exploratory | Proof-led → Decisive | Guidance → Optional | Integrated/aesthetic |
+| Copy voice | Intriguing | Clarity, proof, action | Supportive → Proud | Evocative/poetic |
+| Visual density | High-concept | Structured, scannable | Editorial, spacious | Cinematic/layered |
+| Environment | World-building | Context-rich | Lifestyle | Immersive + surreal |
 | Environment | World-building | Context-rich | Lifestyle, intimate |
 
 ---
@@ -298,12 +351,13 @@ To create a new funnel stage or specialized ad type:
 - **product_1-4**: Shape, label text, material, proportions preserved 1:1
 - **brand_logo**: UI/button style derived from logo geometry
 
-### Soft References (creative guidance)
-- **pose_ref**: Body position replicated EXACTLY (spine, limbs, weight, gaze, micro-gestures)
-- **photo_style_ref**: Camera/lighting/grading/grain derived (can be too literal)
-- **location_ref**: Environment inspired but creatively enhanced
+### Soft References (optional, off by default)
+Reference image input (`referencia`) is optional. When provided, it's analyzed for:
+- **POSE_REF** → Body position, limbs, weight, gaze, micro-gestures
+- **PHOTO_STYLE_REF** → Camera, lens, lighting, grading, grain
+- **LOCATION_REF** → Setting, materials, colors, mood
 
-In the live deployment, the **same reference image** feeds both `pose_ref` and `location_ref`.
+When empty (default), creative direction comes from Brand Identity + Campaign Brief alone.
 
 ---
 
@@ -360,7 +414,8 @@ The skill includes reference copies of all pipeline configuration files:
 │   ├── Master_prompt_05_Conversion.json
 │   ├── Master_prompt_06_Retention.json
 │   ├── Master_prompt_07_Loyalty.json
-│   └── Master_prompt_08_Advocacy.json
+│   ├── Master_prompt_08_Advocacy.json
+│   └── Master_prompt_09_Morfeo_Creative.json  # 🎨 DEFAULT — cinematic, surreal, narrative
 └── Reference_Analyzer/
     └── reference_analysis_prompt.txt   # Pose/style/location analysis prompt
 ```
@@ -372,11 +427,10 @@ These configs are the canonical reference for the pipeline's behavior. The actua
 ## Known Limitations
 
 1. **Product image scraping is fragile** — always provide product images manually
-2. **photo_style_ref can be too literal** — style reference may be replicated too closely
-3. **Some websites block scraping** — provide product data manually when scraping fails
-4. **Single reference = pose + location** — live deployment uses one image for both
-5. **Gemini hallucinations** — occasional issues in complex reasoning steps
-6. **No brief editing** — brief is generated automatically; manual override not yet supported
+2. **Some websites block scraping** — provide product data manually when scraping fails
+3. **Gemini hallucinations** — occasional issues in complex reasoning steps
+4. **No brief editing** — brief is generated automatically; manual override not yet supported
+5. **Logo & reference are optional** — both use server-side bypass; empty string = not used. Logo: use if good quality. Reference: only on explicit request
 
 ---
 
