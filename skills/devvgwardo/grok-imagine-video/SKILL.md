@@ -1,6 +1,9 @@
 ---
 name: grok-imagine-video
 description: xAI Grok Imagine Video API integration for text-to-video, image-to-video, and video editing via natural language. Use when you need to generate videos from text prompts, animate static images into videos, or edit existing videos with natural language instructions. Supports conversational video generation across messaging platforms with async polling, progress updates, and automatic delivery.
+required_env_vars:
+  - XAI_API_KEY
+primary_credential: XAI_API_KEY
 ---
 
 # Grok Imagine Video

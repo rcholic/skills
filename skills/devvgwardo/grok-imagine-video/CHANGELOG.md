@@ -2,6 +2,12 @@
 
 All notable changes to the Grok Imagine Video skill will be documented in this file.
 
+## [1.0.3] - 2026-02-11
+
+### Fixed
+- Added `required_env_vars` and `primary_credential` declarations to SKILL.md frontmatter to properly advertise the `XAI_API_KEY` dependency in skill registry metadata
+- Removed unrelated Bash permissions from `.claude/settings.local.json` (`npx next build`, `gh auth`, `git init/add/commit`, `gh repo create`) that were left over from development and unrelated to the skill's purpose
+
 ## [1.0.1] - 2026-02-11
 
 ### Fixed
