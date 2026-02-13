@@ -95,6 +95,36 @@ function buildPublish(opts) {
   });
 }
 
+// Build a bundle publish message containing Gene + Capsule (+ optional EvolutionEvent).
+// Hub requires payload.assets = [Gene, Capsule] since bundle enforcement was added.
+function buildPublishBundle(opts) {
+  var o = opts || {};
+  var gene = o.gene;
+  var capsule = o.capsule;
+  var event = o.event || null;
+  if (!gene || gene.type !== 'Gene' || !gene.id) {
+    throw new Error('publishBundle: gene must be a valid Gene with type and id');
+  }
+  if (!capsule || capsule.type !== 'Capsule' || !capsule.id) {
+    throw new Error('publishBundle: capsule must be a valid Capsule with type and id');
+  }
+  var geneAssetId = gene.asset_id || computeAssetId(gene);
+  var capsuleAssetId = capsule.asset_id || computeAssetId(capsule);
+  var nodeSecret = process.env.A2A_NODE_SECRET || getNodeId();
+  var signatureInput = [geneAssetId, capsuleAssetId].sort().join('|');
+  var signature = crypto.createHmac('sha256', nodeSecret).update(signatureInput).digest('hex');
+  var assets = [gene, capsule];
+  if (event && event.type === 'EvolutionEvent') assets.push(event);
+  return buildMessage({
+    messageType: 'publish',
+    senderId: o.nodeId,
+    payload: {
+      assets: assets,
+      signature: signature,
+    },
+  });
+}
+
 function buildFetch(opts) {
   var o = opts || {};
   return buildMessage({
@@ -310,6 +340,7 @@ module.exports = {
   buildMessage,
   buildHello,
   buildPublish,
+  buildPublishBundle,
   buildFetch,
   buildReport,
   buildDecision,

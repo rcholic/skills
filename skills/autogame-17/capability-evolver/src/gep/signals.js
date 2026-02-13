@@ -70,21 +70,28 @@ function analyzeRecentHistory(recentEvents) {
 
   var recentIntents = recent.map(function(e) { return e.intent || 'unknown'; });
 
-  return { suppressedSignals: suppressedSignals, recentIntents: recentIntents, consecutiveRepairCount: consecutiveRepairCount, signalFreq: signalFreq, geneFreq: geneFreq };
+  // Count empty cycles (blast_radius.files === 0) in last 8 events.
+  // High ratio indicates the evolver is spinning without producing real changes.
+  var emptyCycleCount = 0;
+  for (var ec = 0; ec < tail.length; ec++) {
+    var br = tail[ec].blast_radius;
+    var em = tail[ec].meta && tail[ec].meta.empty_cycle;
+    if (em || (br && br.files === 0 && br.lines === 0)) {
+      emptyCycleCount++;
+    }
+  }
+
+  return { suppressedSignals: suppressedSignals, recentIntents: recentIntents, consecutiveRepairCount: consecutiveRepairCount, emptyCycleCount: emptyCycleCount, signalFreq: signalFreq, geneFreq: geneFreq };
 }
 
 function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, userSnippet, recentEvents }) {
   var signals = [];
-  var runtimeCorpus = [
+  var corpus = [
     String(recentSessionTranscript || ''),
     String(todayLog || ''),
-  ].join('\n');
-  var contextCorpus = [
     String(memorySnippet || ''),
     String(userSnippet || ''),
   ].join('\n');
-  var corpus = [runtimeCorpus, contextCorpus].join('\n');
-  var runtimeLower = runtimeCorpus.toLowerCase();
   var lower = corpus.toLowerCase();
 
   // Analyze recent evolution history for de-duplication
@@ -92,13 +99,12 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
 
   // --- Defensive signals (errors, missing resources) ---
 
-  // Detect active errors only from runtime logs, not from long-term memory text.
-  var errorHit = /\[error|error:|exception|fail|failed|iserror":true/.test(runtimeLower);
+  var errorHit = /\[error|error:|exception|fail|failed|iserror":true/.test(lower);
   if (errorHit) signals.push('log_error');
 
   // Error signature (more reproducible than a coarse "log_error" tag).
   try {
-    var lines = runtimeCorpus
+    var lines = corpus
       .split('\n')
       .map(function (l) { return String(l || '').trim(); })
       .filter(Boolean);
@@ -127,7 +133,7 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
   // Count repeated identical errors -- these indicate systemic issues that need automated fixes
   try {
     var errorCounts = {};
-    var errPatterns = runtimeCorpus.match(/(?:LLM error|"error"|"status":\s*"error")[^}]{0,200}/gi) || [];
+    var errPatterns = corpus.match(/(?:LLM error|"error"|"status":\s*"error")[^}]{0,200}/gi) || [];
     for (var ep = 0; ep < errPatterns.length; ep++) {
       // Normalize to a short key
       var key = errPatterns[ep].replace(/\s+/g, ' ').slice(0, 100);
@@ -143,26 +149,8 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
   } catch (e) {}
 
   // --- Unsupported input type (e.g. GIF, video formats the LLM can't handle) ---
-  if (/unsupported mime|unsupported.*type|invalid.*mime/i.test(runtimeLower)) {
+  if (/unsupported mime|unsupported.*type|invalid.*mime/i.test(lower)) {
     signals.push('unsupported_input_type');
-  }
-
-  // OpenClaw platform self-heal marker.
-  // These indicate infra/channel recovered by OpenClaw itself, not by evolver changes.
-  // IMPORTANT: must match explicit recovery *phrases*, not generic operational words like
-  // "gateway" or "ws client ready" which appear in every normal cycle.
-  var openclawSelfHealed =
-    /gateway restart|gateway auto-?repair|openclaw.*(?:auto-?repair|self-?heal|recovered|recovery)|ensure-feishu-override.*synced|feishu.*reconnect|ws.*reconnect/i.test(runtimeCorpus);
-
-  // Generic resolved/self-healed marker: issue no longer requires evolver repair attribution.
-  var resolvedBySystem =
-    openclawSelfHealed ||
-    /already fixed|already resolved|issue resolved|auto-?recovered|skip_reused_asset/i.test(runtimeCorpus);
-  if (resolvedBySystem) {
-    signals.push('issue_already_resolved');
-  }
-  if (openclawSelfHealed) {
-    signals.push('openclaw_self_healed');
   }
 
   // --- Opportunity signals (innovation / feature requests) ---
@@ -199,9 +187,19 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
   // --- Tool Usage Analytics ---
   var toolUsage = {};
   var toolMatches = corpus.match(/\[TOOL:\s*(\w+)\]/g) || [];
+  
+  // Extract exec commands to identify benign loops (like watchdog checks)
+  var execCommands = corpus.match(/exec: (node\s+[\w\/\.-]+\.js\s+ensure)/g) || [];
+  var benignExecCount = execCommands.length;
+
   for (var i = 0; i < toolMatches.length; i++) {
     var toolName = toolMatches[i].match(/\[TOOL:\s*(\w+)\]/)[1];
     toolUsage[toolName] = (toolUsage[toolName] || 0) + 1;
+  }
+  
+  // Adjust exec count by subtracting benign commands
+  if (toolUsage['exec']) {
+    toolUsage['exec'] = Math.max(0, toolUsage['exec'] - benignExecCount);
   }
   
   Object.keys(toolUsage).forEach(function(tool) {
@@ -254,15 +252,15 @@ function extractSignals({ recentSessionTranscript, todayLog, memorySnippet, user
     signals.push('force_innovation_after_repair_loop');
   }
 
-  // Hard guard: resolved issue must not continue to drive repair loops.
-  if (signals.includes('issue_already_resolved') || signals.includes('openclaw_self_healed')) {
+  // --- Force innovation after too many empty cycles (zero blast radius) ---
+  // If >= 50% of last 8 cycles produced no code changes, the evolver is spinning idle.
+  // Strip repair signals and force innovate to break the empty loop.
+  if (history.emptyCycleCount >= 4) {
     signals = signals.filter(function (s) {
-      return s !== 'log_error' &&
-        s !== 'recurring_error' &&
-        !s.startsWith('errsig:') &&
-        !s.startsWith('recurring_errsig');
+      return s !== 'log_error' && !s.startsWith('errsig:') && !s.startsWith('recurring_errsig');
     });
-    if (!signals.includes('external_opportunity')) signals.push('external_opportunity');
+    if (!signals.includes('empty_cycle_loop_detected')) signals.push('empty_cycle_loop_detected');
+    if (!signals.includes('stable_success_plateau')) signals.push('stable_success_plateau');
   }
 
   // If no signals at all, add a default innovation signal

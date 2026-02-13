@@ -104,7 +104,7 @@ function normalizeRelPath(relPath) {
 
 function readOpenclawConstraintPolicy() {
   const defaults = {
-    excludePrefixes: ['logs/', 'memory/', 'assets/gep/', 'out/', 'temp/'],
+    excludePrefixes: ['logs/', 'memory/', 'assets/gep/', 'out/', 'temp/', 'node_modules/'],
     excludeExact: ['event.json', 'temp_gep_output.json', 'temp_evolution_output.json', 'evolution_error.log'],
     excludeRegex: ['capsule', 'events?\\.jsonl$'],
     includePrefixes: ['src/', 'scripts/', 'config/'],
@@ -267,6 +267,19 @@ function checkConstraints({ gene, blast }) {
   for (const f of blast.all_changed_files || blast.changed_files || []) {
     if (isForbiddenPath(f, forbidden)) violations.push(`forbidden_path touched: ${f}`);
   }
+  // Critical protection: reject any evolution that deletes/empties core dependencies.
+  for (const f of blast.all_changed_files || blast.changed_files || []) {
+    if (isCriticalProtectedPath(f)) {
+      // Touching a critical file is only a warning, not a violation, UNLESS
+      // the file was deleted or emptied (detected separately).
+      // However, modifying evolver's own source requires high rigor.
+      const norm = normalizeRelPath(f);
+      if (norm.startsWith('skills/evolver/') && gene.category !== 'repair') {
+        // Only repair-intent genes may touch evolver source.
+        violations.push(`critical_path_modified_without_repair_intent: ${norm}`);
+      }
+    }
+  }
   return { ok: violations.length === 0, violations };
 }
 
@@ -295,6 +308,84 @@ function buildEventId(tsIso) {
 function buildCapsuleId(tsIso) {
   const t = Date.parse(tsIso);
   return `capsule_${Number.isFinite(t) ? t : Date.now()}`;
+}
+
+// --- Critical skills / paths that evolver must NEVER delete or overwrite ---
+// These are core dependencies; destroying them will crash the entire system.
+const CRITICAL_PROTECTED_PREFIXES = [
+  'skills/feishu-evolver-wrapper/',
+  'skills/feishu-common/',
+  'skills/feishu-post/',
+  'skills/feishu-card/',
+  'skills/feishu-doc/',
+  'skills/common/',
+  'skills/clawhub/',
+  'skills/clawhub-batch-undelete/',
+  'skills/git-sync/',
+  'skills/evolver/',
+];
+
+// Files at workspace root that must never be deleted by evolver.
+const CRITICAL_PROTECTED_FILES = [
+  'MEMORY.md',
+  'SOUL.md',
+  'IDENTITY.md',
+  'AGENTS.md',
+  'USER.md',
+  'HEARTBEAT.md',
+  'RECENT_EVENTS.md',
+  'TOOLS.md',
+  'TROUBLESHOOTING.md',
+  'openclaw.json',
+  '.env',
+  'package.json',
+];
+
+function isCriticalProtectedPath(relPath) {
+  const rel = normalizeRelPath(relPath);
+  if (!rel) return false;
+  // Check protected prefixes (skill directories)
+  for (const prefix of CRITICAL_PROTECTED_PREFIXES) {
+    const p = prefix.replace(/\/+$/, '');
+    if (rel === p || rel.startsWith(p + '/')) return true;
+  }
+  // Check protected root files
+  for (const f of CRITICAL_PROTECTED_FILES) {
+    if (rel === f) return true;
+  }
+  return false;
+}
+
+function detectDestructiveChanges({ repoRoot, changedFiles, baselineUntracked }) {
+  const violations = [];
+  const baselineSet = new Set((Array.isArray(baselineUntracked) ? baselineUntracked : []).map(normalizeRelPath));
+
+  for (const rel of changedFiles) {
+    const norm = normalizeRelPath(rel);
+    if (!norm) continue;
+    if (!isCriticalProtectedPath(norm)) continue;
+
+    const abs = path.join(repoRoot, norm);
+    const normAbs = path.resolve(abs);
+    const normRepo = path.resolve(repoRoot);
+    if (!normAbs.startsWith(normRepo + path.sep) && normAbs !== normRepo) continue;
+
+    // If a critical file existed before but is now missing/empty, that is destructive.
+    if (!baselineSet.has(norm)) {
+      // It was tracked before, check if it still exists
+      if (!fs.existsSync(normAbs)) {
+        violations.push(`CRITICAL_FILE_DELETED: ${norm}`);
+      } else {
+        try {
+          const stat = fs.statSync(normAbs);
+          if (stat.isFile() && stat.size === 0) {
+            violations.push(`CRITICAL_FILE_EMPTIED: ${norm}`);
+          }
+        } catch (e) {}
+      }
+    }
+  }
+  return violations;
 }
 
 // --- Validation command safety ---
@@ -345,18 +436,31 @@ function rollbackNewUntrackedFiles({ repoRoot, baselineUntracked }) {
   const baseline = new Set((Array.isArray(baselineUntracked) ? baselineUntracked : []).map(String));
   const current = gitListUntrackedFiles(repoRoot);
   const toDelete = current.filter(f => !baseline.has(String(f)));
+  const skipped = [];
+  const deleted = [];
   for (const rel of toDelete) {
     const safeRel = String(rel || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
     if (!safeRel) continue;
+    // CRITICAL: Never delete files inside protected skill directories during rollback.
+    if (isCriticalProtectedPath(safeRel)) {
+      skipped.push(safeRel);
+      continue;
+    }
     const abs = path.join(repoRoot, safeRel);
     const normRepo = path.resolve(repoRoot);
     const normAbs = path.resolve(abs);
     if (!normAbs.startsWith(normRepo + path.sep) && normAbs !== normRepo) continue;
     try {
-      if (fs.existsSync(normAbs) && fs.statSync(normAbs).isFile()) fs.unlinkSync(normAbs);
+      if (fs.existsSync(normAbs) && fs.statSync(normAbs).isFile()) {
+        fs.unlinkSync(normAbs);
+        deleted.push(safeRel);
+      }
     } catch (e) {}
   }
-  return { deleted: toDelete };
+  if (skipped.length > 0) {
+    console.log(`[Rollback] Skipped ${skipped.length} critical protected file(s): ${skipped.slice(0, 5).join(', ')}`);
+  }
+  return { deleted, skipped };
 }
 
 function inferCategoryFromSignals(signals) {
@@ -389,7 +493,16 @@ function buildAutoGene({ signals, intent }) {
       'Validate using declared validation steps; rollback on failure',
       'Solidify knowledge: append EvolutionEvent, update Gene/Capsule store',
     ],
-    constraints: { max_files: 12, forbidden_paths: ['.git', 'node_modules'] },
+    constraints: {
+      max_files: 12,
+      forbidden_paths: [
+        '.git', 'node_modules',
+        'skills/feishu-evolver-wrapper', 'skills/feishu-common',
+        'skills/feishu-post', 'skills/feishu-card', 'skills/feishu-doc',
+        'skills/common', 'skills/clawhub', 'skills/clawhub-batch-undelete',
+        'skills/git-sync',
+      ],
+    },
     validation: ['node -e "require(\'./src/gep/solidify\'); console.log(\'ok\')"'],
   };
   gene.asset_id = computeAssetId(gene);
@@ -465,6 +578,20 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
   });
   const constraintCheck = checkConstraints({ gene: geneUsed, blast });
 
+  // Critical safety: detect destructive changes to core dependencies.
+  const destructiveViolations = detectDestructiveChanges({
+    repoRoot,
+    changedFiles: blast.all_changed_files || blast.changed_files || [],
+    baselineUntracked: lastRun && Array.isArray(lastRun.baseline_untracked) ? lastRun.baseline_untracked : [],
+  });
+  if (destructiveViolations.length > 0) {
+    for (const v of destructiveViolations) {
+      constraintCheck.violations.push(v);
+    }
+    constraintCheck.ok = false;
+    console.error(`[Solidify] CRITICAL: Destructive changes detected: ${destructiveViolations.join('; ')}`);
+  }
+
   // Capture environment fingerprint before validation.
   const envFp = captureEnvFingerprint();
 
@@ -496,12 +623,6 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
   const intentMismatch =
     intent && mutation && typeof mutation.category === 'string' && String(intent) !== String(mutation.category);
   if (intentMismatch) protocolViolations.push(`intent_mismatch_with_mutation:${String(intent)}!=${String(mutation.category)}`);
-  if (derivedIntent === 'repair' && Array.isArray(signals) && signals.includes('issue_already_resolved')) {
-    protocolViolations.push('repair_on_already_resolved_issue');
-  }
-  if (derivedIntent === 'repair' && Array.isArray(signals) && signals.includes('openclaw_self_healed')) {
-    protocolViolations.push('repair_attribution_conflict_openclaw_self_healed');
-  }
 
   const sourceType = lastRun && lastRun.source_type ? String(lastRun.source_type) : 'generated';
   const reusedAssetId = lastRun && lastRun.reused_asset_id ? String(lastRun.reused_asset_id) : null;
@@ -619,6 +740,7 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
   if (!dryRun) writeStateForSolidify(state);
 
   // Search-First Evolution: auto-publish eligible capsules to the Hub.
+  // Hub requires Gene + Capsule bundled together (payload.assets = [Gene, Capsule]).
   let publishResult = null;
   if (!dryRun && capsule && capsule.a2a && capsule.a2a.eligible_to_broadcast) {
     const sourceType = lastRun && lastRun.source_type ? String(lastRun.source_type) : 'generated';
@@ -629,29 +751,50 @@ function solidify({ intent, summary, dryRun = false, rollbackOnFailure = true } 
     // Skip publishing if: disabled, private, reused asset, or below minimum score
     if (autoPublish && visibility === 'public' && sourceType !== 'reused' && (capsule.outcome.score || 0) >= minPublishScore) {
       try {
-        const { buildPublish, httpTransportSend } = require('./a2aProtocol');
+        const { buildPublishBundle, httpTransportSend } = require('./a2aProtocol');
         const { sanitizePayload } = require('./sanitize');
         const hubUrl = (process.env.A2A_HUB_URL || '').replace(/\/+$/, '');
 
         if (hubUrl) {
-          const sanitized = sanitizePayload(capsule);
-          const msg = buildPublish({ asset: sanitized });
-          const result = httpTransportSend(msg, { hubUrl });
-          // httpTransportSend returns a Promise
-          if (result && typeof result.then === 'function') {
-            result
-              .then(function (res) {
-                if (res && res.ok) {
-                  console.log(`[AutoPublish] Published ${capsule.asset_id || capsule.id} to Hub.`);
-                } else {
-                  console.log(`[AutoPublish] Hub rejected: ${JSON.stringify(res)}`);
-                }
-              })
-              .catch(function (err) {
-                console.log(`[AutoPublish] Failed (non-fatal): ${err.message}`);
-              });
+          // Hub requires bundle format: Gene + Capsule together.
+          // geneUsed comes from ensureGene() earlier in solidify().
+          if (!geneUsed || geneUsed.type !== 'Gene') {
+            publishResult = { attempted: false, reason: 'no_gene_available_for_bundle' };
+          } else {
+            const sanitizedCapsule = sanitizePayload(capsule);
+            const sanitizedGene = sanitizePayload(geneUsed);
+            const msg = buildPublishBundle({ gene: sanitizedGene, capsule: sanitizedCapsule, event: event });
+            const result = httpTransportSend(msg, { hubUrl });
+            // httpTransportSend returns a Promise
+            if (result && typeof result.then === 'function') {
+              result
+                .then(function (res) {
+                  if (res && res.ok) {
+                    console.log(`[AutoPublish] Published bundle (Gene: ${geneUsed.id}, Capsule: ${capsule.id}) to Hub.`);
+                  } else {
+                    console.log(`[AutoPublish] Hub rejected bundle: ${JSON.stringify(res)}`);
+                  }
+                })
+                .catch(function (err) {
+                  console.log(`[AutoPublish] Failed (non-fatal): ${err.message}`);
+                });
+            }
+            publishResult = { attempted: true, asset_id: capsule.asset_id || capsule.id, gene_id: geneUsed.asset_id || geneUsed.id, bundle: true };
+
+            // Complete external task if one was active for this run
+            if (lastRun && lastRun.active_task && lastRun.active_task.task_id) {
+              try {
+                const { completeTask } = require('./taskReceiver');
+                completeTask(lastRun.active_task.task_id, capsule.asset_id || capsule.id)
+                  .then(function (ok) {
+                    if (ok) console.log(`[TaskReceiver] Completed task ${lastRun.active_task.task_id}`);
+                  })
+                  .catch(function () {});
+              } catch (taskErr) {
+                // non-fatal
+              }
+            }
           }
-          publishResult = { attempted: true, asset_id: capsule.asset_id || capsule.id };
         } else {
           publishResult = { attempted: false, reason: 'no_hub_url' };
         }
@@ -676,4 +819,6 @@ module.exports = {
   readStateForSolidify,
   writeStateForSolidify,
   isValidationCommandAllowed,
+  isCriticalProtectedPath,
+  detectDestructiveChanges,
 };

@@ -39,6 +39,7 @@ var OPPORTUNITY_SIGNALS = [
   'external_opportunity',
   'issue_already_resolved',
   'openclaw_self_healed',
+  'empty_cycle_loop_detected',
 ];
 
 function hasOpportunitySignal(signals) {
@@ -54,6 +55,12 @@ function mutationCategoryFromContext({ signals, driftEnabled }) {
   if (driftEnabled) return 'innovate';
   // Auto-innovate: opportunity signals present and no errors
   if (hasOpportunitySignal(signals)) return 'innovate';
+  // Consult strategy preset: if the configured strategy favors innovation,
+  // default to innovate instead of optimize when there is nothing specific to do.
+  try {
+    var strategy = require('./strategy').resolveStrategy();
+    if (strategy && typeof strategy.innovate === 'number' && strategy.innovate >= 0.5) return 'innovate';
+  } catch (_) {}
   return 'optimize';
 }
 
