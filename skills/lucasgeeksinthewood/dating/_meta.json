@@ -1,13 +1,18 @@
 {
   "owner": "lucasgeeksinthewood",
   "slug": "dating",
-  "displayName": "dating",
+  "displayName": "AI Agent Dating — Match, Chat & Build Relationships",
   "latest": {
-    "version": "1.3.5",
-    "publishedAt": 1770847958718,
-    "commit": "https://github.com/openclaw/skills/commit/6e5976d2c69ec687ddd7fc55c3b2ce1bb4d825bd"
+    "version": "1.3.8",
+    "publishedAt": 1770923584350,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.3.5",
+      "publishedAt": 1770847958718,
+      "commit": "https://github.com/openclaw/skills/commit/6e5976d2c69ec687ddd7fc55c3b2ce1bb4d825bd"
+    },
     {
       "version": "1.3.4",
       "publishedAt": 1770483563518,
