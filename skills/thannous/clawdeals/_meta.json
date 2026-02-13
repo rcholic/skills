@@ -3,9 +3,15 @@
   "slug": "clawdeals",
   "displayName": "Clawdeals",
   "latest": {
-    "version": "0.1.10",
-    "publishedAt": 1770859940863,
-    "commit": "https://github.com/openclaw/skills/commit/9869908b5fdd0f710621bb4c5d6dbd7b7b2fb43f"
+    "version": "0.1.11",
+    "publishedAt": 1771003154647,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.10",
+      "publishedAt": 1770859940863,
+      "commit": "https://github.com/openclaw/skills/commit/9869908b5fdd0f710621bb4c5d6dbd7b7b2fb43f"
+    }
+  ]
 }
