@@ -1,13 +1,29 @@
 ---
-name: dropbox
+name: dropbox-lite
 description: Upload, download, and manage files in Dropbox with automatic OAuth token refresh.
 homepage: https://www.dropbox.com/developers
-metadata: {"clawdbot":{"emoji":"📦","requires":{"env":["DROPBOX_APP_KEY","DROPBOX_APP_SECRET"]}}}
 ---
 
 # Dropbox
 
 Upload, download, list, and search files in Dropbox. Supports automatic token refresh.
+
+## Required Credentials
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DROPBOX_APP_KEY` | ✅ Yes | Your Dropbox app key |
+| `DROPBOX_APP_SECRET` | ✅ Yes | Your Dropbox app secret |
+| `DROPBOX_REFRESH_TOKEN` | ✅ Yes | OAuth refresh token (long-lived) |
+| `DROPBOX_ACCESS_TOKEN` | Optional | Short-lived access token (auto-refreshed) |
+
+Store in `~/.config/atlas/dropbox.env`:
+```bash
+DROPBOX_APP_KEY=your_app_key
+DROPBOX_APP_SECRET=your_app_secret
+DROPBOX_REFRESH_TOKEN=xxx...
+DROPBOX_ACCESS_TOKEN=sl.u.xxx...
+```
 
 ## Initial Setup (One-Time)
 
@@ -69,17 +85,6 @@ Response includes:
 - `access_token` — Short-lived (~4 hours)
 - `refresh_token` — Long-lived (never expires unless revoked)
 
-### 5. Save Credentials
-
-Create `~/.config/atlas/dropbox.env`:
-
-```bash
-DROPBOX_APP_KEY=your_app_key
-DROPBOX_APP_SECRET=your_app_secret
-DROPBOX_ACCESS_TOKEN=sl.u.xxx...
-DROPBOX_REFRESH_TOKEN=xxx...
-```
-
 ## Usage
 
 ```bash
@@ -107,16 +112,6 @@ The script automatically handles token refresh:
 2. Updates `dropbox.env` with the new access token
 3. Retries the original request
 
-Manual refresh (if needed):
-
-```bash
-curl -X POST "https://api.dropboxapi.com/oauth2/token" \
-  -d "grant_type=refresh_token" \
-  -d "refresh_token=REFRESH_TOKEN" \
-  -d "client_id=APP_KEY" \
-  -d "client_secret=APP_SECRET"
-```
-
 ## Token Lifecycle
 
 | Token | Lifetime | Storage |
@@ -142,4 +137,3 @@ curl -X POST "https://api.dropboxapi.com/oauth2/token" \
 
 - OAuth Guide: https://developers.dropbox.com/oauth-guide
 - API Explorer: https://dropbox.github.io/dropbox-api-v2-explorer/
-- HTTP Endpoints: https://www.dropbox.com/developers/documentation/http/documentation
