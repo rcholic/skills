@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Remove whitelist requirement; protocol is now permissionless
+
 ## 1.0.1
 
 - Add `requires.env: ["BACKEND_URL"]` for credential transparency

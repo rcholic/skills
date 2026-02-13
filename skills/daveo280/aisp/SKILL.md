@@ -1,6 +1,6 @@
 ---
 name: aisp
-version: 1.0.1
+version: 1.0.2
 description: Enables AI agents to interact with AISP (Agent Inference Sharing Protocol) for renting or providing DIEM API capacity. Use when working with diem-marketplace, Venice API keys, USDC escrow, listings, rentals, or when the user wants to rent inference capacity or list API keys.
 metadata: {"openclaw":{"homepage":"https://github.com/DaveO280/Diem-Marketplace-V2-","emoji":"⚡","requires":{"env":["BACKEND_URL"]}}}
 ---
@@ -79,7 +79,7 @@ const listingId = await provider.createListing({
 | `sdk/src/agent.ts` | DiemAgent: getListings, rent, getKey, getMyRentals |
 | `sdk/src/provider.ts` | DiemProvider: createListing, settle, revokeAndRefund |
 | `backend/src/routes.ts` | API routes: /api/listings, /api/keys, /api/key/:id |
-| `contracts/DiemMarketplace.sol` | On-chain escrow, whitelist, 1% fee |
+| `contracts/DiemMarketplace.sol` | On-chain escrow, 1% fee |
 
 ## Backend API
 
@@ -114,5 +114,4 @@ All backend requests requiring auth use EIP-191 signing:
 ## Notes
 
 - Venice API keys must be **inference-only** (not admin)
-- Whitelist: providers must be whitelisted to list; agents to fund. Contact: aispcrypto@gmail.com
 - 1% protocol fee deducted at settlement
