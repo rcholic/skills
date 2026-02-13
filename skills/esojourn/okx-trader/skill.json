@@ -1,6 +1,6 @@
 {
   "name": "okx-trader",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "Professional OKX grid trading system with dual-layer strategy and automated trailing logic.",
   "author": "alz",
   "license": "MIT",
@@ -10,7 +10,7 @@
     "openclaw": ">=2026.2.0"
   },
   "requires": {
-    "bins": ["node", "curl", "jq", "openssl"],
+    "bins": ["node"],
     "env": [
       "OKX_API_KEY",
       "OKX_SECRET_KEY",
