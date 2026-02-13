@@ -3,9 +3,15 @@
   "slug": "clawtan",
   "displayName": "clawtan",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770936968275,
-    "commit": "https://github.com/openclaw/skills/commit/5cd68c86a7f0228c0daa4fea40b455e67f9a2d5b"
+    "version": "1.0.3",
+    "publishedAt": 1770999791975,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770936968275,
+      "commit": "https://github.com/openclaw/skills/commit/5cd68c86a7f0228c0daa4fea40b455e67f9a2d5b"
+    }
+  ]
 }
