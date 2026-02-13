@@ -1,6 +1,6 @@
 ---
 name: loxone
-version: 1.1.0
+version: 1.2.0
 homepage: https://github.com/odrobnik/loxone-skill
 metadata: {"openclaw": {"emoji": "🏠", "requires": {"bins": ["python3"]}}}
 description: Control and monitor a Loxone Miniserver (smart home) via HTTP API and real-time WebSocket. Use for querying room/device status (temperatures, lights), watching live events, and sending safe control commands.

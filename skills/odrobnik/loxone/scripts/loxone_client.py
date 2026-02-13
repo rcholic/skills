@@ -231,6 +231,9 @@ class LoxoneClient:
         Returns:
             Current value
         """
+        import re as _re
+        if not _re.match(r'^[a-fA-F0-9-]+$', uuid):
+            raise ValueError(f"Invalid UUID format: {uuid}")
         endpoint = f"/jdev/sps/io/{uuid}"
         response = self._make_request(endpoint)
         
@@ -253,7 +256,14 @@ class LoxoneClient:
         Returns:
             True if successful
         """
-        endpoint = f"/jdev/sps/io/{uuid}/{value}"
+        import re as _re
+        # Sanitize inputs against path traversal / injection
+        if not _re.match(r'^[a-fA-F0-9-]+$', uuid):
+            raise ValueError(f"Invalid UUID format: {uuid}")
+        val_str = str(value)
+        if not _re.match(r'^[a-zA-Z0-9._-]+$', val_str):
+            raise ValueError(f"Invalid command value: {val_str}")
+        endpoint = f"/jdev/sps/io/{uuid}/{val_str}"
         response = self._make_request(endpoint)
         
         try:

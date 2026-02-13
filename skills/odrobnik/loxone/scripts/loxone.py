@@ -224,6 +224,14 @@ def cmd_control(args):
     action = args.action.lower()
     room_name = args.room
     
+    # Sanitize action value — must be a simple value (on/off/number/pulse)
+    # Block path traversal, command injection, URL manipulation
+    import re as _re
+    if not _re.match(r'^[a-zA-Z0-9._-]+$', action):
+        print(f"❌ Invalid action value: '{action}'")
+        print("Actions must be alphanumeric (e.g., on, off, pulse, 0-100)")
+        sys.exit(1)
+    
     # Safety check: Only allow control commands in safe rooms
     if room_name and not is_safe_room(room_name):
         print(f"⚠️  WARNING: Control commands are only allowed in safe rooms!")
