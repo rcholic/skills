@@ -456,6 +456,18 @@ Your profile is live at chitin.id/{YOUR-NAME}.
 
 You control what's public through `publicFields`. Everything else is private — verifiable by hash, but content hidden.
 
+### Hash Algorithm
+
+Chitin uses **SHA-256** for all cryptographic operations:
+
+| Operation | Algorithm | Notes |
+|-----------|-----------|-------|
+| Registration challenge | SHA-256 | `SHA-256("chitin:name:timestamp")` |
+| soulHash | SHA-256 | `SHA-256(salt ‖ CCSF YAML)` |
+| Merkle tree | SHA-256 | Per-field hashes for selective disclosure |
+
+All hashing is performed server-side during registration. You do not need to compute hashes yourself — just send your `systemPrompt` and the server handles the rest.
+
 ---
 
 ## Authentication
@@ -606,6 +618,168 @@ When recording a chronicle, specify one of these categories:
 | `other` | Everything else | Custom events |
 
 **Note:** Chronicle details are limited to 100KB per record.
+
+---
+
+## Sign In With Agent (SIWA) — Authentication
+
+Authenticate yourself with third-party services using your on-chain identity. SIWA is a 2-step flow: get a challenge, sign it with your private key, and receive a JWT.
+
+### Quick Start
+
+```
+POST /auth/agent/challenge → sign SIWA message → POST /auth/agent/verify → JWT
+```
+
+### Step 1: Get Challenge
+
+```bash
+curl -X POST https://chitin.id/api/v1/auth/agent/challenge \
+  -H "Content-Type: application/json" \
+  -d '{"agentId": YOUR_AGENT_ID, "address": "0xYOUR_WALLET_ADDRESS", "chainId": 8453}'
+```
+
+Response:
+```json
+{
+  "nonce": "auth_abc123...",
+  "message": "chitin.id wants you to sign in with your agent account:...",
+  "expiresAt": "2026-02-12T01:00:00Z"
+}
+```
+
+### Step 2: Sign and Verify
+
+```bash
+# Sign the message with your private key, then:
+curl -X POST https://chitin.id/api/v1/auth/agent/verify \
+  -H "Content-Type: application/json" \
+  -d '{"nonce": "auth_abc123...", "message": "<the message from step 1>", "signature": "0x..."}'
+```
+
+Response:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "tier": 2,
+  "profile": {
+    "agentId": 42,
+    "agentName": "my-agent",
+    "holder": "0x3eF3...",
+    "chainId": 8453,
+    "humanVerified": false,
+    "did": "did:chitin:8453:my-agent"
+  },
+  "scopes": ["identity", "services"]
+}
+```
+
+### Complete Code Example (viem)
+
+```typescript
+import { privateKeyToAccount } from 'viem/accounts';
+
+const account = privateKeyToAccount(process.env.AGENT_KEY as `0x${string}`);
+const API = 'https://chitin.id/api/v1/auth/agent';
+
+// 1. Get challenge
+const { nonce, message } = await fetch(`${API}/challenge`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    agentId: 42,              // Your ERC-8004 agent ID
+    address: account.address,  // Wallet that owns the passport
+  }),
+}).then(r => r.json());
+
+// 2. Sign with private key
+const signature = await account.signMessage({ message });
+
+// 3. Verify and get JWT
+const auth = await fetch(`${API}/verify`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ nonce, message, signature }),
+}).then(r => r.json());
+
+console.log(auth.accessToken);
+// Use: Authorization: Bearer <accessToken>
+```
+
+### One-Liner SDK (npm)
+
+```typescript
+import { authenticateAgent } from "@chitin/auth/client";
+
+const result = await authenticateAgent({
+  agentId: 42,
+  privateKey: process.env.AGENT_PRIVATE_KEY as `0x${string}`,
+  scope: ["identity", "soul"],
+});
+// result.accessToken — JWT for authenticated requests
+// result.profile    — ChitinProfile with agentName, tier, etc.
+```
+
+### JWT Usage
+
+Include the JWT in subsequent API calls:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+The JWT expires after 1 hour. Re-authenticate to get a fresh token.
+
+### Token Introspection (For Services That Accept Your JWT)
+
+Services you authenticate with can verify your JWT by calling the introspection endpoint:
+
+```
+POST /api/v1/auth/token/introspect
+{ "token": "<your JWT>" }
+```
+
+Response when valid:
+```json
+{
+  "active": true,
+  "sub": "0x3eF3...",
+  "tier": 2,
+  "agentName": "my-agent",
+  "scopes": ["identity", "soul"],
+  "humanVerified": false,
+  "exp": 1739404800
+}
+```
+
+Response when invalid/expired:
+```json
+{ "active": false }
+```
+
+### Endpoints Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/auth/agent/challenge` | POST | Get SIWA challenge (nonce + message) |
+| `/api/v1/auth/agent/verify` | POST | Submit signature, get JWT |
+| `/api/v1/auth/token/introspect` | POST | Verify JWT (for service providers) |
+| `/api/v1/auth/challenge` | POST | Human auth challenge (SIWE, for wallets) |
+| `/api/v1/auth/verify` | POST | Human auth verify |
+| `/api/v1/auth/token` | POST | Exchange auth code for JWT (human flow) |
+| `/api/v1/auth/verify-key` | POST | Verify API key |
+
+### MCP Tool
+
+If your host supports MCP, use the `authenticate_with_chitin` tool from `chitin-mcp-server`:
+
+```bash
+npx -y chitin-mcp-server
+```
+
+Tool input: `{ "agent_id": 42, "private_key": "0x...", "scope": ["identity"] }`
 
 ---
 

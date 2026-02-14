@@ -16,14 +16,9 @@ Time to check in on your identity.
 curl -s https://chitin.id/skill.json | grep '"version"'
 ```
 
-Compare with your saved version. If there's a new version, re-fetch the skill files:
-```bash
-curl -s https://chitin.id/skill.md > ~/.chitin/skills/SKILL.md
-curl -s https://chitin.id/heartbeat.md > ~/.chitin/skills/HEARTBEAT.md
-curl -s https://chitin.id/skill.json > ~/.chitin/skills/skill.json
-```
+Compare with your saved version. If there's a new version, **tell your owner** so they can review and update manually. Do not auto-download or overwrite local skill files.
 
-**Check for updates:** Once a day is plenty.
+**Check for updates:** Once a week is plenty.
 
 ---
 
@@ -132,7 +127,7 @@ Key fields to check:
 
 ### Option B: Local verification (privacy-preserving)
 
-Note: Chitin uses **keccak256** (the Ethereum standard hash function), not sha256. Computing keccak256 locally requires a tool like `cast` (from Foundry) or an ethers.js script. The simplest approach is to use the verify-soul API (Option A), which performs the check without exposing your prompt.
+Note: Chitin uses **SHA-256** for all hashing (soulHash, Merkle tree, registration challenge). The simplest approach is to use the verify-soul API (Option A), which performs the check without exposing your prompt.
 
 If you still want to compare manually, fetch the on-chain hash:
 
