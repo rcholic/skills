@@ -15,9 +15,9 @@ import sys
 import re
 import json
 import tempfile
-import shutil
+import zipfile
 from urllib.request import urlopen, Request
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 from pathlib import Path
 
 # Risk levels
@@ -26,172 +26,39 @@ HIGH = "high"
 MEDIUM = "medium"
 LOW = "low"
 
-# Patterns to detect
-PATTERNS = {
-    CRITICAL: [
-        {
-            "name": "curl_pipe_bash",
-            "pattern": r"curl\s+[^|]*\|\s*(ba)?sh",
-            "description": "Executes remote script directly without verification"
-        },
-        {
-            "name": "wget_pipe_bash",
-            "pattern": r"wget\s+[^|]*\|\s*(ba)?sh",
-            "description": "Executes remote script directly without verification"
-        },
-        {
-            "name": "curl_pipe_python",
-            "pattern": r"curl\s+[^|]*\|\s*python",
-            "description": "Executes remote Python code directly"
-        },
-        {
-            "name": "base64_decode_exec",
-            "pattern": r"(base64\s+-d|base64\s+--decode).*\|\s*(ba)?sh",
-            "description": "Decodes and executes obfuscated code"
-        },
-        {
-            "name": "eval_base64",
-            "pattern": r"eval.*base64",
-            "description": "Evaluates base64-encoded code"
-        },
-        {
-            "name": "python_exec_decode",
-            "pattern": r"python.*-c.*exec.*decode",
-            "description": "Executes decoded Python code"
-        },
-        {
-            "name": "xattr_remove_quarantine",
-            "pattern": r"xattr\s+-d\s+com\.apple\.quarantine",
-            "description": "Removes macOS Gatekeeper protection"
-        },
-    ],
-    HIGH: [
-        {
-            "name": "npm_install_unknown",
-            "pattern": r"npm\s+install\s+(?!-)[^\s]+",
-            "description": "Installs npm package",
-            "check_allowlist": "npm_packages"
-        },
-        {
-            "name": "pip_install_unknown",
-            "pattern": r"pip3?\s+install\s+(?!-)[^\s]+",
-            "description": "Installs pip package",
-            "check_allowlist": "pip_packages"
-        },
-        {
-            "name": "brew_install",
-            "pattern": r"brew\s+install\s+",
-            "description": "Installs Homebrew package"
-        },
-        {
-            "name": "chmod_execute",
-            "pattern": r"chmod\s+\+x.*&&.*\./",
-            "description": "Makes script executable and runs it"
-        },
-        {
-            "name": "curl_output_execute",
-            "pattern": r"curl.*-o\s+\S+.*&&.*\./",
-            "description": "Downloads file and executes it"
-        },
-        {
-            "name": "wget_execute",
-            "pattern": r"wget.*&&.*(chmod|\./)",
-            "description": "Downloads and executes file"
-        },
-        {
-            "name": "git_clone_execute",
-            "pattern": r"git\s+clone.*&&.*\./",
-            "description": "Clones repo and executes scripts"
-        },
-    ],
-    MEDIUM: [
-        {
-            "name": "sudo_command",
-            "pattern": r"sudo\s+",
-            "description": "Requires elevated privileges"
-        },
-        {
-            "name": "curl_download",
-            "pattern": r"curl\s+(-[a-zA-Z]+\s+)*https?://",
-            "description": "Downloads from URL"
-        },
-        {
-            "name": "wget_download",
-            "pattern": r"wget\s+https?://",
-            "description": "Downloads from URL"
-        },
-        {
-            "name": "unknown_url",
-            "pattern": r"https?://[^\s\)\]\"\'\>]+",
-            "description": "External URL",
-            "check_allowlist": "urls"
-        },
-    ],
-    LOW: [
-        {
-            "name": "env_file_access",
-            "pattern": r"\.env",
-            "description": "References .env file (could access credentials)"
-        },
-        {
-            "name": "ssh_key_access",
-            "pattern": r"~?/\.ssh/",
-            "description": "References SSH keys"
-        },
-        {
-            "name": "credentials_mention",
-            "pattern": r"(api[_-]?key|secret|token|password|credential)",
-            "description": "Mentions credentials"
-        },
-    ]
-}
+# Get the directory where this script lives
+SCRIPT_DIR = Path(__file__).parent.parent
+PATTERNS_DIR = SCRIPT_DIR / "patterns"
 
-# Known-safe URLs and packages
-ALLOWLIST = {
-    "urls": [
-        r"github\.com",
-        r"githubusercontent\.com",
-        r"npmjs\.com",
-        r"pypi\.org",
-        r"docs\.",
-        r"remotion\.dev",
-        r"remotion\.media",
-        r"example\.com",
-        r"anthropic\.com",
-        r"openai\.com",
-        r"clawhub\.com",  # Ironic but needed for legit refs
-        r"notion\.so",
-        r"exa\.ai",
-        r"twitter\.com",
-        r"x\.com",
-        r"api\.twitter\.com",
-        r"api\.x\.com",
-        r"youtube\.com",
-        r"google\.com",
-        r"googleapis\.com",
-        r"linkedin\.com",
-        r"medium\.com",
-    ],
-    "npm_packages": [
-        "openclaw",
-        "@remotion/",
-        "typescript",
-        "react",
-        "next",
-        "express",
-        "axios",
-        "lodash",
-    ],
-    "pip_packages": [
-        "requests",
-        "flask",
-        "django",
-        "pandas",
-        "numpy",
-        "openai",
-        "anthropic",
-    ]
-}
+
+def load_patterns():
+    """Load patterns from JSON files."""
+    patterns = {}
+    
+    for level in [CRITICAL, HIGH, MEDIUM, LOW]:
+        pattern_file = PATTERNS_DIR / f"{level}.json"
+        if pattern_file.exists():
+            with open(pattern_file, "r") as f:
+                data = json.load(f)
+                patterns[level] = data.get("patterns", [])
+        else:
+            patterns[level] = []
+    
+    return patterns
+
+
+def load_allowlist():
+    """Load allowlist from JSON file."""
+    allowlist_file = PATTERNS_DIR / "allowlist.json"
+    if allowlist_file.exists():
+        with open(allowlist_file, "r") as f:
+            return json.load(f)
+    return {"urls": [], "npm_packages": [], "pip_packages": []}
+
+
+# Load patterns and allowlist
+PATTERNS = load_patterns()
+ALLOWLIST = load_allowlist()
 
 
 def is_allowlisted(value, allowlist_key):
@@ -217,23 +84,27 @@ def scan_content(content, filename=""):
             
         for risk_level, patterns in PATTERNS.items():
             for pattern_info in patterns:
-                matches = re.finditer(pattern_info["pattern"], line, re.IGNORECASE)
-                for match in matches:
-                    matched_text = match.group(0)
-                    
-                    # Check allowlist if applicable
-                    if "check_allowlist" in pattern_info:
-                        if is_allowlisted(matched_text, pattern_info["check_allowlist"]):
-                            continue
-                    
-                    findings[risk_level].append({
-                        "file": filename,
-                        "line": line_num,
-                        "pattern": pattern_info["name"],
-                        "matched": matched_text[:100],  # Truncate long matches
-                        "description": pattern_info["description"],
-                        "context": line.strip()[:150]
-                    })
+                try:
+                    matches = re.finditer(pattern_info["pattern"], line, re.IGNORECASE)
+                    for match in matches:
+                        matched_text = match.group(0)
+                        
+                        # Check allowlist if applicable
+                        if "check_allowlist" in pattern_info:
+                            if is_allowlisted(matched_text, pattern_info["check_allowlist"]):
+                                continue
+                        
+                        findings[risk_level].append({
+                            "file": filename,
+                            "line": line_num,
+                            "pattern": pattern_info["name"],
+                            "matched": matched_text[:100],  # Truncate long matches
+                            "description": pattern_info["description"],
+                            "context": line.strip()[:150]
+                        })
+                except re.error as e:
+                    # Skip invalid regex patterns
+                    continue
     
     return findings
 
@@ -263,24 +134,81 @@ def scan_directory(path):
     return all_findings
 
 
+def fetch_clawhub_skill(slug):
+    """Fetch a skill from ClawHub and return its contents."""
+    # ClawHub API endpoint for downloading skills
+    # Format: https://clawhub.com/api/skills/{owner}/{name}/download or similar
+    
+    # Try to get skill info first
+    api_url = f"https://clawhub.ai/api/skills/{slug}"
+    
+    try:
+        req = Request(api_url, headers={"User-Agent": "claw-skill-guard/1.0"})
+        with urlopen(req, timeout=30) as response:
+            skill_info = json.loads(response.read().decode("utf-8"))
+            
+            # Try to get download URL
+            if "downloadUrl" in skill_info:
+                download_url = skill_info["downloadUrl"]
+            else:
+                # Fallback to standard download path
+                download_url = f"https://clawhub.ai/api/skills/{slug}/download"
+            
+            # Download the skill zip
+            req = Request(download_url, headers={"User-Agent": "claw-skill-guard/1.0"})
+            with urlopen(req, timeout=60) as dl_response:
+                # Save to temp file and extract
+                with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+                    tmp.write(dl_response.read())
+                    tmp_path = tmp.name
+                
+                # Extract to temp directory
+                extract_dir = tempfile.mkdtemp()
+                with zipfile.ZipFile(tmp_path, "r") as zip_ref:
+                    zip_ref.extractall(extract_dir)
+                
+                os.unlink(tmp_path)
+                return extract_dir
+                
+    except HTTPError as e:
+        if e.code == 404:
+            print(f"Error: Skill not found: {slug}")
+        else:
+            print(f"Error fetching skill: {e}")
+        return None
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+
 def fetch_remote_skill(url):
     """Fetch a skill from a remote URL and scan it."""
     # Handle ClawHub URLs
-    if "clawhub.com" in url:
-        # Try to get the raw content
-        # ClawHub format: https://clawhub.com/user/skill-name
-        # This is a simplified version - real implementation would need ClawHub API
-        pass
+    if "clawhub.com" in url or "clawhub.ai" in url:
+        # Extract slug from URL (e.g., clawhub.ai/owner/skill-name)
+        parts = url.rstrip("/").split("/")
+        if len(parts) >= 2:
+            slug = f"{parts[-2]}/{parts[-1]}"
+            temp_dir = fetch_clawhub_skill(slug)
+            if temp_dir:
+                return ("directory", temp_dir)
+        return None
     
     # Handle GitHub URLs
-    if "github.com" in url and "/blob/" in url:
-        url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+    if "github.com" in url:
+        if "/blob/" in url:
+            url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+        elif "/tree/" in url:
+            # Can't easily fetch a directory from GitHub, suggest cloning
+            print("Note: For GitHub directories, consider cloning locally first.")
+            print(f"  git clone {url.split('/tree/')[0]}")
+            return None
     
     try:
         req = Request(url, headers={"User-Agent": "claw-skill-guard/1.0"})
         with urlopen(req, timeout=30) as response:
             content = response.read().decode("utf-8")
-            return content
+            return ("content", content)
     except URLError as e:
         print(f"Error fetching URL: {e}")
         return None
@@ -357,6 +285,15 @@ def print_report(findings, source):
         return 0
 
 
+def cleanup_temp_dir(path):
+    """Clean up temporary directory."""
+    import shutil
+    try:
+        shutil.rmtree(path)
+    except:
+        pass
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -370,14 +307,23 @@ def main():
             sys.exit(1)
         
         target = sys.argv[2]
+        temp_dir = None
         
         if target.startswith("http://") or target.startswith("https://"):
             # Remote URL
-            content = fetch_remote_skill(target)
-            if content:
-                findings = scan_content(content, target)
-                exit_code = print_report(findings, target)
-                sys.exit(exit_code)
+            result = fetch_remote_skill(target)
+            if result:
+                result_type, result_data = result
+                if result_type == "directory":
+                    temp_dir = result_data
+                    findings = scan_directory(temp_dir)
+                    exit_code = print_report(findings, target)
+                    cleanup_temp_dir(temp_dir)
+                    sys.exit(exit_code)
+                else:
+                    findings = scan_content(result_data, target)
+                    exit_code = print_report(findings, target)
+                    sys.exit(exit_code)
             else:
                 print("Failed to fetch remote skill")
                 sys.exit(1)

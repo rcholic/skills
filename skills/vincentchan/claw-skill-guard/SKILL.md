@@ -1,6 +1,6 @@
 ---
 name: claw-skill-guard
-version: 1.0.0
+version: 1.1.0
 description: Security scanner for OpenClaw skills. Detects malicious patterns, suspicious URLs, and install traps before you install a skill. Use before installing ANY skill from ClawHub or external sources.
 author: vincentchan
 repository: https://github.com/vincentchan/clawd-workspace/tree/master/skills/claw-skill-guard
@@ -117,8 +117,10 @@ skills/claw-skill-guard/
 ├── scripts/
 │   └── scanner.py        # The scanner
 ├── patterns/
-│   ├── critical.json     # Patterns that block install
-│   ├── suspicious.json   # Patterns that warn
+│   ├── critical.json     # CRITICAL risk patterns (block install)
+│   ├── high.json         # HIGH risk patterns (require approval)
+│   ├── medium.json       # MEDIUM risk patterns (review)
+│   ├── low.json          # LOW risk patterns (informational)
 │   └── allowlist.json    # Known-safe URLs/packages
 └── examples/
     ├── agents-policy.md  # Copy-paste for AGENTS.md

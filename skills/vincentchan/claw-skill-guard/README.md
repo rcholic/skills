@@ -30,8 +30,8 @@ git clone --depth 1 https://github.com/yourrepo/claw-skill-guard.git skills/claw
 ## Usage
 
 ```bash
-# Scan a skill before installing from ClawHub
-python3 skills/claw-skill-guard/scripts/scanner.py scan https://clawhub.com/user/skill
+# Scan a skill from ClawHub (downloads and scans automatically)
+python3 skills/claw-skill-guard/scripts/scanner.py scan https://clawhub.ai/user/skill-name
 
 # Scan a local skill directory
 python3 skills/claw-skill-guard/scripts/scanner.py scan ./skills/some-skill/
@@ -42,6 +42,11 @@ python3 skills/claw-skill-guard/scripts/scanner.py scan-all ./skills/
 # Check if a URL is in the allowlist
 python3 skills/claw-skill-guard/scripts/scanner.py check-url https://example.com
 ```
+
+**Supported URLs:**
+- ClawHub: `https://clawhub.ai/owner/skill-name` or `https://clawhub.com/owner/skill-name`
+- GitHub raw files: `https://github.com/user/repo/blob/main/SKILL.md`
+- Any direct URL to a skill file
 
 ## Enforcement
 
@@ -170,8 +175,8 @@ Edit `patterns/allowlist.json` to add trusted URLs or packages:
 ```json
 {
   "urls": [
-    "your-company.com",
-    "trusted-domain.com"
+    "your-company\\.com",
+    "trusted-domain\\.com"
   ],
   "npm_packages": [
     "@your-scope/"
@@ -184,19 +189,25 @@ Edit `patterns/allowlist.json` to add trusted URLs or packages:
 
 ### Adding Detection Patterns
 
-Edit `patterns/suspicious.json` to add new patterns:
+Edit the appropriate pattern file (`critical.json`, `high.json`, `medium.json`, or `low.json`):
 
 ```json
 {
-  "high": [
+  "patterns": [
     {
       "name": "new_attack_pattern",
-      "pattern": "regex-here",
+      "pattern": "regex-pattern-here",
       "description": "Why this is dangerous"
     }
   ]
 }
 ```
+
+**Pattern files:**
+- `critical.json` — Patterns that should block installation
+- `high.json` — Patterns requiring manual approval
+- `medium.json` — Patterns to review
+- `low.json` — Informational only
 
 ## Limitations
 
