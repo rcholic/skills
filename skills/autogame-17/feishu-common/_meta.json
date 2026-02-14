@@ -4,8 +4,14 @@
   "displayName": "feishu-common",
   "latest": {
     "version": "1.0.0",
-    "publishedAt": 1770892359246,
-    "commit": "https://github.com/openclaw/skills/commit/fa422fd158e15d6dda9241b1e77c7989d6155e8d"
+    "publishedAt": 1771040100926,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1770892359246,
+      "commit": "https://github.com/openclaw/skills/commit/fa422fd158e15d6dda9241b1e77c7989d6155e8d"
+    }
+  ]
 }

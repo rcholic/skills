@@ -42,21 +42,21 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
                 // Do not retry 4xx errors (except 429), usually auth or param errors
                 if (res.status >= 400 && res.status < 500) {
                     const errBody = await res.text();
-                    throw new Error(`HTTP ${res.status}: ${errBody}`);
+                    throw new Error(`HTTP ${res.status} [${url}]: ${errBody}`);
                 }
-                throw new Error(`HTTP ${res.status} ${res.statusText}`);
+                throw new Error(`HTTP ${res.status} ${res.statusText} [${url}]`);
             }
             return res;
         } catch (e) {
             if (timeoutId) clearTimeout(timeoutId);
-            if (e.name === 'AbortError') e.message = `Timeout (${timeoutMs}ms)`;
+            if (e.name === 'AbortError') e.message = `Timeout (${timeoutMs}ms) [${url}]`;
             
             // Don't retry if it's a permanent error
             if (e.message.includes('HTTP 4') && !e.message.includes('429')) throw e;
             
             if (i === retries - 1) throw e;
             const delay = 1000 * Math.pow(2, i);
-            console.warn(`[FeishuClient] Fetch failed (${e.message}). Retrying in ${delay}ms...`);
+            console.warn(`[FeishuClient] Fetch failed (${e.message}) [${url}]. Retrying in ${delay}ms...`);
             await new Promise(r => setTimeout(r, delay));
         }
     }
