@@ -3,9 +3,15 @@
   "slug": "gong",
   "displayName": "Gong",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1768792699743,
-    "commit": "https://github.com/clawdbot/skills/commit/a401c9b96bdaefe2220a2b4f2bc6ef882cc3b4a2"
+    "version": "1.1.0",
+    "publishedAt": 1770963521964,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1768792699743,
+      "commit": "https://github.com/clawdbot/skills/commit/a401c9b96bdaefe2220a2b4f2bc6ef882cc3b4a2"
+    }
+  ]
 }
