@@ -3,11 +3,16 @@
   "slug": "stock-market-pro",
   "displayName": "Stock Market Pro",
   "latest": {
-    "version": "1.2.11",
-    "publishedAt": 1771174316303,
-    "commit": "https://github.com/openclaw/skills/commit/6696780bdd1a5edf3f0945d5fa979b77f16fda2c"
+    "version": "1.2.12",
+    "publishedAt": 1771174597458,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.11",
+      "publishedAt": 1771174316303,
+      "commit": "https://github.com/openclaw/skills/commit/6696780bdd1a5edf3f0945d5fa979b77f16fda2c"
+    },
     {
       "version": "1.1.0",
       "publishedAt": 1769671465508,

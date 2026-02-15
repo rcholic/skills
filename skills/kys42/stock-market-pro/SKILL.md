@@ -8,8 +8,9 @@ description: >-
 
 # Stock Market Pro
 
-A self-contained stock analysis skill built on **Yahoo Finance (`yfinance`)**.
-It computes technical indicators **locally** (no paid market-data API key required).
+**Stock Market Pro** is a fast, local-first market research toolkit.
+Get clean price + fundamentals, generate publication-ready charts with indicator panels (RSI/MACD/BB/VWAP/ATR), and run a one-shot report that outputs both a summary and a high-res PNG.
+Optional add-ons: quick news link sweep (DDG) + browser-first options/flow (Unusual Whales).
 
 ## What you can do
 - Get **real-time quotes** (price + change)
