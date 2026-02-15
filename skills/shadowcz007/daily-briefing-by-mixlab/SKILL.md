@@ -1,92 +1,59 @@
 ---
 name: daily-briefing
-description: 从 mixdao.world API 获取最新数据，解析并扁平化后保存为临时 JSON，输出文件路径与候选列表（id、标题）供挑选；第二步传入文件路径与 ids，输出每条摘要与详情并删除临时文件。自然语言触发示例：「执行 daily briefing」「拉取 mixdao 高价值 Top 3」「做今日 mixdao 简报」「获取 mixdao 最新动态并输出有关联度的 Top 3」。
+description: 从 mixdao latest 获取数据 → 用 MiniMax-M2.5 做分类整理（agent loop：至多5组、每组至少3条）并生成分组摘要与每条推荐语 → 按 cachedStoryId 提交推荐语到 mixdao。自然语言触发示例：「执行 daily briefing」「做今日 mixdao 简报」。
 ---
 
-# Daily Briefing（Mixdao 内容拉取与简报）
+# Daily Briefing（拉取 + MiniMax 分类 + 推荐语提交）
 
-## 脚本一览
+## 脚本
 
 | 脚本 | 作用 |
 |------|------|
-| `scripts/01-fetch.js` | **第一步**：拉取 mixdao API → 解析并扁平化（仅保留含正文的条目）→ 保存临时 JSON → 输出临时文件路径及所有候选（id、标题）。需设置环境变量 `MIXDAO_API_KEY`。 |
-| `scripts/02-generate.js` | **第二步**：传入**临时文件完整路径** + ids → 输出每条目的详细信息（含摘要、URL等）供 Agent 加工 → **运行结束后删除该临时文件**。 |
+| `scripts/01-fetch.js` | 拉取 mixdao `GET /api/latest`（环境变量 `MIXDAO_API_KEY`）→ 解析并扁平化 → 写入 `temp/briefing-YYYY-MM-DD.json` → 输出 `[FILE PATH] <path>`。 |
+| `scripts/02-briefing.js` | 读取步骤 1 的 temp 文件 → 调用 **MiniMax-M2.5** 做分组（agent loop 直至满足约束）→ 生成分组摘要（20 字内）与每条推荐语（140 字内，创业者视角：场景、问题、解决方案、价值）→ 按 **cachedStoryId** 调用 mixdao PATCH 提交推荐语。 |
 
 ## 工作流程
 
-### 步骤 1：获取候选数据
+### 步骤 1：从 latest 获取数据
 
-在本 skill 根目录下执行：
+在 skill 根目录下执行：
 
 ```bash
 node scripts/01-fetch.js
 ```
 
-**输出说明**：
-- `[FILE PATH] <path>` - 临时文件的完整路径（第二步传参用，如 `…/temp/briefing-2026-02-14.json`）
-- `[CANDIDATES]` - 所有候选条目（扁平列表），每条包含：`ID`、`标题`、分隔线 `-----`
+**输出**：`[FILE PATH] <temp 文件完整路径>`，供步骤 2 使用。
 
-### 步骤 2：挑选并生成简报
+### 步骤 2：MiniMax 分类整理 + 提交推荐语
 
-挑选规则：
-- **高频词** ，标题或正文中出现当前阶段的热门、高频关键词
-- **数量名词描述** ，含有明确数量、金额、比例等（如「融资 X 亿」「用户破 X 万」「增长 X%」）
-- **大公司进展** ，知名公司、独角兽、头部机构的产品/融资/战略动态
-- **易热议话题**，易引发讨论、争议或行业关注的议题（政策、裁员、并购、新范式等）
-- **关联度要求**，需具备至少一种关联，例如：
-    - **同一主题/赛道**：如均为 AI 基础设施、或均为某国监管动态；
-    - **同一事件链条**：如同一家公司融资→产品发布→合作签约；
-    - **同一讨论脉络**：如政策出台→行业反应→典型公司案例；
-    - **互补视角**：如宏观趋势 + 代表公司 + 争议/热议点。
-
-从步骤 1 的输出中复制 **临时文件完整路径**，并按照规则挑选若干条目 id，执行：
+将步骤 1 输出的文件路径传入：
 
 ```bash
-node scripts/02-generate.js <filepath> <id1> <id2> <id3>
+node scripts/02-briefing.js <filepath>
 ```
 
 **示例**：
 
 ```bash
-node scripts/02-generate.js /path/to/skills/daily-briefing/temp/briefing-2026-02-14.json pr-RzL2dyby0y pr-FyZW5hLTU= pr-plbm11eC0y
+node scripts/02-briefing.js ./temp/briefing-2026-02-14.json
 ```
 
-**输出说明**：
-- `[CONTEXT]` - 生成时间、条目数
-- 每条目的详细信息：ID、标题、**摘要**（正文前 200 字）、URL
-- **运行结束后会删除该临时文件**
+**02-briefing 内部流程**：
+1. 读取 JSON（根级条目数组），校验非空。
+2. **分组 Agent Loop**（MiniMax-M2.5）：对类似话题分组，**至多 5 组**，**每组至少 3 条**；不满足则反馈重试，最多 3 次。
+3. **生成摘要与推荐语**：每组一段分组摘要（20 字内）；每条站在**创业者角度**生成推荐语（140 字内），格式：**xxx场景、xxx问题、xxx解决方案、xxx价值**。
+4. 按 **cachedStoryId** 逐条调用 mixdao `PATCH /api/latest/recommendation` 提交推荐语（Bearer `MIXDAO_API_KEY`）。失败打 log 并继续其余条目。
 
-### 步骤 3：Agent 加工输出
+## 环境变量
 
-Agent 根据步骤 2 输出的丰富上下文信息，撰写每条的 140 字中文总结，格式如下：
-
-```markdown
-### 1.
-**总结**：（约 140 字中文，概括核心信息与价值点。）
-**标题**：……
-**链接**：https://...
-
-### 2.
-**总结**：（约 140 字中文。）
-**标题**：……
-**链接**：https://...
-
-### 3.
-**总结**：（约 140 字中文。）
-**标题**：……
-**链接**：https://...
-```
-
-## 优势
-
-- **先预览再选择**：第一步输出所有候选的 id 与标题，便于挑选
-- **丰富上下文**：第二步输出 URL、来源等完整信息，便于生成高质量总结
-- **灵活数量**：可挑选任意数量，不限于 3 条
+| 变量 | 说明 |
+|------|------|
+| **MIXDAO_API_KEY** | 必填。mixdao API 的 Bearer token（拉取 latest 与提交推荐语）。 |
+| **ANTHROPIC_BASE_URL** | 可选，默认 `https://api.minimaxi.com/anthropic`。MiniMax 兼容 Anthropic 的 base URL。 |
+| **ANTHROPIC_API_KEY** | 必填。MiniMax API Key，用于调用 MiniMax-M2.5。 |
 
 ## 注意事项
 
-- **环境变量**：执行前需设置 `MIXDAO_API_KEY`
-- **请求超时**：第一步拉取 API 超时时间为 15 秒
-- **临时文件**：第一步保存在 `temp/` 目录；第二步运行结束后会删除传入的临时文件，故同一文件只能用于一次 generate
-- **文件校验**：第二步会校验 JSON 格式及 `allItems` 字段，无效文件会报错并退出
-- **140 字总结**：由 Agent 根据上下文信息撰写
+- **请求超时**：01-fetch 拉取 API 超时 15 秒；02-briefing 内 PATCH 单条超时 15 秒。
+- **临时文件**：步骤 1 将原始数据写入 `temp/`，步骤 2 仅读取，不删除。
+- **推荐语格式**：每条 140 字内，创业者视角：场景、问题、解决方案、价值。

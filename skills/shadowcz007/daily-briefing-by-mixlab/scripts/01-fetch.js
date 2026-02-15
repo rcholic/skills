@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Daily Briefing 脚本 1: 获取数据
- * - 拉取 mixdao API
- * - 解析并扁平化（仅保留含正文的条目）
- * - 临时保存为 JSON 文件
- * - 输出临时文件路径及所有条目的 id、标题供挑选
+ * Daily Briefing: 获取数据并分组整理
+ * - 拉取 https://www.mixdao.world/api/latest（需环境变量 MIXDAO_API_KEY，Bearer token）
+ * - 解析并扁平化，按 source 分组，输出每组条目的完整信息（id、标题、摘要、URL）
+ * - 可选：将原始数据保存到 temp/ 目录
  *
  * 用法: node scripts/01-fetch.js
  */
@@ -18,9 +17,9 @@ import https from 'https';
 const __dirname = path.dirname(fileURLToPath(
     import.meta.url));
 const API_URL = 'https://www.mixdao.world/api/latest';
-const SKIP_KEYS = new Set(['sources', 'sourceLabels']);
+const SKIP_KEYS = new Set(['sources', 'sourceLabels', 'hasMore']);
 
-function fetchRaw() {
+function fetchLatest() {
     return new Promise((resolve, reject) => {
         const apiKey = process.env.MIXDAO_API_KEY;
         if (!apiKey) {
@@ -59,6 +58,7 @@ function fetchRaw() {
     });
 }
 
+/** API 返回：{ hn: [], arxiv: [], ... }，扁平化为统一 id、标题、摘要等 */
 function flatten(data) {
     const out = [];
     for (const key of Object.keys(data)) {
@@ -67,29 +67,30 @@ function flatten(data) {
         if (!arr.length) continue;
         for (const item of arr) {
             if (!item || (!item.title && !item.translatedTitle)) continue;
-            const title = item.title || item.translatedTitle || '';
-            const translatedTitle = item.translatedTitle || item.title || '';
+            const title = (item.title || item.translatedTitle || '').replace(/&#8217;/g, "'");
+            const translatedTitle = (item.translatedTitle || item.title || '').replace(/&#8217;/g, "'");
             const url = item.url || item.link || '';
             if (!url && !title) continue;
-            if (item.text && item.text.trim()) out.push({
-                id: item.id || `${key}-${item.url || title}`.slice(0, 80),
-                title: title.replace(/&#8217;/g, "'"),
-                translatedTitle: (translatedTitle || '').replace(/&#8217;/g, "'"),
-                text: item.text.trim(),
-                url,
-                score: typeof item.score === 'number' ? item.score : 0,
-                descendants: typeof item.descendants === 'number' ? item.descendants : 0,
-                source: key,
-            });
+            const id = item.cachedStoryId
+            if (id) {
+                out.push({
+                    id,
+                    title,
+                    translatedTitle,
+                    text: (item.text || '').trim(),
+                    url
+                });
+            }
+
         }
     }
     return out;
 }
 
 function main() {
-    fetchRaw()
-        .then((raw) => {
-            const items = flatten(raw);
+    fetchLatest()
+        .then((raw) => flatten(raw))
+        .then((items) => {
             if (!items.length) {
                 console.error('01-fetch.js: no items from API');
                 process.exit(1);
@@ -104,22 +105,11 @@ function main() {
                 fs.mkdirSync(tempDir, { recursive: true });
             }
 
-            const outputData = {
-                generatedAt: new Date().toISOString(),
-                allItems: items,
-            };
+            const outputData = items;
 
             fs.writeFileSync(tempFilePath, JSON.stringify(outputData, null, 2), 'utf8');
 
             console.log(`[FILE PATH] ${tempFilePath}`);
-            console.log('[CANDIDATES]');
-
-            for (const item of items) {
-                const title = item.translatedTitle || item.title || '';
-                console.log(`ID: ${item.id}`);
-                console.log(`标题: ${title}`);
-                console.log('-----');
-            }
         })
         .catch((err) => {
             console.error('Error:', err.message);

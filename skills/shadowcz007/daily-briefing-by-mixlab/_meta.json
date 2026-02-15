@@ -1,11 +1,17 @@
 {
   "owner": "shadowcz007",
   "slug": "daily-briefing-by-mixlab",
-  "displayName": "Daily Briefing（ 高价值内容筛选）",
+  "displayName": "Mixlab Daily Briefing（ 高价值内容筛选）",
   "latest": {
-    "version": "2.0.0",
-    "publishedAt": 1771058362458,
-    "commit": "https://github.com/openclaw/skills/commit/1c062e82879d3124fc5b7b9a3b9f517012624a4d"
+    "version": "3.1.2",
+    "publishedAt": 1771138506009,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "2.0.0",
+      "publishedAt": 1771058362458,
+      "commit": "https://github.com/openclaw/skills/commit/1c062e82879d3124fc5b7b9a3b9f517012624a4d"
+    }
+  ]
 }
