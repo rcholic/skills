@@ -1,6 +1,6 @@
 ---
 name: amber-voice-assistant
-description: Deploy a production-ready OpenClaw phone voice assistant with Twilio + OpenAI Realtime (requires OPENAI_API_KEY), realtime STT/TTS, and OpenClaw knowledge lookup during live calls. Supports both inbound_calls and outbound_calls. Use for inbound/outbound call setup, ask_openclaw-style knowledge/memory access, safety guardrails (approval/payment escalation), quickstart installation, and publishing a reusable voice-assistant skill to ClawHub.
+description: Amber Voice Assistant is a setup-and-operations skill pack for adding a low-latency, phone-capable voice subagent to OpenClaw using Twilio + OpenAI Realtime. Includes install guidance, env templates, validation scripts, guardrail patterns, and troubleshooting runbooks for inbound/outbound call workflows.
 metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER","OPENAI_API_KEY"],"anyBins":["node"]},"primaryEnv":"OPENAI_API_KEY"}}
 ---
 
@@ -8,7 +8,17 @@ metadata: {"openclaw":{"emoji":"☎️","requires":{"env":["TWILIO_ACCOUNT_SID",
 
 ## Overview
 
-Use this skill to turn a working voice-call setup into a shareable, documented OpenClaw skill that others can install and run safely.
+Amber Voice Assistant is a setup-and-operations skill pack that helps you add a low-latency, phone-capable voice subagent to OpenClaw.
+
+It focuses on practical deployment enablement: environment setup, validation, guardrail patterns, and troubleshooting for inbound/outbound call workflows.
+
+## Why Amber
+
+- Practical setup guidance for Twilio + OpenAI Realtime voice workflows
+- Validation + troubleshooting runbooks for common failures (webhook/tunnel drift, silent calls)
+- Built for real workflows: reservations, screening, callbacks, support
+- Works with OpenClaw-connected systems (calendar, CRM, other tools)
+- Operator safety guardrails for approvals/escalation/payment handling
 
 ## Personalization requirements
 
