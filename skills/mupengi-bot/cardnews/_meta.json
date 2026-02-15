@@ -1,0 +1,11 @@
+{
+  "owner": "mupengi-bot",
+  "slug": "cardnews",
+  "displayName": "Cardnews",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771151219482,
+    "commit": null
+  },
+  "history": []
+}
