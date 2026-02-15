@@ -3,9 +3,15 @@
   "slug": "tech-digest",
   "displayName": "Tech Digest",
   "latest": {
-    "version": "2.0.0",
-    "publishedAt": 1771120867283,
-    "commit": "https://github.com/openclaw/skills/commit/2d8b2345a00f39ff1d989511fb5326d3cffdf335"
+    "version": "2.1.2",
+    "publishedAt": 1771157528091,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "2.0.0",
+      "publishedAt": 1771120867283,
+      "commit": "https://github.com/openclaw/skills/commit/2d8b2345a00f39ff1d989511fb5326d3cffdf335"
+    }
+  ]
 }

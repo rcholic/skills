@@ -1,14 +1,26 @@
 ---
 name: tech-digest
-description: Generate tech news digests with unified source model, quality scoring, and multi-format output. Three-layer data collection from RSS feeds, Twitter/X KOLs, and web search. Pipeline-based scripts with retry mechanisms and deduplication. Supports Discord, email, and markdown templates.
-version: "2.0.0"
+description: Generate tech news digests with unified source model, quality scoring, and multi-format output. Four-layer data collection from RSS feeds, Twitter/X KOLs, GitHub releases, and web search. Pipeline-based scripts with retry mechanisms and deduplication. Supports Discord, email, and markdown templates.
+version: "2.1.2"
+homepage: https://github.com/draco-agent/tech-digest
+source: https://github.com/draco-agent/tech-digest
+env:
+  - name: X_BEARER_TOKEN
+    required: false
+    description: Twitter/X API bearer token for KOL monitoring
+  - name: BRAVE_API_KEY
+    required: false
+    description: Brave Search API key for web search layer
+  - name: GITHUB_TOKEN
+    required: false
+    description: GitHub personal access token for higher API rate limits
 ---
 
-# Tech Digest v2.0
+# Tech Digest v2.1
 
 Automated tech news digest system with unified data source model, quality scoring pipeline, and template-based output generation.
 
-## What's New in v2.0
+## What's New in v2.1
 
 - **Unified Source Model**: Single `sources.json` for RSS, Twitter, and web sources
 - **Enhanced Topics**: Richer topic definitions with search queries and filters  
@@ -30,6 +42,7 @@ Automated tech news digest system with unified data source model, quality scorin
 2. **Environment Variables**: 
    - `X_BEARER_TOKEN` - Twitter API bearer token (optional)
    - `BRAVE_API_KEY` - Brave Search API key (optional)
+   - `GITHUB_TOKEN` - GitHub personal access token (optional, improves rate limits)
 
 3. **Generate Digest**:
    ```bash
@@ -37,7 +50,8 @@ Automated tech news digest system with unified data source model, quality scorin
    python3 scripts/fetch-rss.py --config workspace/config
    python3 scripts/fetch-twitter.py --config workspace/config  
    python3 scripts/fetch-web.py --config workspace/config
-   python3 scripts/merge-sources.py --rss rss.json --twitter twitter.json --web web.json
+   python3 scripts/fetch-github.py --config workspace/config
+   python3 scripts/merge-sources.py --rss rss.json --twitter twitter.json --web web.json --github github.json
    ```
 
 4. **Use Templates**: Apply Discord, email, or markdown templates to merged output
@@ -121,16 +135,24 @@ python3 scripts/fetch-web.py [--config CONFIG_DIR] [--freshness 48h] [--output F
 - **Without API**: Generates search interface for agents to execute
 - **Filtering**: Content-based inclusion/exclusion rules
 
-### 4. `merge-sources.py` - Quality Scoring & Deduplication
+### 4. `fetch-github.py` - GitHub Releases Monitor
 ```bash
-python3 scripts/merge-sources.py --rss rss.json --twitter twitter.json --web web.json
+python3 scripts/fetch-github.py [--config CONFIG_DIR] [--hours 168] [--output FILE]
+```
+- **Features**: Parallel repository monitoring, release filtering, markdown stripping
+- **Authentication**: Optional `GITHUB_TOKEN` for higher rate limits
+- **Output**: Structured JSON with releases tagged by topics
+
+### 5. `merge-sources.py` - Quality Scoring & Deduplication
+```bash
+python3 scripts/merge-sources.py --rss rss.json --twitter twitter.json --web web.json --github github.json
 ```
 - **Quality Scoring**: Priority sources (+3), multi-source (+5), recency (+2), engagement (+1)
 - **Deduplication**: Title similarity detection (85% threshold), domain saturation limits
 - **Previous Digest Penalty**: Avoids repeating articles from recent digests
 - **Output**: Topic-grouped articles with quality scores
 
-### 5. `validate-config.py` - Configuration Validator
+### 6. `validate-config.py` - Configuration Validator
 ```bash
 python3 scripts/validate-config.py [--config-dir CONFIG_DIR] [--verbose]
 ```
@@ -190,10 +212,11 @@ Place custom configs in `workspace/config/` to override defaults:
 - Technical details section
 - Expandable sections support
 
-## Default Sources (65 total)
+## Default Sources (109 total)
 
-- **RSS Feeds (32)**: AI labs, tech blogs, crypto news, Chinese tech media
-- **Twitter/X KOLs (29)**: AI researchers, crypto leaders, tech executives  
+- **RSS Feeds (46)**: AI labs, tech blogs, crypto news, Chinese tech media
+- **Twitter/X KOLs (44)**: AI researchers, crypto leaders, tech executives
+- **GitHub Repos (19)**: Major open-source projects (LangChain, vLLM, Foundry, etc.)
 - **Web Search (4 topics)**: LLM, AI Agent, Crypto, Frontier Tech
 
 All sources pre-configured with appropriate topic tags and priority levels.
@@ -253,19 +276,81 @@ export BRAVE_API_KEY="your_brave_search_api_key"  # Optional
 - **Twitter**: Read-only bearer token, pay-per-use pricing
 - **Brave Search**: Optional, fallback to agent web_search if unavailable
 
-## Cron Integration
+## Cron / Scheduled Task Integration
 
-Daily digest example:
-```bash
-# Run at 7:00 AM daily
-0 7 * * * cd /path/to/tech-digest && ./scripts/daily-digest.sh
+### OpenClaw Cron (Recommended)
+
+The cron prompt should **NOT** hardcode the pipeline steps. Instead, reference `references/digest-prompt.md` and only pass configuration parameters. This ensures the pipeline logic stays in the skill repo and is consistent across all installations.
+
+#### Daily Digest Cron Prompt
+```
+读取 <SKILL_DIR>/references/digest-prompt.md，按照其中的完整流程生成日报。
+
+用以下参数替换占位符：
+- MODE = daily
+- TIME_WINDOW = past 1-2 days
+- FRESHNESS = pd
+- RSS_HOURS = 48
+- ITEMS_PER_SECTION = 3-5
+- BLOG_PICKS_COUNT = 2-3
+- EXTRA_SECTIONS = （无）
+- SUBJECT = Daily Tech Digest - YYYY-MM-DD
+- WORKSPACE = <your workspace path>
+- SKILL_DIR = <your skill install path>
+- DISCORD_CHANNEL_ID = <your channel id>
+- EMAIL = （optional）
+- LANGUAGE = Chinese
+- TEMPLATE = discord
+
+严格按 prompt 模板中的步骤执行，不要跳过任何步骤。
 ```
 
-Weekly digest example:
-```bash
-# Run at 7:00 AM every Monday
-0 7 * * 1 cd /path/to/tech-digest && ./scripts/weekly-digest.sh
+#### Weekly Digest Cron Prompt
 ```
+读取 <SKILL_DIR>/references/digest-prompt.md，按照其中的完整流程生成周报。
+
+用以下参数替换占位符：
+- MODE = weekly
+- TIME_WINDOW = past 7 days
+- FRESHNESS = pw
+- RSS_HOURS = 168
+- ITEMS_PER_SECTION = 5-8
+- BLOG_PICKS_COUNT = 3-5
+- EXTRA_SECTIONS = 📊 Weekly Trend Summary (2-3 sentences summarizing macro trends)
+- SUBJECT = Weekly Tech Digest - YYYY-MM-DD
+- WORKSPACE = <your workspace path>
+- SKILL_DIR = <your skill install path>
+- DISCORD_CHANNEL_ID = <your channel id>
+- EMAIL = （optional）
+- LANGUAGE = Chinese
+- TEMPLATE = discord
+
+严格按 prompt 模板中的步骤执行，不要跳过任何步骤。
+```
+
+#### Why This Pattern?
+- **Single source of truth**: Pipeline logic lives in `digest-prompt.md`, not scattered across cron configs
+- **Portable**: Same skill on different OpenClaw instances, just change paths and channel IDs
+- **Maintainable**: Update the skill → all cron jobs pick up changes automatically
+- **Anti-pattern**: Do NOT copy pipeline steps into the cron prompt — it will drift out of sync
+
+#### Multi-Channel Delivery Limitation
+OpenClaw enforces **cross-provider isolation**: a single session can only send messages to one provider (e.g., Discord OR Telegram, not both). If you need to deliver digests to multiple platforms, create **separate cron jobs** for each provider:
+
+```
+# Job 1: Discord + Email
+- DISCORD_CHANNEL_ID = 1470806864412414071
+- EMAIL = user@example.com
+- TEMPLATE = discord
+
+# Job 2: Telegram DM
+- DISCORD_CHANNEL_ID = （无）
+- EMAIL = （无）
+- TEMPLATE = telegram
+```
+Replace `DISCORD_CHANNEL_ID` delivery with Telegram delivery in the second job's prompt (use `message` tool with `channel=telegram`).
+
+This is a security feature, not a bug — it prevents accidental cross-context data leakage.
 
 ## Support & Troubleshooting
 

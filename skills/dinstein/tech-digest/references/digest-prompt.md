@@ -46,8 +46,8 @@ Read the most recent archive file from `<WORKSPACE>/archive/tech-digest/` (if an
 ### Step 1: RSS Feeds
 ```bash
 python3 <SKILL_DIR>/scripts/fetch-rss.py \
-  --config <WORKSPACE>/config \
   --defaults <SKILL_DIR>/config/defaults \
+  --config <WORKSPACE>/config \
   --hours <RSS_HOURS> \
   --output /tmp/td-rss.json \
   --verbose
@@ -59,8 +59,8 @@ If the script fails, fall back to manually fetching priority feeds via `web_fetc
 ### Step 2: Twitter/X KOL Monitoring
 ```bash
 python3 <SKILL_DIR>/scripts/fetch-twitter.py \
-  --config <WORKSPACE>/config \
   --defaults <SKILL_DIR>/config/defaults \
+  --config <WORKSPACE>/config \
   --hours <RSS_HOURS> \
   --output /tmp/td-twitter.json \
   --verbose
@@ -70,8 +70,8 @@ Reads `sources.json`, fetches all `type: "twitter"` sources. Requires `$X_BEARER
 ### Step 3: Web Search
 ```bash
 python3 <SKILL_DIR>/scripts/fetch-web.py \
-  --config <WORKSPACE>/config \
   --defaults <SKILL_DIR>/config/defaults \
+  --config <WORKSPACE>/config \
   --freshness <FRESHNESS> \
   --output /tmp/td-web.json \
   --verbose
@@ -80,13 +80,25 @@ Reads `topics.json` search queries. Uses Brave Search API if `$BRAVE_API_KEY` is
 
 Also search Twitter trending discussions using `web_search` with `freshness='<FRESHNESS>'` and the `twitter_queries` from topics.
 
-### Step 4: Merge & Score
+### Step 4: GitHub Releases
+```bash
+python3 <SKILL_DIR>/scripts/fetch-github.py \
+  --defaults <SKILL_DIR>/config/defaults \
+  --config <WORKSPACE>/config \
+  --hours <RSS_HOURS> \
+  --output /tmp/td-github.json \
+  --verbose
+```
+Reads `sources.json`, fetches all `type: "github"` sources with `enabled: true`. Fetches recent releases from GitHub API (optional `$GITHUB_TOKEN` for higher rate limits). Outputs structured JSON with releases tagged by topics.
+
+### Step 5: Merge & Score
 ```bash
 python3 <SKILL_DIR>/scripts/merge-sources.py \
   --rss /tmp/td-rss.json \
   --twitter /tmp/td-twitter.json \
   --web /tmp/td-web.json \
-  --previous <WORKSPACE>/archive/tech-digest/ \
+  --github /tmp/td-github.json \
+  --archive-dir <WORKSPACE>/archive/tech-digest/ \
   --output /tmp/td-merged.json \
   --verbose
 ```
@@ -125,6 +137,14 @@ Use sections defined in `topics.json`. Each topic has:
 - **Append source link after each item** (wrap in `<link>` for Discord)
 - **<ITEMS_PER_SECTION> items per section**
 - **Use bullet lists, no markdown tables** (Discord compatibility)
+
+### Data Source Stats Footer
+At the end of the report, append a stats line showing raw data collected from each pipeline step. Read the counts from the merged JSON's `input_sources` field or from each step's output. Format:
+
+```
+---
+📊 数据源统计：RSS {{rss_count}} 篇 | Twitter {{twitter_count}} 条 | Web {{web_count}} 篇 | GitHub {{github_count}} 个 release | 合并去重后 {{merged_count}} 篇
+```
 
 ## Archive
 Save the report to `<WORKSPACE>/archive/tech-digest/<MODE>-YYYY-MM-DD.md`
