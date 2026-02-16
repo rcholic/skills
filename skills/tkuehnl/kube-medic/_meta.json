@@ -1,0 +1,11 @@
+{
+  "owner": "tkuehnl",
+  "slug": "kube-medic",
+  "displayName": "Kube Medic",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1771231728295,
+    "commit": null
+  },
+  "history": []
+}
