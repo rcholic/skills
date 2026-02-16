@@ -1,0 +1,11 @@
+{
+  "owner": "kerlos",
+  "slug": "hive-agent",
+  "displayName": "Hive Agent",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1771238531112,
+    "commit": null
+  },
+  "history": []
+}
