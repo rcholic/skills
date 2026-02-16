@@ -1,6 +1,19 @@
 ---
 name: kilocli-coding-agent
 description: Run Kilo CLI via background process for programmatic control.
+version: 0.0.9
+metadata:
+  openclaw:
+    requires:
+      env:
+        - GITHUB_TOKEN
+      bins:
+        - kilo
+        - git
+        - gh
+        - tmux
+    primaryEnv: GITHUB_TOKEN
+---
 ---
 
 IMPORTANT: You need to have Kilo CLI installed and configured so OpenClaw can use it without any issue.
@@ -8,6 +21,8 @@ IMPORTANT: You need to have Kilo CLI installed and configured so OpenClaw can us
 ```sh
 npm install -g @kilocode/cli
 ```
+
+If you want to automate pull requests to Github, then you also need to authenticate Github CLI in your project: https://github.com/cli/cli#installation
 
 # Coding Agent (background-first)
 
@@ -44,24 +59,25 @@ process action:kill sessionId:XXX
 
 ## Kilo CLI
 
-### Building/Creating (use --full-auto or --yolo)
+### Building/Creating (Use Autonomous mode)
+
 ```bash
-bash workdir:~/project background:true command:"kilo run \"Build a snake game with dark theme\""
+bash workdir:~/project background:true command:"kilo run --auto \"Build a snake game with dark theme\""
 ```
 
 ### Reviewing PRs (vanilla, no flags)
 
-**⚠️ CRITICAL: Never review PRs in Clawdbot's own project folder!**
-- Either use the project where the PR is submitted (if it's NOT ~/Projects/clawdbot)
+**⚠️ CRITICAL: Never review PRs in OpenClaw's own project folder!**
+- Either use the project where the PR is submitted (if it's NOT ~/Projects/openclaw)
 - Or clone to a temp folder first
 
 ```bash
-# Option 1: Review in the actual project (if NOT clawdbot)
+# Option 1: Review in the actual project (if NOT OpenClaw)
 bash workdir:~/Projects/some-other-repo background:true command:"kilo run \"Review current branch against main branch\""
 
-# Option 2: Clone to temp folder for safe review (REQUIRED for clawdbot PRs!)
+# Option 2: Clone to temp folder for safe review (REQUIRED for OpenClaw PRs!)
 REVIEW_DIR=$(mktemp -d)
-git clone https://github.com/clawdbot/clawdbot.git $REVIEW_DIR
+git clone https://github.com/openclaw/openclaw.git $REVIEW_DIR
 cd $REVIEW_DIR && gh pr checkout 130
 bash workdir:$REVIEW_DIR background:true command:"kilo run \"Review current branch against main branch\""
 # Clean up after: rm -rf $REVIEW_DIR
@@ -71,7 +87,7 @@ git worktree add /tmp/pr-130-review pr-130-branch
 bash workdir:/tmp/pr-130-review background:true command:"kilo run \"Review current branch against main branch\""
 ```
 
-**Why?** Checking out branches in the running Clawdbot repo can break the live instance!
+**Why?** Checking out branches in the running OpenClaw repo can break the live instance!
 
 ### Batch PR Reviews (parallel army!)
 ```bash
@@ -159,8 +175,8 @@ git worktree remove /tmp/issue-99
 4. **--full-auto for building** — auto-approves changes
 5. **vanilla for reviewing** — no special flags needed
 6. **Parallel is OK** — run many Kilo CLI processes at once for batch work
-7. **NEVER start Kilo CLI in ~/clawd/** — it'll read your soul docs and get weird ideas about the org chart! Use the target project dir or /tmp for blank slate chats
-8. **NEVER checkout branches in ~/Projects/clawdbot/** — that's the LIVE Clawdbot instance! Clone to /tmp or use git worktree for PR reviews
+7. **NEVER start Kilo CLI in ~/openclaw/** — it'll read your soul docs and get weird ideas about the org chart! Use the target project dir or /tmp for blank slate chats
+8. **NEVER checkout branches in ~/Projects/openclaw/** — that's the LIVE OpenClaw instance! Clone to /tmp or use git worktree for PR reviews
 
 ---
 

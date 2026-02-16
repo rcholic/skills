@@ -3,11 +3,16 @@
   "slug": "kilocli-coding-agent",
   "displayName": "Kilo CLI Coding Agent",
   "latest": {
-    "version": "0.0.3",
-    "publishedAt": 1770367114151,
-    "commit": "https://github.com/openclaw/skills/commit/07331d7f88027e966c8c5e496aef0d396b250144"
+    "version": "0.0.9",
+    "publishedAt": 1771211218705,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.0.3",
+      "publishedAt": 1770367114151,
+      "commit": "https://github.com/openclaw/skills/commit/07331d7f88027e966c8c5e496aef0d396b250144"
+    },
     {
       "version": "0.0.2",
       "publishedAt": 1770303454776,
