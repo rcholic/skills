@@ -1,7 +1,7 @@
 {
   "id": "nima-memory",
   "name": "nima-memory",
-  "version": "2.0.3",
+  "version": "2.0.8",
   "kind": "memory",
   "description": "NIMA Unified Memory - Three-layer experiential capture and graph-augmented recall",
   "main": "index.js",

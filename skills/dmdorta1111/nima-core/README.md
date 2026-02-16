@@ -35,11 +35,51 @@ export VOYAGE_API_KEY=your-key
 openclaw restart
 ```
 
+## 🔒 Privacy & Permissions
+
+**What NIMA accesses:**
+- ✅ Session transcripts: `~/.openclaw/agents/*/sessions/*.jsonl` (captures conversation turns)
+- ✅ Local storage: `~/.nima/` (SQLite/LadybugDB databases, affect history, embeddings)
+
+**Network calls (conditional):**
+- 🌐 **Voyage API** — Only when `NIMA_EMBEDDER=voyage` (sends conversation text for embeddings)
+- 🌐 **OpenAI API** — Only when `NIMA_EMBEDDER=openai` (sends conversation text for embeddings)
+- 🔒 **Local embeddings** — Default (`NIMA_EMBEDDER=local`), no external network calls
+
+**Opt-in controls:**
+```json
+// openclaw.json - Fine-grained control
+{
+  "plugins": {
+    "entries": {
+      "nima-memory": {
+        "enabled": true,
+        "skip_subagents": true,      // Don't capture subagent sessions
+        "skip_heartbeats": true,      // Don't capture heartbeat checks
+        "noise_filtering": {
+          "filter_heartbeat_mechanics": true,
+          "filter_system_noise": true
+        }
+      }
+    }
+  }
+}
+```
+
+**Privacy-first defaults:**
+- Subagent sessions excluded by default
+- Heartbeat/system noise filtered
+- Local embeddings (no external API calls)
+- All data stored locally in `~/.nima/`
+
+**To disable entirely:** Remove `nima-memory` from `plugins.allow` in `openclaw.json`
+
 ## 📚 Documentation
 
 | Guide | Description |
 |-------|-------------|
 | [SETUP_GUIDE.md](./SETUP_GUIDE.md) | Step-by-step installation |
+| [AFFECTIVE_CORE_PROFILES_GUIDE.md](./docs/AFFECTIVE_CORE_PROFILES_GUIDE.md) | Archetypes & personality profiles |
 | [DATABASE_OPTIONS.md](./docs/DATABASE_OPTIONS.md) | SQLite vs LadybugDB |
 | [EMBEDDING_PROVIDERS.md](./docs/EMBEDDING_PROVIDERS.md) | Voyage, OpenAI, Local |
 | [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) | Migrate from old versions |

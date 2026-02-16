@@ -12,6 +12,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { execPython } from "../utils/async-python.js"; // Async wrapper
 import { existsSync, writeFileSync, readFileSync, unlinkSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import os from "node:os";
@@ -44,7 +45,7 @@ function sanitizeFTS5(query) {
 }
 
 /**
- * Strip channel prefix from message (e.g., [Telegram David id:123 ...] → actual message)
+ * Strip channel prefix from message (e.g., [Telegram UserName id:123 ...] → actual message)
  */
 function stripChannelPrefix(text) {
   return text.replace(/^\[(?:Telegram|Discord|Signal|SMS|Slack|Matrix|WhatsApp|iMessage|Email)\s+[^\]]*\]\s*/i, "").trim();
@@ -88,7 +89,7 @@ function extractUserMessage(prompt) {
 /**
  * Run lightweight FTS5-only recall (no graph traversal)
  */
-function quickRecall(query) {
+async function quickRecall(query) {
   if (!existsSync(GRAPH_DB)) return null;
   
   const ftsQuery = sanitizeFTS5(query);
@@ -154,11 +155,11 @@ print(json.dumps(output))
 db.close()
 `;
     
-    const result = execFileSync("python3", ["-c", script, queryFile], {
+    const result = await execPython("python3", ["-c", script, queryFile], {
       timeout: QUERY_TIMEOUT,
       encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"]
-    }).trim();
+      breakerId: "recall-hook-fts"
+    });
     
     return JSON.parse(result);
   } catch (err) {
@@ -186,7 +187,7 @@ export default function nimaRecallLivePlugin(api, config) {
   
   log.info?.("[nima-recall-live] Live recall hook loaded");
   
-  api.on("before_agent_start", (event, ctx) => {
+  api.on("before_agent_start", async (event, ctx) => {
     try {
       // Debug: log that we fired
       console.error(`[nima-recall-live] FIRED. event keys: ${Object.keys(event || {}).join(",")}, ctx keys: ${Object.keys(ctx || {}).join(",")}`);
@@ -213,7 +214,7 @@ export default function nimaRecallLivePlugin(api, config) {
         return;
       }
       
-      const memories = quickRecall(userMessage);
+      const memories = await quickRecall(userMessage);
       const formatted = formatMemories(memories);
       
       // Cache

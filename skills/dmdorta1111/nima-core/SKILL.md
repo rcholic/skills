@@ -1,8 +1,8 @@
 ---
 name: nima-core
-description: Neural Integrated Memory Architecture — Graph-based memory with LadybugDB, semantic search, dynamic affect, lazy recall. Production-ready for AI agents.
-version: 2.0.5
-metadata: {"clawdbot":{"emoji":"🧠","requires":{"bins":["python3","node"],"env":["NIMA_EMBEDDER","VOYAGE_API_KEY","NIMA_DATA_DIR"]}}}
+description: Neural Integrated Memory Architecture — Graph-based memory with LadybugDB, semantic search, dynamic affect, lazy recall. Production-ready for AI agents. Learn more at nima-core.ai
+version: 2.0.11
+metadata: {"clawdbot":{"emoji":"🧠","requires":{"bins":["python3","node"],"env":["NIMA_DATA_DIR"]},"optional_env":{"NIMA_EMBEDDER":"voyage|openai|local (default: local)","VOYAGE_API_KEY":"Required when NIMA_EMBEDDER=voyage","OPENAI_API_KEY":"Required when NIMA_EMBEDDER=openai"},"permissions":{"reads":["~/.openclaw/agents/*/sessions/*.jsonl"],"writes":["~/.nima/"],"network":["voyage.ai (conditional)","openai.com (conditional)"]}}}
 ---
 
 # NIMA Core 2.0
@@ -31,6 +31,45 @@ export VOYAGE_API_KEY=your-key
 # Restart OpenClaw
 openclaw restart
 ```
+
+## 🔒 Privacy & Permissions
+
+**Data Access:**
+- ✅ Reads session transcripts from `~/.openclaw/agents/*/sessions/*.jsonl`
+- ✅ Writes to local storage at `~/.nima/` (databases, affect history, embeddings)
+
+**Network Calls (conditional on embedder choice):**
+- 🌐 **Voyage API** — Only when `NIMA_EMBEDDER=voyage` (sends text for embeddings)
+- 🌐 **OpenAI API** — Only when `NIMA_EMBEDDER=openai` (sends text for embeddings)
+- 🔒 **Local embeddings** — Default (`NIMA_EMBEDDER=local`), no external API calls
+
+**Opt-in Controls:**
+```json
+// openclaw.json
+{
+  "plugins": {
+    "entries": {
+      "nima-memory": {
+        "enabled": true,
+        "skip_subagents": true,      // Exclude subagent sessions (default)
+        "skip_heartbeats": true,      // Exclude heartbeat checks (default)
+        "noise_filtering": {
+          "filter_heartbeat_mechanics": true,
+          "filter_system_noise": true
+        }
+      }
+    }
+  }
+}
+```
+
+**Privacy Defaults:**
+- Subagent sessions excluded
+- Heartbeat/system noise filtered  
+- Local embeddings (no external calls)
+- All data stored locally
+
+**To disable:** Remove `nima-memory` from `plugins.allow` in `openclaw.json`
 
 ## What's New in 2.0
 

@@ -10,7 +10,7 @@ OPTIMIZED VERSION with:
   - Timeout protection
   - Skip embedding for short queries
 
-Author: Lilu + David Dorta
+Author: NIMA Core Team
 Date: 2026-02-14
 """
 

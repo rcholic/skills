@@ -38,6 +38,20 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass, field
+
+# Security: Path sanitization to prevent traversal attacks
+import re
+def sanitize_path_component(name: str, max_length: int = 100, default: str = "default") -> str:
+    """Sanitize string for safe use in file/directory names."""
+    if not isinstance(name, str):
+        name = str(name) if name is not None else ""
+    name = name.replace('/', '_').replace('\\', '_').replace('..', '')
+    name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+    name = re.sub(r'_+', '_', name).strip('_')
+    if not name:
+        name = default
+    return name[:max_length].rstrip('_') if len(name) > max_length else name
+
 from datetime import datetime
 
 # Set up logging
@@ -174,7 +188,8 @@ class DynamicAffectSystem:
             blend_strength: How much new input influences state (0-1, default 0.25)
             cross_affect: Enable cross-affect interactions (default True)
         """
-        self.identity_name = identity_name
+        # Security: Sanitize identity_name to prevent path traversal attacks
+        self.identity_name = sanitize_path_component(identity_name)
         
         # Thread safety
         self._lock = threading.RLock()
@@ -190,7 +205,7 @@ class DynamicAffectSystem:
                 self.data_dir = Path.home() / ".nima" / "affect"
         
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.state_file = self.data_dir / f"affect_state_{identity_name}.json"
+        self.state_file = self.data_dir / f"affect_state_{self.identity_name}.json"
         
         # Dynamics parameters
         self.momentum = momentum

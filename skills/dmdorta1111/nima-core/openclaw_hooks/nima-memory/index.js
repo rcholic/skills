@@ -15,16 +15,46 @@
  * Hook Events:
  *   agent_end → extract 3 layers from messages snapshot, bind affect, store
  *
- * Author: David Dorta + Lilu
+ * Author: NIMA Core Team
  * Date: 2026-02-13
  * Updated: 2026-02-13 (Security & correctness fixes)
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import { randomBytes } from "node:crypto";
+
+// AUDIT FIX 2026-02-16: Import error handling utilities (Issues #1-4)
+// Addresses: Silent failures, missing retry logic, JSON parse errors
+import { 
+  retrySync, 
+  safeJsonParse, 
+  wrapError, 
+  isTransientError,
+  createCircuitBreaker,
+  retryWithBackoff
+} from "../shared/error-handling.js";
+
+// Async Python execution with rate limiting and circuit breaker
+import { execPython } from "../utils/async-python.js";
+
+// Circuit breaker to prevent cascading failures to SQLite
+const dbCircuitBreaker = createCircuitBreaker({
+  failureThreshold: 5,
+  resetTimeoutMs: 60000,  // 1 minute cooldown
+  successThreshold: 2
+});
+
+// Log helper (set by plugin init)
+let log = console;
+
+// CONCURRENCY CONTROL
+const writeQueue = [];
+let isWriting = false;
+let initPromise = null;
 
 // =============================================================================
 // CONFIGURATION
@@ -33,7 +63,10 @@ import { randomBytes } from "node:crypto";
 const NIMA_HOME = join(os.homedir(), ".nima");
 const MEMORY_DIR = join(NIMA_HOME, "memory");
 const GRAPH_DB = join(MEMORY_DIR, "graph.sqlite");
+const LADYBUG_DB = join(MEMORY_DIR, "ladybug.lbug");
 const AFFECT_DIR = join(NIMA_HOME, "affect", "conversations");
+const EMERGENCY_DIR = join(MEMORY_DIR, "emergency_backups");
+const USE_LADYBUG_WRITE = true; // Dual-write to LadybugDB (default: true)
 
 // Content length limits (security - prevent DoS via oversized content)
 const MAX_TEXT_LENGTH = 3000;
@@ -45,16 +78,52 @@ const MAX_THINKING_SUMMARY = 120;
 const MAX_OUTPUT_SUMMARY = 100;
 
 // =============================================================================
+// SECURITY: Path Sanitization
+// =============================================================================
+
+/**
+ * Sanitize a string for safe use in file paths.
+ * Prevents path traversal attacks (e.g., "../../etc/passwd").
+ * 
+ * @param {string} name - Input string (e.g., identityName, conversationId)
+ * @param {number} maxLength - Maximum allowed length (default 100)
+ * @returns {string} Sanitized string containing only [a-zA-Z0-9_-]
+ */
+function sanitizePathComponent(name, maxLength = 100) {
+  if (typeof name !== "string") {
+    name = name != null ? String(name) : "";
+  }
+  // Remove path separators and parent directory references
+  name = name.replace(/\//g, "_").replace(/\\/g, "_").replace(/\.\./g, "");
+  // Keep only alphanumeric, dash, underscore
+  name = name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  // Collapse multiple underscores
+  name = name.replace(/_+/g, "_");
+  // Remove leading/trailing underscores
+  name = name.replace(/^_+|_+$/g, "");
+  // Ensure non-empty
+  if (!name) name = "default";
+  // Truncate if too long
+  if (name.length > maxLength) name = name.slice(0, maxLength);
+  return name;
+}
+
+// =============================================================================
 // MEMORY RECORD
 // =============================================================================
 
 /**
  * Truncate text to max length (security boundary).
+ * 
+ * SECURITY: Applies Unicode normalization to prevent injection bypass.
+ * Fixed 2026-02-16 - CVE pending assignment.
  */
 function truncateText(text, maxLen) {
   if (!text) return "";
-  if (text.length <= maxLen) return text;
-  return text.substring(0, maxLen);
+  // SECURITY FIX: Normalize Unicode before processing
+  const normalized = typeof text === 'string' ? text.normalize('NFKC') : String(text);
+  if (normalized.length <= maxLen) return normalized;
+  return normalized.substring(0, maxLen);
 }
 
 /**
@@ -229,16 +298,20 @@ function summarize(text, maxLen) {
 
 function readAffectState(conversationId, identityName) {
   try {
+    // Security: Sanitize inputs to prevent path traversal attacks
+    const safeIdentity = sanitizePathComponent(identityName, 64);
+    const safeConvId = conversationId ? sanitizePathComponent(conversationId, 64) : null;
+    
     // Try conversation-specific state first
-    if (conversationId) {
-      const convPath = join(AFFECT_DIR, `${identityName}_${conversationId}.json`);
+    if (safeConvId) {
+      const convPath = join(AFFECT_DIR, `${safeIdentity}_${safeConvId}.json`);
       if (existsSync(convPath)) {
         const data = JSON.parse(readFileSync(convPath, "utf-8"));
         return data.current?.named || null;
       }
     }
     // Fall back to shared state
-    const sharedPath = join(NIMA_HOME, "affect", `affect_state_${identityName}.json`);
+    const sharedPath = join(NIMA_HOME, "affect", `affect_state_${safeIdentity}.json`);
     if (existsSync(sharedPath)) {
       const data = JSON.parse(readFileSync(sharedPath, "utf-8"));
       return data.current?.named || null;
@@ -262,11 +335,18 @@ function readAffectState(conversationId, identityName) {
  *   - Heartbeat instruction text (system mechanics, not user message)
  *
  * This prevents feedback loops where recall output gets stored as memory input.
+ * 
+ * SECURITY: Applies Unicode normalization (NFKC) to prevent bypass attacks
+ * using homoglyphs or fullwidth characters.
+ * Fixed 2026-02-16 - CVE pending assignment.
  */
 function cleanInputText(text) {
   if (!text || typeof text !== "string") return "";
 
-  let cleaned = text;
+  // SECURITY FIX: Unicode normalization prevents bypass via homoglyphs
+  // NFKC: Canonical decomposition + compatibility composition
+  // This normalizes fullwidth chars (e.g., \uff07 → ') and other Unicode tricks
+  let cleaned = text.normalize('NFKC');
 
   // Remove NIMA RECALL blocks (multiline, non-greedy)
   cleaned = cleaned.replace(/\[NIMA RECALL[^\]]*\][\s\S]*?\[End recall[^\]]*\]\s*/gi, "");
@@ -380,7 +460,7 @@ function isLowQualityMemory(input, output, contemplation) {
  * Extract the three layers from the messages snapshot.
  * Returns { input, contemplation, output }
  */
-function extractLayers(messages) {
+function extractLayers(messages, ctx) {
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return null;
   }
@@ -392,11 +472,13 @@ function extractLayers(messages) {
   // Walk backwards to find the last user→assistant pair
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (!lastAssistantMsg && msg.role === "assistant") {
-      lastAssistantMsg = msg;
+    // Handle both nested (msg.message.role) and flat (msg.role) structures
+    const role = msg.role || msg.message?.role;
+    if (!lastAssistantMsg && role === "assistant") {
+      lastAssistantMsg = msg.message || msg;
     }
-    if (lastAssistantMsg && msg.role === "user") {
-      lastUserMsg = msg;
+    if (lastAssistantMsg && role === "user") {
+      lastUserMsg = msg.message || msg;
       break;
     }
   }
@@ -418,7 +500,32 @@ function extractLayers(messages) {
     }
     // Try to extract sender from message format (expanded channel support)
     const senderMatch = inputText.match(/\[(?:Telegram|Discord|Signal|SMS|Slack|Matrix|WhatsApp|iMessage|Email)\s+(.+?)\s+(?:id|ID|Id):/);
-    if (senderMatch) inputWho = senderMatch[1];
+    if (senderMatch) {
+      inputWho = senderMatch[1];
+    } else if (ctx) {
+      // Debug: Log ctx fields to understand what's available
+      if (process.env.DEBUG_NIMA) {
+        console.error('[nima-memory] DEBUG ctx keys:', Object.keys(ctx));
+      }
+      // Fallback: Use context metadata for webchat and other channels
+      // Check common field names for user identity
+      if (ctx.userName) {
+        inputWho = ctx.userName;
+      } else if (ctx.userDisplayName) {
+        inputWho = ctx.userDisplayName;
+      } else if (ctx.userId) {
+        inputWho = ctx.userId;
+      } else if (ctx.senderId) {
+        inputWho = ctx.senderId;
+      } else if (ctx.from) {
+        inputWho = ctx.from;
+      } else if (ctx.accountId) {
+        inputWho = ctx.accountId;
+      } else if (ctx.conversationId) {
+        // Last resort: Use conversationId as part of attribution
+        inputWho = "user";
+      }
+    }
 
     // Clean injected context blocks (NIMA RECALL, AFFECT STATE) to prevent feedback loops
     inputText = cleanInputText(inputText);
@@ -459,15 +566,12 @@ function extractLayers(messages) {
 // =============================================================================
 
 /**
- * Initialize SQLite database for graph storage.
- * Creates tables if they don't exist.
- *
- * SECURITY FIX: Database path passed as argument, not embedded in code.
- * CORRECTNESS FIX: Table existence checked in Python (no race condition).
- * FEATURE: FTS5 virtual table and triggers for full-text search.
+ * Internal DB initialization logic.
+ * Called via atomic ensureInitialized().
  */
-function initDatabase() {
+async function _initDatabase() {
   ensureDir(MEMORY_DIR);
+  ensureDir(EMERGENCY_DIR);  // Emergency backup directory for fallback storage
 
   // Python script with parameterized DB path (no injection)
   const initSQL = `
@@ -566,6 +670,9 @@ try:
     db.execute("CREATE INDEX IF NOT EXISTS idx_edges_target ON memory_edges(target_id)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_turns_timestamp ON memory_turns(timestamp)")
     
+    # CONCURRENCY FIX: Add unique constraint on (turn_id, layer) to prevent duplicates
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_nodes_turn_layer_unique ON memory_nodes(turn_id, layer)")
+    
     # Add fe_score column if it doesn't exist (migration)
     try:
         db.execute("ALTER TABLE memory_nodes ADD COLUMN fe_score REAL DEFAULT 0.5")
@@ -582,18 +689,60 @@ except Exception as e:
 `;
 
   try {
-    const result = execFileSync("python3", ["-c", initSQL, GRAPH_DB], {
+    const result = await execPython("python3", ["-c", initSQL, GRAPH_DB], {
       timeout: 5000,
       encoding: "utf-8",
+      breakerId: "db-init"
     });
-    return result.trim() === "ok";
-  } catch (err) {
-    console.error(`[nima-memory] DB init failed: ${err.message}`);
-    if (err.stderr) {
-      console.error(`[nima-memory] Python error: ${err.stderr}`);
+    
+    // AUDIT FIX: Validate response (Issue #4)
+    const trimmed = (result || '').trim();
+    if (trimmed !== "ok") {
+      throw new Error(`Unexpected init response: ${trimmed.substring(0, 100)}`);
     }
-    return false;
+    return true;
+  } catch (err) {
+    // AUDIT FIX: Propagate errors instead of returning false (Issue #1)
+    log.error?.(`[nima-memory] DB init failed: ${err.message}`);
+    if (err.stderr) {
+      log.error?.(`[nima-memory] Python error: ${err.stderr}`);
+    }
+    throw wrapError(err, 'initDatabase', { dbPath: GRAPH_DB });
   }
+}
+
+/**
+ * Atomic DB initialization with double-check locking.
+ */
+async function ensureInitialized() {
+  if (initPromise) return initPromise;
+  
+  initPromise = (async () => {
+    try {
+      // Retry logic for robustness
+      return await retryWithBackoff(
+        async () => {
+          const result = await _initDatabase();
+          if (!result) throw new Error("DB init returned false");
+          return result;
+        },
+        {
+          maxRetries: 3,
+          baseDelayMs: 1000,
+          maxDelayMs: 5000,
+          onRetry: (attempt, err, delay) => {
+            log.warn?.(`[nima-memory] DB init attempt ${attempt} failed: ${err.message}`);
+          }
+        }
+      );
+    } catch (err) {
+      log.error?.(`[nima-memory] CRITICAL: DB init failed after retries: ${err.message}`);
+      initPromise = null; // Reset so we can try again
+      throw err;
+    }
+  })();
+  
+  return initPromise;
 }
 
 /**
@@ -603,7 +752,7 @@ except Exception as e:
  *   { ok: true, stats: { nodes, turns, layers, ... } }
  *   { ok: false, error: "..." }
  */
-function healthCheck() {
+async function healthCheck() {
   if (!existsSync(GRAPH_DB)) {
     return { ok: false, error: "Database file not found", path: GRAPH_DB };
   }
@@ -666,12 +815,21 @@ except Exception as e:
 `;
 
   try {
-    const result = execFileSync("python3", ["-c", healthSQL, GRAPH_DB], {
+    const result = await execPython("python3", ["-c", healthSQL, GRAPH_DB], {
       timeout: 3000,
       encoding: "utf-8",
+      breakerId: "db-health"
     });
-    return JSON.parse(result);
+    
+    // AUDIT FIX: Safe JSON parsing with validation (Issue #4)
+    return safeJsonParse(result, {
+      context: "healthCheck Python output",
+      validator: (obj) => typeof obj === 'object' && obj !== null && 'ok' in obj,
+      defaultValue: { ok: false, error: "Invalid JSON from health check script" }
+    });
   } catch (err) {
+    // AUDIT FIX: Log full error for debugging (Issue #1)
+    log.error?.(`[nima-memory] healthCheck failed: ${err.message}`);
     return {
       ok: false,
       error: err.message,
@@ -681,13 +839,15 @@ except Exception as e:
 }
 
 /**
- * Store a memory record to the SQLite graph.
+ * Internal storage logic (renamed from storeMemory).
+ * Execute this ONLY via queuedWrite().
  *
  * SECURITY FIX: Data passed via JSON temp file, not embedded in Python code.
  * CORRECTNESS FIX: All inserts wrapped in transaction (atomicity).
  */
-function storeMemory(record) {
-  const turnId = `turn_${record.timestamp}`;
+async function _storeMemoryInternal(record) {
+  // UNIQUE ID FIX: Add random suffix to prevent collisions
+  const turnId = `turn_${record.timestamp}_${randomBytes(4).toString("hex")}`;
 
   // Prepare data structure to pass to Python
   const data = {
@@ -785,20 +945,105 @@ except Exception as e:
     sys.exit(1)
 `;
 
-    const result = execFileSync("python3", ["-c", storeSQL, tempFile], {
-      timeout: 10000,
-      encoding: "utf-8",
-    });
+    // AUDIT FIX: Add retry logic for transient failures (Issue #3)
+    const result = await retryWithBackoff(
+      async () => execPython("python3", ["-c", storeSQL, tempFile], {
+        timeout: 10000,
+        encoding: "utf-8",
+        breakerId: "store-memory"
+      }),
+      {
+        maxRetries: 3,
+        baseDelayMs: 500,
+        maxDelayMs: 5000,
+        onRetry: (attempt, err, delay) => {
+          log.warn?.(`[nima-memory] SQLite write attempt ${attempt} failed, retrying in ${delay}ms: ${err.message}`);
+        }
+      }
+    );
 
-    success = result.trim().startsWith("stored:");
+    // AUDIT FIX: Validate response format (Issue #4)
+    if (!result || typeof result !== 'string') {
+      throw new Error('Invalid response from storage script: expected string');
+    }
+    
+    const trimmed = result.trim();
+    if (!trimmed.startsWith("stored:")) {
+      // Check for error prefix
+      if (trimmed.startsWith("error:")) {
+        throw new Error(`Storage script error: ${trimmed.substring(6)}`);
+      }
+      throw new Error(`Unexpected response: ${trimmed.substring(0, 100)}`);
+    }
+    
+    success = true;
+    const nodeIds = trimmed.substring(7).split(',');
+    log.debug?.(`[nima-memory] Stored nodes: ${nodeIds.join(', ')}`);
+    
+    // DUAL-WRITE: Also write to LadybugDB if enabled
+    if (success && USE_LADYBUG_WRITE && existsSync(LADYBUG_DB)) {
+      try {
+        const ladybugStorePath = join(dirname(fileURLToPath(import.meta.url)), "ladybug_store.py");
+        if (existsSync(ladybugStorePath)) {
+          // Fire and forget (don't await) to speed up response?
+          // No, we should await to ensure data integrity, but use separate breaker
+          await execPython(ladybugStorePath, [tempFile], {
+            timeout: 5000,
+            encoding: "utf-8",
+            breakerId: "store-ladybug"
+          });
+          log.debug?.(`[nima-memory] ✅ Dual-write to LadybugDB successful`);
+        }
+      } catch (lbErr) {
+        // Non-critical: LadybugDB write failed but SQLite succeeded
+        log.warn?.(`[nima-memory] ⚠️ LadybugDB dual-write failed (non-critical): ${lbErr.message}`);
+      }
+    }
+    
     return success;
 
   } catch (err) {
-    console.error(`[nima-memory] Store failed: ${err.message}`);
+    // AUDIT FIX: Always log full error context (Issue #1)
+    log.error?.(`[nima-memory] ❌ Primary storage failed: ${err.message}`);
     if (err.stderr) {
-      console.error(`[nima-memory] Python error: ${err.stderr}`);
+      log.error?.(`[nima-memory] Python stderr: ${err.stderr}`);
     }
-    return false;
+    if (err.stack) {
+      log.debug?.(`[nima-memory] Stack trace: ${err.stack}`);
+    }
+    
+    // FALLBACK: Emergency backup to prevent data loss
+    try {
+      const backupFile = join(EMERGENCY_DIR, `backup_${Date.now()}_${randomBytes(4).toString("hex")}.json`);
+      writeFileSync(backupFile, JSON.stringify(data, null, 2), { encoding: "utf-8", mode: 0o600 });
+      log.warn?.(`[nima-memory] ⚠️  EMERGENCY BACKUP saved: ${backupFile}`);
+      log.warn?.(`[nima-memory] ⚠️  To recover, run: python3 scripts/recover_backups.py`);
+      
+      // AUDIT FIX: Propagate error instead of returning false (Issue #1)
+      // This allows the caller to decide how to handle the failure
+      throw wrapError(err, 'storeMemory', { 
+        backupFile, 
+        turnId,
+        recovered: true 
+      });
+    } catch (backupErr) {
+      // Check if this is our wrapped error being re-thrown
+      if (backupErr.cause === err) {
+        throw backupErr;
+      }
+      
+      log.error?.(`[nima-memory] ❌ CRITICAL: Emergency backup ALSO failed!`);
+      log.error?.(`[nima-memory] ❌ Lost memory: ${data.input?.summary || 'unknown'}`);
+      log.error?.(`[nima-memory] Backup error: ${backupErr.message}`);
+      
+      // AUDIT FIX: Propagate error with full context (Issue #1)
+      throw wrapError(err, 'storeMemory', { 
+        backupFailed: true,
+        backupError: backupErr.message,
+        turnId,
+        lostData: data.input?.summary 
+      });
+    }
   } finally {
     // Clean up temp file
     try {
@@ -809,6 +1054,47 @@ except Exception as e:
       console.error(`[nima-memory] Failed to clean up temp file: ${cleanupErr.message}`);
     }
   }
+}
+
+/**
+ * Queue a write operation to ensure sequential SQLite access (WAL mode limitation).
+ * Returns a promise that resolves when the operation completes.
+ */
+async function queuedWrite(operation) {
+  return new Promise((resolve, reject) => {
+    writeQueue.push({ operation, resolve, reject });
+    if (!isWriting) processQueue();
+  });
+}
+
+/**
+ * Process the write queue sequentially.
+ */
+async function processQueue() {
+  if (isWriting || writeQueue.length === 0) return;
+  isWriting = true;
+  
+  const { operation, resolve, reject } = writeQueue.shift();
+  try {
+    const result = await operation();
+    resolve(result);
+  } catch (err) {
+    reject(err);
+  } finally {
+    isWriting = false;
+    // Process next item
+    if (writeQueue.length > 0) {
+      setImmediate ? setImmediate(processQueue) : setTimeout(processQueue, 0);
+    }
+  }
+}
+
+/**
+ * Public storage entry point.
+ * Queues the write operation to prevent race conditions.
+ */
+async function storeMemory(record) {
+  return queuedWrite(() => _storeMemoryInternal(record));
 }
 
 // =============================================================================
@@ -874,14 +1160,11 @@ export default function nimaMemoryPlugin(api, config) {
 
   const log = api.log || console;
 
-  // Initialize database on first hook (no global state race)
-  let initAttempted = false;
-
   // ─── Health Check on Gateway Start ───
   if (config?.database?.health_check_on_startup !== false) {
     // Run health check after a short delay (let gateway fully start)
-    setTimeout(() => {
-      const health = healthCheck();
+    setTimeout(async () => {
+      const health = await healthCheck();
       if (health.ok) {
         log.info?.(`[nima-memory] ✅ Health check passed`);
         log.info?.(`[nima-memory] Database: ${health.stats.nodes} nodes, ${health.stats.turns} turns, ${health.stats.db_size_mb}MB`);
@@ -899,20 +1182,21 @@ export default function nimaMemoryPlugin(api, config) {
 
   // ─── Auto-Migration to LadybugDB (if enabled) ───
   if (config?.database?.auto_migrate === true && config?.database?.backend === "ladybugdb") {
-    setTimeout(() => {
+    setTimeout(async () => {
       const batchSize = config?.database?.migration_batch_size || 500;
       log.info?.(`[nima-memory] Starting auto-migration to LadybugDB (batch size: ${batchSize})...`);
       
       const migrationScript = join(os.homedir(), ".openclaw", "extensions", "nima-memory", "migrate_to_ladybug.py");
       
       try {
-        const result = execFileSync("python3", [
+        await execPython("python3", [
           migrationScript,
           "--batch-size", String(batchSize),
           "--auto"
         ], {
           timeout: 600000, // 10 minutes max
-          encoding: "utf-8"
+          encoding: "utf-8",
+          breakerId: "migration"
         });
         
         log.info?.(`[nima-memory] ✅ Migration completed`);
@@ -926,19 +1210,14 @@ export default function nimaMemoryPlugin(api, config) {
   }
 
   // ─── Single Hook: agent_end ───
-  api.on("agent_end", (event, ctx) => {
+  api.on("agent_end", async (event, ctx) => {
     try {
-      // Try to initialize DB on first use (allows retry on failure)
-      if (!initAttempted) {
-        initAttempted = true;
-        const initialized = initDatabase();
-        if (initialized) {
-          log.info?.(`[nima-memory] SQLite graph initialized at ${GRAPH_DB}`);
-        } else {
-          log.error?.(`[nima-memory] Failed to initialize database - will retry on next event`);
-          initAttempted = false; // Allow retry
-          return;
-        }
+      // CONCURRENCY FIX: Atomic initialization with double-check locking
+      try {
+        await ensureInitialized();
+      } catch (initErr) {
+        log.error?.(`[nima-memory] DB init failed, skipping capture: ${initErr.message}`);
+        return;
       }
 
       // Skip subagents and heartbeats
@@ -949,7 +1228,7 @@ export default function nimaMemoryPlugin(api, config) {
       if (!event.success) return;
 
       // Extract all three layers from messages
-      const layers = extractLayers(event.messages);
+      const layers = extractLayers(event.messages, ctx);
       if (!layers) return;
 
       // Skip if no meaningful content (heartbeat acks, etc.)
@@ -999,17 +1278,31 @@ export default function nimaMemoryPlugin(api, config) {
         }
       );
 
-      // Store to graph
-      const stored = storeMemory(record);
-      if (stored) {
+      // AUDIT FIX: Store to graph with proper error handling (Issue #1)
+      // storeMemory now throws on failure instead of returning false
+      try {
+        await storeMemory(record);
         const topAffect = affect ? Object.entries(affect).sort((a,b) => b[1]-a[1])[0]?.[0] : 'none';
-        log.info?.(`[nima-memory] Stored turn: ${layers.input?.who || 'user'} → thinking → response (affect: ${topAffect})`);
-      } else {
-        log.error?.(`[nima-memory] Failed to store memory turn`);
+        log.info?.(`[nima-memory] ✅ Stored turn: ${layers.input?.who || 'user'} → thinking → response (affect: ${topAffect})`);
+      } catch (storeErr) {
+        // AUDIT FIX: Log but don't crash the hook (Issue #1)
+        // Error is already logged and backed up by storeMemory
+        log.error?.(`[nima-memory] ❌ Failed to store memory turn: ${storeErr.message}`);
+        
+        // If there's a backup file, mention it
+        if (storeErr.backupFile) {
+          log.info?.(`[nima-memory] 📁 Data preserved in: ${storeErr.backupFile}`);
+        }
+        
+        // Don't re-throw - this is a background task, failing shouldn't crash the agent
+        // The error has already been logged and data backed up
       }
     } catch (err) {
-      console.error(`[nima-memory] agent_end error: ${err.message}`);
-      console.error(err.stack);
+      // AUDIT FIX: Log full context on unexpected errors (Issue #1)
+      log.error?.(`[nima-memory] agent_end error: ${err.message}`);
+      if (err.stack) {
+        log.debug?.(`[nima-memory] Stack: ${err.stack}`);
+      }
     }
   });
 
@@ -1025,10 +1318,27 @@ export default function nimaMemoryPlugin(api, config) {
     }
   });
 
-  // after_compaction: Log compaction stats
-  api.on("after_compaction", (event, ctx) => {
+  // after_compaction: Log compaction stats + trigger embedding indexing
+  api.on("after_compaction", async (event, ctx) => {
     try {
       log.info?.(`[nima-memory] Compaction complete (compacted ${event.compactedCount} messages, ${event.messageCount} remain)`);
+      
+      // Trigger embedding indexing for newly stored memories
+      // This makes recent memories immediately searchable without waiting for 3 AM cron
+      const embeddingScript = join(MEMORY_DIR, "..", "..", "openclaw_hooks", "nima-memory", "embeddings.py");
+      if (existsSync(embeddingScript)) {
+        try {
+          const result = await execPython("python3", [embeddingScript, "backfill", "--batch-size", "100"], {
+            timeout: 30000,
+            encoding: "utf-8",
+            cwd: dirname(embeddingScript),
+            breakerId: "embeddings"
+          });
+          log.info?.(`[nima-memory] Embedding index updated: ${result.trim()}`);
+        } catch (embErr) {
+          log.warn?.(`[nima-memory] Embedding indexing failed (non-critical): ${embErr.message}`);
+        }
+      }
     } catch (err) {
       console.error(`[nima-memory] after_compaction error: ${err.message}`);
     }
@@ -1043,8 +1353,8 @@ export default function nimaMemoryPlugin(api, config) {
   // ─── Expose Health Check API ───
   // Other plugins or tools can call this
   if (api.registerMethod) {
-    api.registerMethod("nima-memory.healthCheck", () => {
-      return healthCheck();
+    api.registerMethod("nima-memory.healthCheck", async () => {
+      return await healthCheck();
     });
   }
 

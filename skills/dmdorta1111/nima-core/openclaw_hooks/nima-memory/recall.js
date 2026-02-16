@@ -8,12 +8,13 @@
  *
  * Flow: Query → FTS match → graph traverse → summaries → rank → reconstruct top N
  *
- * Author: David Dorta + Lilu
+ * Author: NIMA Core Team
  * Date: 2026-02-13
  * Security fixes: 2026-02-13
  */
 
 import { execFileSync } from "node:child_process";
+import { execPython } from "../utils/async-python.js"; // Async wrapper
 import { join } from "node:path";
 import { writeFileSync, unlinkSync, mkdtempSync } from "node:fs";
 import os from "node:os";
@@ -32,7 +33,7 @@ const GRAPH_DB = join(os.homedir(), ".nima", "memory", "graph.sqlite");
  * @param {string} options.layer - Filter by layer: input|contemplation|output (optional)
  * @returns {object} { memories: [...], summaryCount, nodesScanned }
  */
-export function recall(query, options = {}) {
+export async function recall(query, options = {}) {
   const maxResults = options.maxResults || 3;
   const maxSummaries = options.maxSummaries || 15;
   const traverseDepth = options.traverseDepth || 2;
@@ -300,9 +301,10 @@ print(json.dumps(result, default=str))
 db.close()
 `;
 
-    const result = execFileSync("python3", ["-c", recallScript, paramsFile], {
+    const result = await execPython("python3", ["-c", recallScript, paramsFile], {
       timeout: 15000,
       encoding: "utf-8",
+      breakerId: "recall-cli"
     });
     return JSON.parse(result.trim());
   } catch (err) {

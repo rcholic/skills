@@ -47,6 +47,37 @@ const ARCHETYPES = {
 // Default balanced baseline (agents should configure their own)
 const DEFAULT_BASELINE = [0.5, 0.1, 0.1, 0.1, 0.5, 0.1, 0.4];
 
+// =============================================================================
+// SECURITY: Path Sanitization
+// =============================================================================
+
+/**
+ * Sanitize a string for safe use in file paths.
+ * Prevents path traversal attacks (e.g., "../../etc/passwd").
+ * 
+ * @param {string} name - Input string (e.g., identityName, conversationId)
+ * @param {number} maxLength - Maximum allowed length (default 100)
+ * @returns {string} Sanitized string containing only [a-zA-Z0-9_-]
+ */
+function sanitizePathComponent(name, maxLength = 100) {
+  if (typeof name !== "string") {
+    name = name != null ? String(name) : "";
+  }
+  // Remove path separators and parent directory references
+  name = name.replace(/\//g, "_").replace(/\\/g, "_").replace(/\.\./g, "");
+  // Keep only alphanumeric, dash, underscore
+  name = name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  // Collapse multiple underscores
+  name = name.replace(/_+/g, "_");
+  // Remove leading/trailing underscores
+  name = name.replace(/^_+|_+$/g, "");
+  // Ensure non-empty
+  if (!name) name = "default";
+  // Truncate if too long
+  if (name.length > maxLength) name = name.slice(0, maxLength);
+  return name;
+}
+
 // Dynamics
 const MOMENTUM = 0.85;
 const BLEND_STRENGTH = 0.25;
@@ -202,6 +233,9 @@ function getStatePath(identityName, conversationId = null) {
   const nimaHome = process.env.NIMA_HOME || join(os.homedir(), ".nima");
   const affectDir = join(nimaHome, "affect");
   
+  // Security: Sanitize both identityName and conversationId to prevent path traversal
+  const safeIdentity = sanitizePathComponent(identityName, 64);
+  
   // Conversation isolation: separate state file per conversation
   if (conversationId) {
     // Create conversations subdirectory
@@ -210,17 +244,20 @@ function getStatePath(identityName, conversationId = null) {
       mkdirSync(convDir, { recursive: true });
     }
     // Use sanitized conversation ID in filename
-    const safeId = conversationId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
-    return join(convDir, `${identityName}_${safeId}.json`);
+    const safeId = sanitizePathComponent(conversationId, 64);
+    return join(convDir, `${safeIdentity}_${safeId}.json`);
   }
   
-  return join(affectDir, `affect_state_${identityName}.json`);
+  return join(affectDir, `affect_state_${safeIdentity}.json`);
 }
 
 function loadState(statePath, baseline) {
   try {
     if (existsSync(statePath)) {
       const state = JSON.parse(readFileSync(statePath, "utf-8"));
+      
+      // Ensure version exists (migration)
+      if (!state.version) state.version = 1;
       
       // Apply temporal decay since last save
       if (state.current && state.current.timestamp) {
@@ -292,24 +329,48 @@ function blendAffect(currentVals, inputAffects, intensity, baseline) {
 
 function updateAffectState(identityName, detectedAffects, intensity, baseline, conversationId = null) {
   const statePath = getStatePath(identityName, conversationId);
-  const state = loadState(statePath, baseline);
+  const MAX_RETRIES = 5;
   
-  let values = applyDecay(state.current.values, baseline, state.current.timestamp);
-  
-  if (Object.keys(detectedAffects).length > 0) {
-    values = blendAffect(values, detectedAffects, intensity, baseline);
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const state = loadState(statePath, baseline);
+    const initialVersion = state.version;
+    
+    let values = applyDecay(state.current.values, baseline, state.current.timestamp);
+    
+    if (Object.keys(detectedAffects).length > 0) {
+      values = blendAffect(values, detectedAffects, intensity, baseline);
+    }
+    
+    state.current = {
+      values,
+      timestamp: Date.now() / 1000,
+      source: "plugin_lexicon",
+      named: Object.fromEntries(AFFECTS.map((name, i) => [name, values[i]])),
+    };
+    state.saved_at = new Date().toISOString();
+    
+    // OPTIMISTIC LOCK CHECK
+    // Verify version hasn't changed on disk before writing
+    try {
+      if (existsSync(statePath)) {
+        const onDisk = JSON.parse(readFileSync(statePath, "utf-8"));
+        if ((onDisk.version || 1) !== initialVersion) {
+          // Conflict: Version mismatch (someone else wrote), retry
+          continue;
+        }
+      }
+    } catch (e) {
+      // Read failed (locked/deleted), treat as conflict and retry
+      continue;
+    }
+    
+    state.version = initialVersion + 1;
+    saveState(statePath, state);
+    return state.current;
   }
   
-  state.current = {
-    values,
-    timestamp: Date.now() / 1000,
-    source: "plugin_lexicon",
-    named: Object.fromEntries(AFFECTS.map((name, i) => [name, values[i]])),
-  };
-  state.saved_at = new Date().toISOString();
-  
-  saveState(statePath, state);
-  return state.current;
+  console.error("[nima-affect] Failed to update state after retries (contention)");
+  return loadState(statePath, baseline).current;
 }
 
 function getCurrentAffect(identityName, baseline, conversationId = null) {
@@ -405,10 +466,10 @@ function getBaselineFromConfig(configValue, log) {
 export default function register(api) {
   const log = api.logger;
   
-  // Get configuration
+  // Get configuration (env vars override config for OpenClaw validation bug workaround)
   const pluginConfig = api.config?.plugins?.["nima-affect"] || {};
-  const identityName = pluginConfig.identity_name || "agent";
-  const customBaseline = pluginConfig.baseline || null;
+  const identityName = process.env.NIMA_IDENTITY_NAME || pluginConfig.identity_name || "agent";
+  const customBaseline = process.env.NIMA_BASELINE || pluginConfig.baseline || null;
   const skipSubagents = pluginConfig.skipSubagents !== false; // default true
   
   // Validate custom baseline (IMPORTANT FIX 14)

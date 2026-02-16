@@ -5,7 +5,7 @@ NIMA Lazy Reconstruction Recall v4 - LadybugDB Backend
 
 Uses LadybugDB with HNSW vector index for memory retrieval.
 
-Author: Lilu + David Dorta
+Author: NIMA Core Team
 Date: 2026-02-14
 """
 
@@ -60,22 +60,27 @@ def disconnect():
 # =============================================================================
 
 def text_search(query: str, limit: int = MAX_RESULTS) -> List[Dict]:
-    """Search memories by text content (CONTAINS)."""
+    """Search memories by text content (CONTAINS).
+    
+    SECURITY: Uses parameterized queries to prevent Cypher injection.
+    Fixed 2026-02-16 - CVE pending assignment.
+    """
     conn = connect()
     
     start = time.time()
-    safe_query = query.replace("'", "\\'")
+    # SECURITY FIX: No string escaping - use parameterized queries instead
     
     min_timestamp = int((datetime.now() - timedelta(days=TIME_WINDOW_DAYS)).timestamp() * 1000)
     
     try:
-        result = conn.execute(f"""
+        # SECURITY FIX: Parameterized query prevents injection
+        result = conn.execute("""
             MATCH (n:MemoryNode)
-            WHERE (n.text CONTAINS '{safe_query}' OR n.summary CONTAINS '{safe_query}')
-            AND n.timestamp >= {min_timestamp}
+            WHERE (n.text CONTAINS $query OR n.summary CONTAINS $query)
+            AND n.timestamp >= $min_ts
             RETURN n.id, n.text, n.summary, n.who, n.layer, n.timestamp
-            LIMIT {limit * 2}
-        """)
+            LIMIT $result_limit
+        """, {"query": query, "min_ts": min_timestamp, "result_limit": limit * 2})
         
         memories = []
         for row in result:
@@ -96,27 +101,42 @@ def text_search(query: str, limit: int = MAX_RESULTS) -> List[Dict]:
         return [], 0
 
 def vector_search(query_embedding: List[float], limit: int = MAX_RESULTS) -> List[Dict]:
-    """Search memories by vector similarity (HNSW)."""
+    """Search memories by vector similarity (HNSW).
+    
+    SECURITY: Uses parameterized queries to prevent injection.
+    Fixed 2026-02-16 - CVE pending assignment.
+    """
     conn = connect()
     
     start = time.time()
     
-    # Convert embedding to string
-    emb_str = "[" + ",".join(f"{x:.6f}" for x in query_embedding) + "]"
+    # SECURITY FIX: Validate embedding is a list of floats only
+    if not isinstance(query_embedding, list):
+        print(f"[ladybug_recall] Invalid embedding type: {type(query_embedding)}", file=sys.stderr)
+        return [], 0
+    
+    # Sanitize: ensure all values are valid floats (no injection via array elements)
+    try:
+        sanitized_embedding = [float(x) for x in query_embedding]
+    except (ValueError, TypeError) as e:
+        print(f"[ladybug_recall] Invalid embedding values: {e}", file=sys.stderr)
+        return [], 0
     
     min_timestamp = int((datetime.now() - timedelta(days=TIME_WINDOW_DAYS)).timestamp() * 1000)
     
     try:
-        result = conn.execute(f"""
+        # SECURITY FIX: Parameterized query for vector search
+        # Note: LadybugDB QUERY_VECTOR_INDEX uses positional params for vectors
+        result = conn.execute("""
             CALL QUERY_VECTOR_INDEX(
                 'MemoryNode',
                 'embedding_idx',
-                {emb_str},
-                {limit * 3}
+                $embedding,
+                $top_k
             )
             RETURN node.id, node.text, node.summary, node.who, node.layer, node.timestamp, distance
             ORDER BY distance
-        """)
+        """, {"embedding": sanitized_embedding, "top_k": limit * 3})
         
         memories = []
         for row in result:
@@ -148,22 +168,27 @@ def vector_search(query_embedding: List[float], limit: int = MAX_RESULTS) -> Lis
         return [], 0
 
 def who_search(who: str, limit: int = MAX_RESULTS) -> List[Dict]:
-    """Search memories by who said it."""
+    """Search memories by who said it.
+    
+    SECURITY: Uses parameterized queries to prevent Cypher injection.
+    Fixed 2026-02-16 - CVE pending assignment.
+    """
     conn = connect()
     
     start = time.time()
-    safe_who = who.replace("'", "\\'")
+    # SECURITY FIX: No string escaping - use parameterized queries instead
     
     min_timestamp = int((datetime.now() - timedelta(days=TIME_WINDOW_DAYS)).timestamp() * 1000)
     
     try:
-        result = conn.execute(f"""
-            MATCH (n:MemoryNode {{who: '{safe_who}'}})
-            WHERE n.timestamp >= {min_timestamp}
+        # SECURITY FIX: Parameterized query prevents injection
+        result = conn.execute("""
+            MATCH (n:MemoryNode {who: $who_param})
+            WHERE n.timestamp >= $min_ts
             RETURN n.id, n.text, n.summary, n.who, n.layer, n.timestamp
             ORDER BY n.timestamp DESC
-            LIMIT {limit}
-        """)
+            LIMIT $result_limit
+        """, {"who_param": who, "min_ts": min_timestamp, "result_limit": limit})
         
         memories = []
         for row in result:
@@ -245,19 +270,31 @@ def hybrid_search(query: str, query_embedding: List[float],
     return results
 
 def get_related(node_id: int, limit: int = 5) -> List[Dict]:
-    """Get related memories through graph edges."""
+    """Get related memories through graph edges.
+    
+    SECURITY: Uses parameterized queries to prevent Cypher injection.
+    Fixed 2026-02-16 - CVE pending assignment.
+    """
     conn = connect()
     
     start = time.time()
     
+    # SECURITY FIX: Validate node_id is an integer
     try:
-        result = conn.execute(f"""
-            MATCH (n:MemoryNode {{id: {node_id}}})-[r:relates_to]-(related:MemoryNode)
+        validated_node_id = int(node_id)
+    except (ValueError, TypeError):
+        print(f"[ladybug_recall] Invalid node_id: {node_id}", file=sys.stderr)
+        return [], 0
+    
+    try:
+        # SECURITY FIX: Parameterized query prevents injection
+        result = conn.execute("""
+            MATCH (n:MemoryNode {id: $node_id})-[r:relates_to]-(related:MemoryNode)
             RETURN related.id, related.text, related.summary, related.who, related.layer, 
                    related.timestamp, r.weight, r.relation
             ORDER BY r.weight DESC
-            LIMIT {limit}
-        """)
+            LIMIT $result_limit
+        """, {"node_id": validated_node_id, "result_limit": limit})
         
         memories = []
         for row in result:

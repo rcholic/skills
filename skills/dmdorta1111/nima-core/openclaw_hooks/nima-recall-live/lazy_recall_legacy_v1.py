@@ -13,7 +13,7 @@ Optimizations:
   - Timestamp filtering (last 90 days default)
   - Tiered loading to minimize context usage
 
-Author: Lilu + David Dorta
+Author: NIMA Core Team
 Date: 2026-02-14
 """
 

@@ -12,6 +12,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { execPython } from "../utils/async-python.js"; // Async wrapper
 import { existsSync, writeFileSync, readFileSync, unlinkSync, mkdtempSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import os from "node:os";
@@ -53,6 +54,37 @@ let lastQueryTime = 0;
 let lastResult = "";
 let lastBleed = null;  // Cache affect bleed too
 
+// =============================================================================
+// SECURITY: Path Sanitization
+// =============================================================================
+
+/**
+ * Sanitize a string for safe use in file paths.
+ * Prevents path traversal attacks (e.g., "../../etc/passwd").
+ * 
+ * @param {string} name - Input string (e.g., identityName, conversationId)
+ * @param {number} maxLength - Maximum allowed length (default 100)
+ * @returns {string} Sanitized string containing only [a-zA-Z0-9_-]
+ */
+function sanitizePathComponent(name, maxLength = 100) {
+  if (typeof name !== "string") {
+    name = name != null ? String(name) : "";
+  }
+  // Remove path separators and parent directory references
+  name = name.replace(/\//g, "_").replace(/\\/g, "_").replace(/\.\./g, "");
+  // Keep only alphanumeric, dash, underscore
+  name = name.replace(/[^a-zA-Z0-9_-]/g, "_");
+  // Collapse multiple underscores
+  name = name.replace(/_+/g, "_");
+  // Remove leading/trailing underscores
+  name = name.replace(/^_+|_+$/g, "");
+  // Ensure non-empty
+  if (!name) name = "default";
+  // Truncate if too long
+  if (name.length > maxLength) name = name.slice(0, maxLength);
+  return name;
+}
+
 /**
  * Sanitize FTS5 query — escape operators
  */
@@ -69,7 +101,7 @@ function sanitizeFTS5(query) {
 }
 
 /**
- * Strip channel prefix from message (e.g., [Telegram David id:123 ...] → actual message)
+ * Strip channel prefix from message (e.g., [Telegram UserName id:123 ...] → actual message)
  */
 function stripChannelPrefix(text) {
   return text.replace(/^\[(?:Telegram|Discord|Signal|SMS|Slack|Matrix|WhatsApp|iMessage|Email)\s+[^\]]*\]\s*/i, "").trim();
@@ -119,7 +151,7 @@ function extractUserMessage(prompt) {
  * Tier 2: Summary load (compressed)
  * Tier 3: Full decode (on demand only)
  */
-function quickRecall(query) {
+async function quickRecall(query) {
   console.error(`[nima-recall-live] 🚀 LAZY RECALL with: "${query.substring(0,50)}"`);
   
   // Try LadybugDB backend first (if enabled and available)
@@ -127,15 +159,15 @@ function quickRecall(query) {
     const ladybugPath = join(os.homedir(), ".openclaw", "extensions", "nima-recall-live", "ladybug_recall.py");
     if (existsSync(ladybugPath)) {
       try {
-        const result = execFileSync("python3", ["-I", ladybugPath, query, "--top", String(MAX_RESULTS), "--json"], {
+        const result = await execPython(ladybugPath, [query, "--top", String(MAX_RESULTS), "--json"], {
           timeout: QUERY_TIMEOUT,
           encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"]
-        }).trim();
+          breakerId: "recall-ladybug"
+        });
         
-        if (result && result !== "[]") {
+        if (result && result.trim() !== "[]") {
           console.error(`[nima-recall-live] ✅ LadybugDB backend`);
-          return JSON.parse(result);
+          return JSON.parse(result.trim());
         }
       } catch (err) {
         console.error(`[nima-recall-live] LadybugDB recall failed: ${err.message}, trying SQLite fallback`);
@@ -166,24 +198,23 @@ function quickRecall(query) {
   // Build args for v3+ scripts (canonical lazy_recall.py is v3+)
   const isV3 = actualPath.endsWith("lazy_recall.py") || actualPath.includes("lazy_recall_v3.py");
   const args = isV3 ? [
-    actualPath, 
     query, 
     "--max-results", String(MAX_RESULTS),
     ...(FTS_ONLY_MODE ? ["--fts-only"] : [])
-  ] : [actualPath, query];
+  ] : [query];
   
   try {
-    const result = execFileSync("python3", ["-I", ...args], {
+    const result = await execPython(actualPath, args, {
       timeout: QUERY_TIMEOUT,
       encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"]
-    }).trim();
+      breakerId: "recall-lazy"
+    });
     
-    if (!result || result === "[]") {
+    if (!result || result.trim() === "[]") {
       return null;
     }
     
-    return JSON.parse(result);
+    return JSON.parse(result.trim());
   } catch (err) {
     console.error(`[nima-recall-live] Lazy recall failed: ${err.message}`);
     return null;
@@ -194,7 +225,7 @@ function quickRecall(query) {
  * DEPRECATED: Old inline recall (slower, loads all embeddings)
  * Kept for fallback if lazy_recall.py fails
  */
-function quickRecallLegacy(query) {
+async function quickRecallLegacy(query) {
   console.error(`[nima-recall-live] 🚀 LEGACY quickRecall (slower) with: "${query.substring(0,50)}"`);
   if (!existsSync(GRAPH_DB)) {
     console.error(`[nima-recall-live] ❌ Graph DB not found at ${GRAPH_DB}`);
@@ -332,13 +363,13 @@ print(json.dumps(output))
 db.close()
 `;
     
-    const result = execFileSync("python3", ["-c", script, queryFile], {
+    const result = await execPython("python3", ["-c", script, queryFile], {
       timeout: QUERY_TIMEOUT,
       encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"]
-    }).trim();
+      breakerId: "recall-legacy"
+    });
     
-    return JSON.parse(result);
+    return JSON.parse(result.trim());
   } catch (err) {
     console.error(`[nima-recall-live] Query failed: ${err.message}`);
     return null;
@@ -419,18 +450,21 @@ function applyAffectBleed(bleed, identityName = "agent", conversationId = null) 
   const nimaHome = process.env.NIMA_HOME || join(os.homedir(), ".nima");
   const affectDir = join(nimaHome, "affect");
   
+  // Security: Sanitize inputs to prevent path traversal attacks
+  const safeIdentity = sanitizePathComponent(identityName, 64);
+  const safeConvId = conversationId ? sanitizePathComponent(conversationId, 64) : null;
+  
   // Determine state file path
   let statePath;
-  if (conversationId) {
+  if (safeConvId) {
     const convDir = join(affectDir, "conversations");
     if (!existsSync(convDir)) {
       mkdirSync(convDir, { recursive: true });
     }
-    const safeId = conversationId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
-    statePath = join(convDir, `${identityName}_${safeId}.json`);
+    statePath = join(convDir, `${safeIdentity}_${safeConvId}.json`);
     console.error(`[nima-recall-live] 🎭 Looking for: ${statePath}`);
   } else {
-    statePath = join(affectDir, `affect_state_${identityName}.json`);
+    statePath = join(affectDir, `affect_state_${safeIdentity}.json`);
     console.error(`[nima-recall-live] 🎭 No conversationId, using: ${statePath}`);
   }
   
@@ -485,8 +519,8 @@ export default function nimaRecallLivePlugin(api, config) {
   
   log.info?.("[nima-recall-live] Live recall hook loaded");
   
-  api.on("before_agent_start", (event, ctx) => {
-    // Extract conversation ID from prompt format: [Telegram David Dorta id:5556407150 ...]
+  api.on("before_agent_start", async (event, ctx) => {
+    // Extract conversation ID from prompt format: [Telegram UserName id:1234567890 ...]
     const promptText = typeof event?.prompt === 'string' ? event.prompt : '';
     const channelMatch = promptText.match(/\[(Telegram|Discord|Signal|WhatsApp)\s+[^\]]*id:(\d+)/i);
     let conversationId = ctx?.conversationId || ctx?.channelId || ctx?.chatId || null;
@@ -535,7 +569,7 @@ export default function nimaRecallLivePlugin(api, config) {
       }
       
       console.error(`[nima-recall-live] 🚀 About to call quickRecall with: "${userMessage.substring(0,30)}"`);
-      const result = quickRecall(userMessage);
+      const result = await quickRecall(userMessage);
       console.error(`[nima-recall-live] ✅ Recall complete: ${result?.memories?.length || 0} memories returned`);
       
       // Handle both old array format and new {memories, affect_bleed} format

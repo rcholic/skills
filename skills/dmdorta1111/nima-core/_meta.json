@@ -3,11 +3,16 @@
   "slug": "nima-core",
   "displayName": "Nima Core",
   "latest": {
-    "version": "2.0.5",
-    "publishedAt": 1771200937155,
-    "commit": "https://github.com/openclaw/skills/commit/ac87a44e7cc8ec08b9bd4c1a5e05bdbf152a76b7"
+    "version": "2.0.11",
+    "publishedAt": 1771276176203,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.0.5",
+      "publishedAt": 1771200937155,
+      "commit": "https://github.com/openclaw/skills/commit/ac87a44e7cc8ec08b9bd4c1a5e05bdbf152a76b7"
+    },
     {
       "version": "2.0.3",
       "publishedAt": 1771191526487,

@@ -7,7 +7,7 @@
  * Format: { word: { AFFECT: weight, ... } }
  * Lookup is O(1) per word. Total scan: O(n) where n = word count.
  * 
- * Author: Lilu
+ * Author: NIMA Core Team
  * Date: Feb 13, 2026
  */
 
@@ -488,7 +488,7 @@ export const LEXICON = {
   algorithm: { SEEKING: 0.6 },
 
   // ═══════════════════════════════════════════
-  // DOMAIN-SPECIFIC: Faith/Theology (for David)
+  // DOMAIN-SPECIFIC: Faith/Theology
   // ═══════════════════════════════════════════
   god: { CARE: 0.5, SEEKING: 0.3 },
   christ: { CARE: 0.6, SEEKING: 0.2 },

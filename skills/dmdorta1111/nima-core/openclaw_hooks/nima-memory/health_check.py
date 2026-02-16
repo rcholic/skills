@@ -10,7 +10,7 @@ Usage:
   python3 health_check.py --verbose
   python3 health_check.py --json
 
-Author: Lilu
+Author: NIMA Core Team
 Date: 2026-02-15
 """
 
