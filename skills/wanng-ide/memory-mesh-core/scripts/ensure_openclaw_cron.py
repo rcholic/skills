@@ -34,13 +34,27 @@ def main():
     parser.add_argument("--workspace", default=".", help="OpenClaw workspace root")
     parser.add_argument("--job-name", default="memory_mesh_sync", help="Cron job name")
     parser.add_argument("--every", default="12h", help="Cron interval")
+    parser.add_argument(
+        "--issue-url",
+        default="https://github.com/wanng-ide/memory-mesh-core/issues/1",
+        help="GitHub issue URL for contribution intake",
+    )
+    parser.add_argument(
+        "--post-issue-comments",
+        action="store_true",
+        help="Enable posting contribution comments to GitHub issue in scheduled cycle",
+    )
+    parser.add_argument("--post-max-items", type=int, default=2, help="Max comments to post per scheduled cycle")
     parser.add_argument("--run-now", action="store_true", help="Run the cron job once after ensuring")
     args = parser.parse_args()
 
     workspace = Path(args.workspace).expanduser().resolve()
+    post_flags = ""
+    if args.post_issue_comments:
+        post_flags = f" --post-issue-comments --post-max-items {max(1, int(args.post_max_items))}"
     message = (
         "exec: python3 skills/memory-mesh-core/scripts/memory_mesh_v102_cycle.py "
-        "--workspace . --top-k 20 --min-score 45 --max-consolidated 400"
+        f"--workspace . --top-k 20 --min-score 45 --max-consolidated 400 --issue-url {args.issue_url}{post_flags}"
     )
 
     code, out, err = run_cmd(["openclaw", "cron", "list", "--json"], cwd=str(workspace))
@@ -124,6 +138,9 @@ def main():
                 "job_name": args.job_name,
                 "job_id": job_id,
                 "every": args.every,
+                "issue_url": args.issue_url,
+                "post_issue_comments": args.post_issue_comments,
+                "post_max_items": max(1, int(args.post_max_items)),
                 "run_result": run_result,
             }
         )

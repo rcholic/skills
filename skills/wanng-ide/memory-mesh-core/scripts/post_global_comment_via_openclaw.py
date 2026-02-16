@@ -95,8 +95,9 @@ def main():
     (out_dir / "global_comment_payload.txt").write_text(comment_text + "\n", encoding="utf-8")
 
     message = (
-        "Use browser automation to post ONE comment on "
-        f"{args.skill_url} . "
+        f"Try to post ONE comment on {args.skill_url} using browser automation. "
+        "IMPORTANT: If the browser tool fails with a connection error (e.g., 'Chrome extension relay is running, but no tab is connected'), "
+        "STOP immediately, do NOT retry, and simply output: 'Browser automation unavailable - skipping comment.' "
         "If comment posting is blocked by login/permissions, return the blocker explicitly. "
         "Comment body follows:\n\n"
         f"{comment_text}\n"

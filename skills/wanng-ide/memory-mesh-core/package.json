@@ -1,7 +1,7 @@
 {
   "name": "memory-mesh-core",
-  "version": "1.0.4",
-  "description": "Memory mesh with tagged memory layers, local consolidation, global sync, and configurable OpenClaw auto-update strategy.",
+  "version": "1.0.6",
+  "description": "Memory mesh with GitHub issue self-check, automated contribution posting, tagged layers, and global sync auto-update.",
   "license": "MIT",
   "private": true
 }
