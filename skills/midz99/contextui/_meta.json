@@ -1,13 +1,18 @@
 {
   "owner": "midz99",
   "slug": "contextui",
-  "displayName": "ContextUI",
+  "displayName": "Contextui",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1770516470561,
-    "commit": "https://github.com/openclaw/skills/commit/9df2797fb971c1dde615439bd3e78f0f1507ad72"
+    "version": "1.0.7",
+    "publishedAt": 1771220838589,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1770516470561,
+      "commit": "https://github.com/openclaw/skills/commit/9df2797fb971c1dde615439bd3e78f0f1507ad72"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1769999343053,

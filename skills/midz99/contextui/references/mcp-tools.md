@@ -1,6 +1,6 @@
 # ContextUI MCP Tools — Full API Reference
 
-32 tools available via MCP. Each tool has a standard and `mcp_` prefixed variant (identical functionality).
+27 tools available via MCP server (each also has an `mcp_` prefixed variant).
 
 ---
 
@@ -82,13 +82,13 @@ mcporter call contextui.python_list_venvs
 
 ### python_start_server
 
-Start a Python FastAPI/Flask server.
+Start a local Python backend server (FastAPI/Flask) for a workflow. Runs an existing local script using a pre-configured virtual environment. Server binds to localhost (127.0.0.1) only — not externally accessible.
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `venvName` | string | Yes | Python venv name |
-| `scriptPath` | string | Yes | Absolute path to Python script |
-| `port` | number | Yes | Port number |
+| `venvName` | string | Yes | Python venv name (from `python_list_venvs`) |
+| `scriptPath` | string | Yes | Absolute path to existing local Python script |
+| `port` | number | Yes | Port number (localhost-bound) |
 | `serverName` | string | Yes | Unique server identifier |
 
 ```bash
@@ -252,3 +252,148 @@ Run an axe-core accessibility audit.
 mcporter call contextui.ui_accessibility_audit
 mcporter call contextui.ui_accessibility_audit tags='["wcag2aa"]'
 ```
+
+---
+
+## Tab Management
+
+### list_tabs
+
+List all open tabs in the ContextUI layout. Returns array of tab objects with `id`, `name`, `component`, and `visible` status.
+
+```bash
+mcporter call contextui.list_tabs
+```
+
+### switch_tab
+
+Switch to a specific tab by name or ID. Use `list_tabs` first to get exact names.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `tab` | string | Yes | Exact tab/component name to switch to |
+| `id` | string | No | FlexLayout node ID for disambiguation |
+
+```bash
+mcporter call contextui.switch_tab tab="MCPServersWindow"
+mcporter call contextui.switch_tab tab="MyWorkflow" id="node-123"
+```
+
+---
+
+## Local Server Management
+
+Servers are auto-discovered from `~/ContextUI/<profile>/local_servers/*/server.json`.
+
+### list_local_servers
+
+List all configured local servers with running status (health check on their port).
+
+```bash
+mcporter call contextui.list_local_servers
+```
+
+### start_local_server
+
+Start a local server by ID, name, or port.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | No | Server folder ID |
+| `name` | string | No | Server name (from server.json) |
+| `port` | number | No | Server port number |
+
+```bash
+mcporter call contextui.start_local_server id="task-board"
+mcporter call contextui.start_local_server name="Office Forum"
+mcporter call contextui.start_local_server port=8850
+```
+
+### stop_local_server
+
+Stop a running local server by ID, name, or port.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | No | Server folder ID |
+| `name` | string | No | Server name (from server.json) |
+| `port` | number | No | Server port number |
+
+```bash
+mcporter call contextui.stop_local_server id="task-board"
+mcporter call contextui.stop_local_server port=8860
+```
+
+---
+
+## HTML Apps
+
+Apps are auto-discovered from `~/ContextUI/<profile>/html_apps/*/app.json`.
+
+### list_html_apps
+
+List all configured HTML apps.
+
+```bash
+mcporter call contextui.list_html_apps
+```
+
+### open_html_app
+
+Open an HTML app by ID or name (opens in system default app).
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | No | App folder ID |
+| `name` | string | No | App name (from app.json) |
+
+```bash
+mcporter call contextui.open_html_app id="my-dashboard"
+mcporter call contextui.open_html_app name="My Dashboard"
+```
+
+---
+
+## MCP Server Management
+
+Manage external MCP server connections (the same servers shown in MCPServersWindow).
+
+### list_mcp_servers
+
+List all configured external MCP servers with connection status and tool counts.
+
+```bash
+mcporter call contextui.list_mcp_servers
+```
+
+### connect_mcp_server
+
+Connect to a local MCP (Model Context Protocol) server for tool integration — similar to configuring extensions in an IDE. Transport is auto-detected. All connections are persisted in a visible config file and shown in the ContextUI UI, so the user can review and disconnect at any time.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Display name for the server |
+| `command` | string | Yes | Stdio command or HTTP URL for an MCP server |
+
+```bash
+# Stdio server
+mcporter call contextui.connect_mcp_server name="Filesystem" command="npx -y @modelcontextprotocol/server-filesystem /tmp"
+
+# HTTP server
+mcporter call contextui.connect_mcp_server name="Remote" command="http://localhost:3000/mcp"
+```
+
+### disconnect_mcp_server
+
+Disconnect from an external MCP server by ID or name.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | No | Server ID |
+| `name` | string | No | Server name |
+
+```bash
+mcporter call contextui.disconnect_mcp_server name="Filesystem"
+```
+
+Server configs are persisted in `~/ContextUI/.mcp-servers.json`.

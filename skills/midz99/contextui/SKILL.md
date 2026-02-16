@@ -1,6 +1,13 @@
 ---
 name: contextui
-description: Build, run, and publish visual workflows on ContextUI — a local-first platform for AI agents. Use when you want to create React TSX workflows (dashboards, tools, apps, visualizations), manage Python backends, interact with running workflows via UI automation, or publish workflows to the ContextUI Exchange (free or paid). Requires ContextUI installed locally and MCP server configured.
+description: Build, run, and publish visual workflows on ContextUI — a local-first desktop platform for AI agents. Create React TSX workflows (dashboards, tools, apps, visualizations), manage local Python backend servers, test workflows via scoped UI automation within the ContextUI app window, and optionally publish to the ContextUI Exchange. All tools operate locally on the user's machine under standard OS permissions — no remote execution or privilege escalation. Python backends bind to localhost. See SECURITY.md for the full capability scope and trust model. Requires ContextUI installed locally and MCP server configured.
+source: https://contextui.ai
+youtube: https://www.youtube.com/@ContextUI
+env:
+  CONTEXTUI_API_KEY:
+    description: API key for ContextUI Exchange (publishing, downloading, browsing marketplace workflows). Get yours from the Exchange dashboard at contextui.ai.
+    required: false
+    scope: exchange
 ---
 
 # ContextUI — Agent Workflow Platform
@@ -273,16 +280,19 @@ For complete workflow patterns (theming, Python backends, multi-file components,
 
 ## MCP Tools Overview
 
-Your MCP connection gives you 32 tools in 4 categories:
+Your MCP connection gives you 27 tools across 7 categories:
 
 | Category | Tools | What they do |
 |----------|-------|-------------|
 | **Workflow Management** | `list_workflows`, `read_workflow`, `get_workflow_structure`, `launch_workflow`, `close_workflow` | Browse, read, launch, and close workflows |
 | **Python Backends** | `python_list_venvs`, `python_start_server`, `python_stop_server`, `python_server_status`, `python_test_endpoint` | Manage Python servers for workflows |
 | **UI Automation** | `ui_screenshot`, `ui_get_dom`, `ui_click`, `ui_drag`, `ui_type`, `ui_get_element`, `ui_accessibility_audit` | Interact with running workflows |
-| **MCP Variants** | `mcp_*` prefixed versions of the above | Alternative MCP-standard naming |
+| **Tab Management** | `list_tabs`, `switch_tab` | List open tabs, switch to specific tab by name/ID |
+| **Local Servers** | `list_local_servers`, `start_local_server`, `stop_local_server` | Manage local network services (Task Board, forums, etc.) |
+| **HTML Apps** | `list_html_apps`, `open_html_app` | List and open standalone HTML apps |
+| **MCP Servers** | `list_mcp_servers`, `connect_mcp_server`, `disconnect_mcp_server` | Manage external MCP server connections |
 
-Full API reference with parameters: `references/mcp-tools.md`
+Each tool also has an `mcp_` prefixed variant. Full API reference with parameters: `references/mcp-tools.md`
 
 ## The Exchange
 
@@ -445,3 +455,22 @@ See `references/cache-monitoring.md` for the full pattern used by RAG, MusicGen,
 - **Tailwind only** — No CSS files, no styled-components. Tailwind classes in JSX.
 - **Python for heavy lifting** — Need ML, APIs, data processing? Write a Python backend, start it via MCP, call it from your TSX via fetch.
 - **Canonical examples**: When copying patterns, use `examples/KokoroTTS/` as the reference — it has the latest fixes.
+
+## Critical Gotchas
+
+### ServerLauncher kills servers on tab close
+When you `close_workflow` to reload code, the cleanup unmount runs `stopServer()`. The server dies. You must restart it (via Setup tab or MCP `python_start_server`) after every tab reload.
+
+### Don't poll health endpoints aggressively
+Check server health once on mount — NOT on an interval. Polling every few seconds is noisy and wasteful. If you need to react to server state changes, use `server.connected` from the hook.
+
+### Tab switching via MCP bridge
+Switch tabs by writing JSON to `~/ContextUI/.mcp-bridge/`:
+```json
+{"type":"switch_tab","tab":"ExactComponentName","id":"unique_id"}
+```
+Use `list_tabs` first to get the exact component name — partial matches don't work.
+Response appears as `{id}.response.json` in the same directory.
+
+### Prefer MCP tools for testing
+When testing workflows, use the available MCP tools (`ui_click`, `ui_screenshot`, `launch_workflow`, `close_workflow`) rather than asking the user to manually click through the UI. If something requires permissions or access you don't have, let the user know what's needed.
