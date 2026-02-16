@@ -1,0 +1,11 @@
+{
+  "owner": "mupengi-bot",
+  "slug": "mupeng-notification-hub",
+  "displayName": "Notification Hub",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771198281611,
+    "commit": null
+  },
+  "history": []
+}
