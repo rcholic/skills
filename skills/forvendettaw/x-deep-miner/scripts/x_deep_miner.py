@@ -64,24 +64,28 @@ def ensure_dirs():
 
 def search_x_tweets(keywords: list, min_bookmarks: int = 1000) -> list:
     """
-    搜索 X (Twitter) 高热度推文
-    使用浏览器自动化抓取（无需 API）
+    抓取用户 Timeline 新帖
+    使用 OpenClaw Managed Browser (openclaw profile)
+    
+    使用方式:
+    1. browser action=start profile=openclaw
+    2. browser action=open targetUrl="https://x.com/home" profile=openclaw
+    3. browser action=snapshot targetId=<id>
     """
-    print(f"[X-Deep-Miner] 搜索关键词: {keywords}")
-    print(f"[X-Deep-Miner] 最低收藏数: {min_bookmarks}")
+    print(f"[X-Deep-Miner] 监控模式：抓取 Timeline 新帖")
+    print(f"[X-Deep-Miner] 关键词过滤: {keywords}")
+    print(f"[X-Deep-Miner] 最低热度: {min_bookmarks}")
     
     results = []
     
-    # 方法1: 使用 web_search 查找高热度推文链接
-    # 方法2: 使用浏览器直接抓取（需要配置）
+    # 使用浏览器自动化抓取
+    # 1. 启动浏览器 (profile="openclaw")
+    # 2. 打开 x.com/home
+    # 3. 解析 DOM 获取推文
     
-    print("\n💡 提示: 要启用自动抓取，请确保：")
-    print("   1. 安装浏览器: openclaw browser start")
-    print("   2. 手动打开 https://x.com/explore 搜索")
-    print("   3. 或使用 web_search 查找链接后手动收集")
-    
-    # 示例：使用 Brave Search 查找
-    # bravesearch query "AI twitter thread 1000+ likes"
+    print("\n💡 使用 OpenClaw Managed Browser:")
+    print("   browser action=start profile=openclaw")
+    print("   browser action=open targetUrl=https://x.com/home profile=openclaw")
     
     return results
 
