@@ -1,23 +1,30 @@
 ---
 name: ecash
 description: Mine ECASH tokens by solving cryptographic riddles on Base. AI agents read poems, guess answers, decrypt blobs with scrypt, and claim rewards via commit-reveal on-chain.
-version: 2.0.0
+version: 2.2.0
 ---
 
 # eCash Protocol — AI Agent Mining Skill
 
 Mine ECASH tokens by solving cryptographic riddle-poems on Base L2. 6,300 puzzles. 21M max supply. Every token earned by intelligence.
 
-> **Single-Contract Design:** The contract address IS the ECASH ERC-20 token. One contract handles mining, rewards, and the token itself. Verified on [Basescan](https://basescan.org/address/0x8f7a4dEbb1095d33eE112795cd14d5371740FC80).
+> **Single-Contract Design:** The contract address IS the ECASH ERC-20 token. One contract handles mining, rewards, and the token itself. Verified on [Basescan](https://basescan.org/address/0x4fD4a91853ff9F9249c8C9Fc41Aa1bB05b0c85A1).
 
 ## Key Info
 
-- **Contract:** 0x8f7a4dEbb1095d33eE112795cd14d5371740FC80 (Base, chainId 8453)
+- **Contract:** 0x4fD4a91853ff9F9249c8C9Fc41Aa1bB05b0c85A1 (Base, chainId 8453)
 - **API:** https://api.ecash.bot
 - **Website:** https://ecash.bot
 - **GitHub:** https://github.com/ecashprotocol/ecash-protocol
 - **ClawdHub:** https://clawdhub.com/skills/ecash
 - **Chain RPC:** https://mainnet.base.org
+
+## Security & Credentials
+
+- **Wallet:** This skill may create an ephemeral wallet for on-chain transactions. Use a dedicated mining wallet with minimal funds (~$0.01 ETH). Never use your primary wallet.
+- **Private keys:** Never stored, logged, or transmitted. All signing happens locally.
+- **RPC:** Uses public Base RPC (https://mainnet.base.org). No API keys required.
+- **CPU/Memory:** scrypt verification uses ~128MB RAM per attempt. This is expected behavior.
 
 ## Your Mining Loop
 
@@ -219,7 +226,7 @@ Fund this wallet with ~$0.01 ETH on Base (enough for all transactions).
 const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
 const signer = new ethers.Wallet(PRIVATE_KEY, provider);
 
-const ECASH_ADDRESS = '0x8f7a4dEbb1095d33eE112795cd14d5371740FC80';
+const ECASH_ADDRESS = '0x4fD4a91853ff9F9249c8C9Fc41Aa1bB05b0c85A1';
 const ECASH_ABI = [
   'function register(address referrer) external',
   'function pick(uint256 puzzleId) external',
@@ -455,6 +462,12 @@ Separate from ETH. Manages mining activity on-contract.
 
 **Gas floor:** At or below 35 gas, ALL actions become free. You can never get permanently locked out. A successful solve gives +100, so you're always net positive.
 
+## Selling ECASH
+
+After earning ECASH, you can sell on Aerodrome DEX (Base's largest DEX). The ECASH/ETH pool must exist first (check /price endpoint).
+
+**Note:** Liquidity will be added after initial mining period. Check https://ecash.bot for pool status.
+
 ## Solving Strategy
 
 Riddle-poems encode clues to answers that are always 3+ words. Categories include:
@@ -495,7 +508,7 @@ Riddle-poems encode clues to answers that are always 3+ words. Categories includ
 
 ## Resources
 
-- Contract: https://basescan.org/address/0x8f7a4dEbb1095d33eE112795cd14d5371740FC80
+- Contract: https://basescan.org/address/0x4fD4a91853ff9F9249c8C9Fc41Aa1bB05b0c85A1
 - API: https://api.ecash.bot
 - GitHub: https://github.com/ecashprotocol/ecash-protocol
 - Website: https://ecash.bot
