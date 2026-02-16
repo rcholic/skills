@@ -5,7 +5,7 @@ user-invocable: true
 model-invocable: false
 disableModelInvocation: true
 homepage: https://relayplane.com
-version: 3.1.0
+version: 3.4.0
 author: Continuum
 license: MIT
 metadata:
@@ -17,7 +17,7 @@ metadata:
 
 # RelayPlane
 
-**Spend $100/mo on OpenClaw? Keep $47 of it.** 835+ developers already installed.
+**Spend $100/mo on OpenClaw? Keep $47 of it.** 835+ developers already installed. Now with cloud telemetry — every install makes routing smarter for everyone.
 
 ## What It Does
 
@@ -81,10 +81,24 @@ export GEMINI_API_KEY=...
 export XAI_API_KEY=...
 ```
 
+## Free Account (Optional)
+
+Create a free account to see your savings dashboard and contribute to smarter network routing:
+
+```bash
+# Visit the dashboard to create an account
+# Then set your API key for personalized stats:
+export RELAYPLANE_API_KEY=rp_...
+```
+
+Or just visit https://relayplane.com/dashboard — your proxy works fine without an account.
+
+**Pro ($29/mo)** unlocks network-optimized routing, budget alerts, and provider health monitoring. Worth it at $60+/mo API spend.
+
 ## Privacy
 
 - **Your prompts stay local** — never sent to RelayPlane
-- **Anonymous telemetry** — only token counts, latency, model used
+- **Anonymous telemetry** — only token counts, latency, model used (improves routing for everyone)
 - **Opt-out anytime** — `relayplane-proxy telemetry off`
 - **Fully offline mode** — `relayplane-proxy --offline`
 
