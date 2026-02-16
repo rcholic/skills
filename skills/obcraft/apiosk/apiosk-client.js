@@ -33,7 +33,7 @@ function loadWallet() {
 async function callApiosk(apiId, params = {}) {
   const { wallet, config } = loadWallet();
   
-  const url = new URL(`/api/${apiId}`, config.gateway_url);
+  const url = new URL(`/${apiId}`, config.gateway_url);
   
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(params);

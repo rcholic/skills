@@ -6,7 +6,6 @@ set -e
 WALLET_DIR="$HOME/.apiosk"
 WALLET_FILE="$WALLET_DIR/wallet.json"
 CONFIG_FILE="$WALLET_DIR/config.json"
-SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "🦞 Apiosk Wallet Setup"
 echo ""
@@ -21,29 +20,34 @@ if [ -f "$WALLET_FILE" ] && [ "$1" != "--regenerate" ]; then
   exit 1
 fi
 
-# Install ethers if needed
-if [ ! -d "$SKILL_DIR/node_modules/ethers" ]; then
-  echo "Installing dependencies..."
-  (cd "$SKILL_DIR" && npm install --production --quiet 2>/dev/null)
+# Generate wallet using cast (Foundry)
+if ! command -v cast &> /dev/null; then
+  echo ""
+  echo "❌ 'cast' not found. Foundry is required to generate wallets."
+  echo ""
+  echo "To install Foundry, run:"
+  echo "  curl -L https://foundry.paradigm.xyz | bash"
+  echo "  foundryup"
+  echo ""
+  echo "Or visit: https://book.getfoundry.sh/getting-started/installation"
+  echo ""
+  exit 1
 fi
 
 echo "Generating new wallet..."
+WALLET_OUTPUT=$(cast wallet new)
+ADDRESS=$(echo "$WALLET_OUTPUT" | grep "Address:" | awk '{print $2}')
+PRIVATE_KEY=$(echo "$WALLET_OUTPUT" | grep "Private key:" | awk '{print $3}')
 
-# Generate a proper Ethereum keypair using ethers.js
-WALLET_JSON=$(node -e "
-const { ethers } = require('$SKILL_DIR/node_modules/ethers');
-const wallet = ethers.Wallet.createRandom();
-console.log(JSON.stringify({
-  address: wallet.address,
-  private_key: wallet.privateKey,
-  created_at: new Date().toISOString()
-}));
-")
+# Save wallet
+cat > "$WALLET_FILE" << EOF
+{
+  "address": "$ADDRESS",
+  "private_key": "$PRIVATE_KEY",
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
 
-ADDRESS=$(echo "$WALLET_JSON" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).address)")
-
-# Save wallet (private key stored locally for on-chain transactions)
-echo "$WALLET_JSON" > "$WALLET_FILE"
 chmod 600 "$WALLET_FILE"
 
 # Create config
@@ -62,18 +66,16 @@ echo ""
 echo "✅ Wallet created successfully!"
 echo ""
 echo "📍 Address: $ADDRESS"
-echo "📂 Saved to: $WALLET_FILE (chmod 600, user-only)"
+echo "📂 Saved to: $WALLET_FILE"
 echo ""
-echo "⚠️  SECURITY:"
-echo "  Your private key is stored in $WALLET_FILE"
-echo "  This file is readable only by you (chmod 600)."
-echo "  Only fund this wallet with small amounts for testing (\$1-10)."
-echo "  For production, use a hardware wallet or external KMS."
+echo "⚠️  IMPORTANT: Fund your wallet with USDC on Base mainnet"
 echo ""
-echo "💰 Fund your wallet with USDC on Base mainnet:"
+echo "How to fund:"
 echo "  1. Bridge USDC to Base: https://bridge.base.org"
 echo "  2. Or buy on Coinbase → Withdraw to Base"
 echo "  3. Send to: $ADDRESS"
+echo ""
+echo "Minimum recommended: $1-10 USDC"
 echo ""
 echo "Check balance: ./check-balance.sh"
 echo ""

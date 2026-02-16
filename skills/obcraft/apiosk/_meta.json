@@ -1,13 +1,18 @@
 {
   "owner": "obcraft",
   "slug": "apiosk",
-  "displayName": "Apiosk - API Payment Gateway",
+  "displayName": "Apiosk Skill",
   "latest": {
-    "version": "1.0.5",
-    "publishedAt": 1770975892654,
-    "commit": "https://github.com/openclaw/skills/commit/2947abc19a3fd3363c7ad97d05ce7ba97ec29b1e"
+    "version": "1.1.0",
+    "publishedAt": 1771192503066,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.5",
+      "publishedAt": 1770975892654,
+      "commit": "https://github.com/openclaw/skills/commit/2947abc19a3fd3363c7ad97d05ce7ba97ec29b1e"
+    },
     {
       "version": "1.0.3",
       "publishedAt": 1770935734956,

@@ -44,7 +44,7 @@ def call_apiosk(api_id: str, params: dict = None) -> dict:
     wallet, config = load_wallet()
     params = params or {}
     
-    url = f"{config['gateway_url']}/api/{api_id}"
+    url = f"{config['gateway_url']}/{api_id}"
     headers = {
         'Content-Type': 'application/json',
         'X-Wallet-Address': wallet['address'],

@@ -42,17 +42,26 @@ See [SKILL.md](./SKILL.md) for complete documentation:
 
 ---
 
-## 🔐 Security
+## 🔐 Security Notice
 
-- **Proper Ethereum keypair** — generated locally via `ethers.js` (standard, audited library)
-- **No external installers** — `npm install` only, no `curl | bash`
-- **Private key never transmitted** — only your public address is sent to the gateway
-- **Restrictive permissions** — wallet file is chmod 600 (owner-only)
-- **HTTPS only** — all gateway communication is encrypted
+**Before using this skill:**
 
-⚠️ Private key is stored in plaintext locally. Only fund with small amounts for testing. For production, use a hardware wallet or KMS.
+1. **Private key storage:** The wallet's private key is stored in plaintext in `~/.apiosk/wallet.json` (with chmod 600 permissions). This is suitable for testing but NOT for production with large amounts.
 
-See [SECURITY.md](./SECURITY.md) for full details.
+2. **Recommended for production:**
+   - Use a hardware wallet (Ledger, Trezor)
+   - Or use an external key management service
+   - Only fund test wallet with small amounts ($1-10)
+
+3. **Foundry installation:** This skill requires Foundry (cast command). Install it manually:
+   ```bash
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup
+   ```
+
+4. **Gateway verification:** All payments are verified on-chain by the gateway. Your private key is NEVER sent to the gateway.
+
+5. **Test first:** Try with a small API call before funding with larger amounts.
 
 ---
 
@@ -92,7 +101,7 @@ apiosk-skill/
 ## 🎯 What This Enables
 
 **For Agents:**
-- Access 15+ production APIs after one-time wallet setup
+- Access 9+ production APIs instantly
 - Pay per request ($0.001-0.10)
 - No API key management
 - Automatic USDC micropayments

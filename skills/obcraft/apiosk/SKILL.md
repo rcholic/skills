@@ -1,17 +1,17 @@
 # Apiosk - Keyless API Access with USDC Micropayments
 
-**Pay-per-request API access for agents using USDC micropayments.**
+**Pay-per-request API access for agents. No API keys. No accounts. Just pay and call.**
 
-Apiosk enables agents to access production APIs using x402 protocol - USDC micropayments on Base blockchain. No API keys to manage, pay only for what you use.
+Apiosk enables agents to access production APIs using x402 protocol - USDC micropayments on Base blockchain. Stop managing API keys, start paying per request.
 
 ---
 
 ## 🎯 What This Skill Does
 
-- **Discover APIs** - Browse 15+ production APIs (weather, prices, news, geocoding, etc.)
+- **Discover APIs** - Browse 9+ production APIs (weather, prices, news, geocoding, etc.)
 - **Pay per request** - Automatic USDC micropayments ($0.001-0.10 per call)
-- **No API keys** - No provider accounts or subscriptions needed
-- **Simple setup** - One-time wallet creation, then call APIs with x402 payment
+- **No setup** - No API keys, no accounts, no subscriptions
+- **Instant access** - Call APIs immediately with x402 payment
 
 ---
 
@@ -22,7 +22,7 @@ Apiosk enables agents to access production APIs using x402 protocol - USDC micro
 clawhub install apiosk
 
 # Or clone manually
-git clone https://github.com/olivierbrinkman/apiosk-skill
+git clone https://github.com/apiosk/apiosk-skill
 ```
 
 ---
@@ -36,13 +36,11 @@ git clone https://github.com/olivierbrinkman/apiosk-skill
 ./setup-wallet.sh
 
 # This creates ~/.apiosk/wallet.json with:
-# - Ethereum address (public)
-# - Private key (stored locally, chmod 600)
-# - Creation timestamp
-#
-# ⚠️ The private key is stored in plaintext with restrictive permissions.
-# Only fund with small amounts for testing ($1-10).
-# For production, use a hardware wallet or external KMS.
+# - Private key (stored locally, chmod 600 for security)
+# - Public address
+# - Base mainnet RPC
+
+**IMPORTANT:** The private key is stored in plaintext in `~/.apiosk/wallet.json` (with restrictive file permissions). Only fund this wallet with small amounts for testing. For production, use a hardware wallet or external key management.
 ```
 
 **Important:** Fund your wallet with USDC on Base mainnet (minimum $1-10 recommended).
@@ -159,7 +157,7 @@ WALLET_ADDRESS=$(jq -r '.address' ~/.apiosk/wallet.json)
 
 # Make request (x402 payment happens via on-chain verification)
 # The gateway validates payment on-chain, no client-side signature needed
-curl -X POST "https://gateway.apiosk.com/api/$API_ID" \
+curl -X POST "https://gateway.apiosk.com/$API_ID" \
   -H "Content-Type: application/json" \
   -H "X-Wallet-Address: $WALLET_ADDRESS" \
   -d "$PARAMS"
@@ -282,11 +280,11 @@ console.log(await getDailyDigest(['technology', 'business']));
 
 **Apiosk (x402):**
 ```
-1. Generate wallet (keypair stored locally)
-2. Fund with USDC on Base
-3. Make request — gateway returns 402
-4. Client signs payment with your private key
-5. Gateway verifies on-chain
+1. Make request
+2. Gateway returns 402 Payment Required
+3. Your wallet signs payment proof
+4. Gateway verifies on-chain
+5. Gateway forwards to API
 6. You get response
 ```
 
@@ -418,7 +416,7 @@ curl -X POST https://dashboard.apiosk.com/api/add \
 - **Website:** https://apiosk.com
 - **Dashboard:** https://dashboard.apiosk.com
 - **Docs:** https://docs.apiosk.com
-- **GitHub:** https://github.com/olivierbrinkman/apiosk-skill
+- **GitHub:** https://github.com/apiosk
 - **Support:** support@apiosk.com
 - **Moltbook:** @ApioskAgent
 

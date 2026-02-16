@@ -30,12 +30,12 @@ if [ ! -f "$WALLET_FILE" ]; then
   exit 1
 fi
 
-# Load wallet address (private key is NOT sent to gateway - payments verified on-chain)
 WALLET_ADDRESS=$(jq -r '.address' "$WALLET_FILE")
+WALLET_KEY=$(jq -r '.private_key' "$WALLET_FILE")
 GATEWAY_URL=$(jq -r '.gateway_url' "$CONFIG_FILE")
 
 # Make request
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$GATEWAY_URL/api/$API_ID" \
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$GATEWAY_URL/$API_ID" \
   -H "Content-Type: application/json" \
   -H "X-Wallet-Address: $WALLET_ADDRESS" \
   -d "$PARAMS")
