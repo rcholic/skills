@@ -4,6 +4,11 @@ All notable changes to the **MoltFlow Skills** package are documented here.
 
 ---
 
+## v2.11.4 (2026-02-16)
+
+### Fixed
+- Fixed ERC-8004 explorer URLs to include `/ethereum/` path segment across all files
+
 ## v2.11.3 (2026-02-15)
 
 ### Fixed

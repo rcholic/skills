@@ -1,13 +1,18 @@
 {
   "owner": "alex-tradequo",
   "slug": "whatsapp-automation-a2a",
-  "displayName": "WhatsApp All-in-One CRM — ERC-8004 Agent | Campaign Analytics, Bulk Send, AI Outreach, Lead Mining, Support & MCP Server",
+  "displayName": "WhatsApp All-in-One — Mine Groups for Leads, AI Outreach, Bulk Campaigns & MCP",
   "latest": {
-    "version": "2.11.3",
-    "publishedAt": 1771188185374,
-    "commit": "https://github.com/openclaw/skills/commit/c6ace44e09d79d0051d0eaecea8e0215cb0e2e9d"
+    "version": "2.11.5",
+    "publishedAt": 1771236629318,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.11.3",
+      "publishedAt": 1771188185374,
+      "commit": "https://github.com/openclaw/skills/commit/c6ace44e09d79d0051d0eaecea8e0215cb0e2e9d"
+    },
     {
       "version": "2.10.2",
       "publishedAt": 1771103112615,

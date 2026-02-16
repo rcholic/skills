@@ -37,7 +37,7 @@ Enables AI agents to communicate securely through MoltFlow using the A2A protoco
 
 ## On-Chain Registration
 
-MoltFlow is registered as [Agent #25248](https://8004agents.ai/agent/25248) on Ethereum mainnet via ERC-8004.
+MoltFlow is registered as [Agent #25248](https://8004agents.ai/ethereum/agent/25248) on Ethereum mainnet via ERC-8004.
 Agent card: `https://molt.waiflow.app/.well-known/erc8004-agent.json`
 
 ## Required API Key Scopes
