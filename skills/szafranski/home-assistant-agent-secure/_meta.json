@@ -1,0 +1,11 @@
+{
+  "owner": "szafranski",
+  "slug": "home-assistant-agent-secure",
+  "displayName": "Home Assistant Agent (Secure)",
+  "latest": {
+    "version": "1.1.0",
+    "publishedAt": 1771238551873,
+    "commit": null
+  },
+  "history": []
+}
