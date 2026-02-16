@@ -1,72 +1,83 @@
 ---
 name: Rust
+slug: rust
+version: 1.0.1
 description: Write idiomatic Rust avoiding ownership pitfalls, lifetime confusion, and common borrow checker battles.
 metadata: {"clawdbot":{"emoji":"🦀","requires":{"bins":["rustc","cargo"]},"os":["linux","darwin","win32"]}}
 ---
 
-## Ownership Traps
-- Variable moved after use — clone explicitly or borrow with `&`
-- `for item in vec` moves vec — use `&vec` or `.iter()` to borrow
-- Struct field access moves field if not Copy — destructure or clone
-- Closure captures by move with `move ||` — needed for threads and 'static
-- `String` moved into function — pass `&str` for read-only access
+## Quick Reference
 
-## Borrowing Battles
-- Can't have mutable and immutable borrow simultaneously — restructure code or use interior mutability
-- Borrow lasts until last use (NLL) — not until scope end in modern Rust
-- Returning reference to local fails — return owned value or use lifetime parameter
-- Mutable borrow through `&mut self` blocks all other access — split struct or use `RefCell`
+| Topic | File | Key Trap |
+|-------|------|----------|
+| Ownership & Borrowing | `ownership-borrowing.md` | Move semantics catch everyone |
+| Strings & Types | `types-strings.md` | `String` vs `&str`, UTF-8 indexing |
+| Errors & Iteration | `errors-iteration.md` | `unwrap()` in production, lazy iterators |
+| Concurrency & Memory | `concurrency-memory.md` | `Rc` not `Send`, `RefCell` panics |
+| Advanced Traps | `advanced-traps.md` | unsafe, macros, FFI, performance |
 
-## Lifetime Gotchas
-- Missing lifetime annotation — compiler usually infers, explicit when multiple references
-- `'static` means "can live forever", not "lives forever" — `String` is 'static, `&str` may not be
-- Struct holding reference needs lifetime parameter — `struct Foo<'a> { bar: &'a str }`
-- Function returning reference must tie to input lifetime — `fn get<'a>(s: &'a str) -> &'a str`
+---
 
-## String Confusion
-- `String` is owned, `&str` is borrowed slice — convert with `.as_str()` or `String::from()`
-- Indexing `s[0]` fails — UTF-8 variable width, use `.chars().nth(0)` or `.bytes()`
-- Concatenation: `s1 + &s2` moves s1 — use `format!("{}{}", s1, s2)` to keep both
-- `.len()` returns bytes, not characters — use `.chars().count()` for char count
+## Critical Traps (High-Frequency Failures)
 
-## Error Handling
-- `unwrap()` panics on None/Err — use `?` operator or `match` in production
-- `?` requires function returns Result/Option — can't use in main without `-> Result<()>`
-- Converting errors: `map_err()` or `From` trait implementation
-- `expect("msg")` better than `unwrap()` — shows context on panic
-- `Option` and `Result` don't mix — use `.ok()` or `.ok_or()` to convert
+### Ownership — #1 Source of Compiler Errors
+- **Variable moved after use** — clone explicitly or borrow with `&`
+- **`for item in vec` moves vec** — use `&vec` or `.iter()` to borrow
+- **`String` moved into function** — pass `&str` for read-only access
 
-## Pattern Matching
-- Match must be exhaustive — use `_` wildcard for remaining cases
-- `if let` for single pattern — avoids verbose match for one case
-- Guard conditions: `match x { n if n > 0 => ... }` — guards don't create bindings
-- `@` bindings: `Some(val @ 1..=5)` — binds matched value to name
-- `ref` keyword in patterns to borrow — often unnecessary with match ergonomics
+### Borrowing — The Borrow Checker Always Wins
+- **Can't have `&mut` and `&` simultaneously** — restructure or interior mutability
+- **Returning reference to local fails** — return owned value instead
+- **Mutable borrow through `&mut self` blocks all access** — split struct or `RefCell`
 
-## Iterator Gotchas
-- `.iter()` borrows, `.into_iter()` moves, `.iter_mut()` borrows mutably
-- `.collect()` needs type annotation — `collect::<Vec<_>>()` or let binding with type
-- Iterators are lazy — nothing happens until consumed
-- `.map()` returns iterator, not collection — chain with `.collect()`
-- Modifying while iterating impossible — collect indices first, then modify
+### Lifetimes — When Compiler Can't Infer
+- **`'static` means CAN live forever, not DOES** — `String` is 'static capable
+- **Struct with reference needs `<'a>`** — `struct Foo<'a> { bar: &'a str }`
+- **Function returning ref must tie to input** — `fn get<'a>(s: &'a str) -> &'a str`
 
-## Type System
-- Orphan rule: can't impl external trait on external type — newtype pattern workaround
-- Trait objects `dyn Trait` have runtime cost — generics monomorphize for performance
-- `Box<dyn Trait>` for heap-allocated trait object — `&dyn Trait` for borrowed
-- Associated types vs generics: use associated when one impl per type
-- `Self` vs `self`: type vs value — `Self::new()` vs `&self`
+### Strings — UTF-8 Surprises
+- **`s[0]` doesn't compile** — use `.chars().nth(0)` or `.bytes()`
+- **`.len()` returns bytes, not chars** — use `.chars().count()`
+- **`s1 + &s2` moves s1** — use `format!("{}{}", s1, s2)` to keep both
 
-## Concurrency
-- Data shared between threads needs `Send` and `Sync` — most types are, `Rc` is not
-- Use `Arc` for shared ownership across threads — `Rc` is single-threaded only
-- `Mutex<T>` for mutable shared state — lock returns guard, auto-unlocks on drop
-- `RwLock` allows multiple readers or one writer — deadlock if reader tries to write
-- Async functions return `Future` — must be awaited or spawned
+### Error Handling — Production Code
+- **`unwrap()` panics** — use `?` or `match` in production
+- **`?` needs `Result`/`Option` return type** — main needs `-> Result<()>`
+- **`expect("context")` > `unwrap()`** — shows why it panicked
 
-## Memory Patterns
-- `Box<T>` for heap allocation — also needed for recursive types
-- `Rc<T>` for shared ownership (single-thread) — `Arc<T>` for multi-thread
-- `RefCell<T>` for interior mutability — runtime borrow checking, panics on violation
-- `Cell<T>` for Copy types interior mutability — no borrow, just get/set
-- Avoid `Rc<RefCell<T>>` spaghetti — rethink ownership structure
+### Iterators — Lazy Evaluation
+- **`.iter()` borrows, `.into_iter()` moves** — choose carefully
+- **`.collect()` needs type** — `collect::<Vec<_>>()` or typed binding
+- **Iterators are lazy** — nothing runs until consumed
+
+### Concurrency — Thread Safety
+- **`Rc` is NOT `Send`** — use `Arc` for threads
+- **`Mutex` lock returns guard** — auto-unlocks on drop, don't hold across await
+- **`RwLock` deadlock** — reader upgrading to writer blocks forever
+
+### Memory — Smart Pointers
+- **`RefCell` panics at runtime** — if borrow rules violated
+- **`Box` for recursive types** — compiler needs known size
+- **Avoid `Rc<RefCell<T>>` spaghetti** — rethink ownership
+
+---
+
+## Common Compiler Errors (NEW)
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `value moved here` | Used after move | Clone or borrow |
+| `cannot borrow as mutable` | Already borrowed | Restructure or RefCell |
+| `missing lifetime specifier` | Ambiguous reference | Add `<'a>` |
+| `the trait bound X is not satisfied` | Missing impl | Check trait bounds |
+| `type annotations needed` | Can't infer | Turbofish or explicit type |
+| `cannot move out of borrowed content` | Deref moves | Clone or pattern match |
+
+---
+
+## Cargo Traps (NEW)
+
+- **`cargo update` updates Cargo.lock, not Cargo.toml** — manual version bump needed
+- **Features are additive** — can't disable a feature a dependency enables
+- **`[dev-dependencies]` not in release binary** — but in tests/examples
+- **`cargo build --release` much faster** — debug builds are slow intentionally
