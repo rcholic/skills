@@ -3,9 +3,15 @@
   "slug": "reflect-learn",
   "displayName": "Reflect",
   "latest": {
-    "version": "2.0.0",
-    "publishedAt": 1769445465505,
-    "commit": "https://github.com/clawdbot/skills/commit/85101a4888fda372437ef84f59612ea50aae098f"
+    "version": "2.1.0",
+    "publishedAt": 1771297371403,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "2.0.0",
+      "publishedAt": 1769445465505,
+      "commit": "https://github.com/clawdbot/skills/commit/85101a4888fda372437ef84f59612ea50aae098f"
+    }
+  ]
 }
