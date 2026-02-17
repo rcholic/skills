@@ -3,11 +3,16 @@
   "slug": "bot-debate",
   "displayName": "bot-debate",
   "latest": {
-    "version": "2.3.2",
-    "publishedAt": 1771009022412,
-    "commit": "https://github.com/openclaw/skills/commit/c3c4e4e1c42292611747d279769e170d7f1dc6f0"
+    "version": "2.4.0",
+    "publishedAt": 1771216785664,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.3.2",
+      "publishedAt": 1771009022412,
+      "commit": "https://github.com/openclaw/skills/commit/c3c4e4e1c42292611747d279769e170d7f1dc6f0"
+    },
     {
       "version": "2.2.2",
       "publishedAt": 1770998922182,
