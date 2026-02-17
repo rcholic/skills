@@ -3,9 +3,15 @@
   "slug": "para-proactive-workspace",
   "displayName": "PARA + Proactive Agent Workspace",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771310508403,
-    "commit": "https://github.com/openclaw/skills/commit/4c7190ed1b064904b94427ebeb1149b0d5a32f0c"
+    "version": "1.0.2",
+    "publishedAt": 1771312984773,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771310508403,
+      "commit": "https://github.com/openclaw/skills/commit/4c7190ed1b064904b94427ebeb1149b0d5a32f0c"
+    }
+  ]
 }

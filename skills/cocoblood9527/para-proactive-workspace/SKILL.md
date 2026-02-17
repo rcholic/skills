@@ -1,6 +1,6 @@
 ---
 name: para-proactive-workspace
-description: "A complete workspace template combining PARA Method (Projects, Areas, Resources, Archives) with Proactive Agent Architecture for organized content management and AI memory persistence."
+description: "A production-ready workspace template combining PARA Method (Projects, Areas, Resources, Archives) by Tiago Forte with Proactive Agent Architecture for file organization, folder structure, productivity, knowledge management, second brain, and AI agent memory persistence. For OpenClaw. Includes 19+ templates and 3 visual guides."
 version: 1.0.0
 author: Cocoblood9527
 homepage: https://github.com/Cocoblood9527/para-proactive-workspace
