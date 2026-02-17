@@ -1,0 +1,11 @@
+{
+  "owner": "wuxxin",
+  "slug": "local-llama-tts",
+  "displayName": "Local Llama TTS",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771263813545,
+    "commit": null
+  },
+  "history": []
+}
