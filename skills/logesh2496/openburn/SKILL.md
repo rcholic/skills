@@ -1,6 +1,6 @@
 ---
 name: openburn
-description: Automates burning SOL tokens from a creator wallet to a burn address. Use this skill when the user wants to set up a regular burning schedule for their Pump.fun tokens.
+description: Automates collecting Pump.fun creator fees and burning a percentage of the collected SOL. Use this skill when the user wants to set up a regular fee collection and SOL burning schedule for their Pump.fun tokens.
 metadata:
   {
     "openclaw":
@@ -8,12 +8,14 @@ metadata:
         "emoji": "🔥",
         "requires":
           {
-            "modules": ["@solana/web3.js"],
+            "modules": ["@solana/web3.js", "tsx", "dotenv"],
+            "binaries": ["node", "pnpm"],
             "env":
               [
                 "CREATOR_WALLET_PRIVATE_KEY",
                 "PUMP_FUN_TOKEN_ADDRESS",
-                "API_URL",
+                "BURN_PERCENTAGE",
+                "MIN_FEE_TO_BURN",
               ],
           },
         "install":
@@ -22,8 +24,8 @@ metadata:
               "id": "pnpm-solana",
               "kind": "npm",
               "module": "@solana/web3.js",
-              "cmd": "pnpm add @solana/web3.js -w",
-              "label": "Install @solana/web3.js",
+              "cmd": "pnpm add @solana/web3.js @pump-fun/pump-sdk tsx dotenv -w",
+              "label": "Install dependencies",
             },
           ],
       },
@@ -32,7 +34,12 @@ metadata:
 
 # Openburn
 
-This skill helps users automate the burning of SOL tokens from a creator wallet to a burn address on Pump.fun.
+This skill helps users automate the collection of creator fees and burning of SOL on Pump.fun.
+
+## How It Works
+
+1. **Collect Creator Fees**: The script collects trading fees (in SOL) from both the bonding curve and AMM pools
+2. **Burn SOL**: A configurable percentage of the collected SOL is burned by transferring it to Solana's incinerator address (`1nc1nerator11111111111111111111111111111111`)
 
 ## Setup Instructions
 
@@ -40,7 +47,8 @@ This skill helps users automate the burning of SOL tokens from a creator wallet 
     Ask the user for the following information:
     - `PUMP_FUN_TOKEN_ADDRESS` (The token address on Pump.fun)
     - `CREATOR_WALLET_PRIVATE_KEY` (The private key of the wallet to burn from)
-    - `API_URL` (The base URL for the API to report status to, e.g., `https://api.example.com`)
+    - `BURN_PERCENTAGE` (Percentage of SOL to burn after fee collection, default: 80)
+    - `MIN_FEE_TO_BURN` (Minimum SOL fees required to proceed with burn, default: 0.1)
 
     > [!IMPORTANT]
     > Remind the user that their keys will be stored locally in the `.env` file.
@@ -55,23 +63,23 @@ This skill helps users automate the burning of SOL tokens from a creator wallet 
     ```env
     PUMP_FUN_TOKEN_ADDRESS=...
     CREATOR_WALLET_PRIVATE_KEY=...
-    API_URL=...
+    BURN_PERCENTAGE=80
+    MIN_FEE_TO_BURN=0.1
     ```
 
 3.  **Register Token**:
-    Make a POST request to register the token and wallet.
+    Once the `PUMP_FUN_TOKEN_ADDRESS` is received and stored, register the token with the API.
 
-    **Endpoint**: `POST {API_URL}/api/burn/register`
+    **Endpoint**: `POST https://api.openburn.fun/api/burn/register`
     **Body**:
 
     ```json
     {
-      "tokenAddress": "...",
-      "creatorWallet": "..." (Public key derived from private key if possible, or ask user for public key if needed. For now, sending the token address is key)
+      "tokenAddress": "<PUMP_FUN_TOKEN_ADDRESS>"
     }
     ```
 
-    _Note: If the user provided the private key, you can explain that the script will derive the public key, but for this registration call, you might strictly send what you have or just the token address if that's what the API expects._
+    This registration step is required before scheduling the burn job.
 
 4.  **Schedule Job**:
     Ask the user for the scheduling interval (default: every 2 hours).
@@ -92,7 +100,7 @@ This skill helps users automate the burning of SOL tokens from a creator wallet 
 5.  **Report Schedule**:
     Make a POST request to report the scheduled job.
 
-    **Endpoint**: `POST {API_URL}/api/burn/schedule`
+    **Endpoint**: `POST https://api.openburn.fun/api/burn/schedule`
     **Body**:
 
     ```json
@@ -114,9 +122,5 @@ When the cron job triggers (receiving the message "Execute the openburn script..
     ```
 
 2.  **Report Results**:
-    The script will automatically report transaction success/failure to `{API_URL}/api/burn/transaction`.
+    The script will automatically report transaction success/failure to `https://api.openburn.fun/api/burn/transaction`.
     You should also report the output (transaction signature) to the user in the chat.
-
-## References
-
-- [API Specifications](references/api.md)
