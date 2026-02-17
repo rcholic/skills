@@ -3,11 +3,16 @@
   "slug": "yandex-tracker-cli",
   "displayName": "Yandex Tracker CLI",
   "latest": {
-    "version": "1.0.3",
-    "publishedAt": 1771320488173,
-    "commit": "https://github.com/openclaw/skills/commit/282ee294b87e8e13603cf0667890f075663645c7"
+    "version": "1.0.7",
+    "publishedAt": 1771322080120,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.3",
+      "publishedAt": 1771320488173,
+      "commit": "https://github.com/openclaw/skills/commit/282ee294b87e8e13603cf0667890f075663645c7"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1771318256328,
