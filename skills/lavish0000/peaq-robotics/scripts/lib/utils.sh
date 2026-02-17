@@ -64,7 +64,7 @@ validate_json_file_arg() {
   local raw_path="$1"
   local real_path size max_size
   local -a allowed_roots=()
-  local workspace skill_root root extra_root root_real allowed=0
+  local workspace skill_root root root_real allowed=0
 
   real_path="$(resolve_realpath "$raw_path")"
   [[ -f "$real_path" ]] || fatal "JSON file not found: $raw_path"
@@ -87,15 +87,6 @@ validate_json_file_arg() {
   workspace="$(resolve_openclaw_workspace)"
   if [[ -n "$workspace" ]]; then
     allowed_roots+=("$workspace/.peaq_robot")
-  fi
-
-  if [[ -n "${PEAQ_ROS2_JSON_ALLOWED_ROOTS:-}" ]]; then
-    local IFS=','
-    read -r -a extras <<<"${PEAQ_ROS2_JSON_ALLOWED_ROOTS}"
-    for extra_root in "${extras[@]}"; do
-      extra_root="$(echo "$extra_root" | xargs)"
-      [[ -n "$extra_root" ]] && allowed_roots+=("$extra_root")
-    done
   fi
 
   for root in "${allowed_roots[@]}"; do
@@ -133,7 +124,9 @@ read_json_arg() {
   fi
   if [[ "$arg" == @* ]]; then
     local path="${arg#@}"
-    path="$(validate_json_file_arg "$path")"
+    if ! path="$(validate_json_file_arg "$path")"; then
+      return 2
+    fi
     python3 - <<'PY' "$path"
 import json
 import sys
@@ -145,30 +138,6 @@ PY
     return
   fi
   json_compact "$arg"
-}
-
-ensure_transfers_enabled() {
-  local command_name="${1:-transfer command}"
-  if [[ "${PEAQ_ROS2_ENABLE_TRANSFERS:-0}" != "1" ]]; then
-    fatal "$command_name is disabled by default. Set PEAQ_ROS2_ENABLE_TRANSFERS=1 to enable value transfers."
-  fi
-}
-
-normalize_bool() {
-  local raw="${1:-false}"
-  local lowered
-  lowered="$(printf "%s" "$raw" | tr '[:upper:]' '[:lower:]')"
-  case "$lowered" in
-    1|true|yes|on)
-      echo "true"
-      ;;
-    0|false|no|off|"")
-      echo "false"
-      ;;
-    *)
-      fatal "Invalid boolean value '$raw' (expected true/false)"
-      ;;
-  esac
 }
 
 require_safe_token() {

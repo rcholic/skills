@@ -1,35 +1,5 @@
 #!/usr/bin/env bash
 
-wallet_info_from_config() {
-  python3 - <<'PY' "$CONFIG"
-import json
-import os
-import sys
-try:
-    import yaml  # type: ignore
-except Exception as e:
-    raise SystemExit(f"PyYAML required to read config: {e}")
-
-cfg = sys.argv[1]
-with open(cfg, "r") as f:
-    data = yaml.safe_load(f) or {}
-
-network = data.get("network") or ""
-wallet = data.get("wallet") or {}
-path = wallet.get("path") or ""
-path = os.path.expanduser(path)
-if not path:
-    raise SystemExit("wallet.path missing in config")
-if not os.path.exists(path):
-    raise SystemExit(f"wallet file not found: {path}")
-
-print(json.dumps({
-    "network": network,
-    "wallet_path": path,
-}))
-PY
-}
-
 fund_request_line() {
   local amount="${1:-}"
   local reason="${2:-}"

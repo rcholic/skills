@@ -12,8 +12,6 @@ peaq_ros2.sh - helper for peaq-robotics-ros2 ROS 2 nodes/services
 Usage:
   peaq_ros2.sh env
   peaq_ros2.sh check
-  peaq_ros2.sh install [target_dir] [ref] [--update] [--skip-build]
-  peaq_ros2.sh onboard [amount] [reason] [--install] [--dir <path>] [--ref <ref>] [--update] [--skip-build]
 
   peaq_ros2.sh core-start
   peaq_ros2.sh core-start-fg
@@ -43,8 +41,6 @@ Usage:
   peaq_ros2.sh identity-card-did-create [name] [roles_csv] [endpoints_json] [metadata_json]
   peaq_ros2.sh identity-card-did-read
 
-  peaq_ros2.sh balance [address]
-  peaq_ros2.sh fund <to_address> <amount> [--planck]
   peaq_ros2.sh fund-request [amount] [reason]
 
   peaq_ros2.sh store-add <key> <value_json> [mode]
@@ -55,30 +51,17 @@ Usage:
   peaq_ros2.sh access-assign-permission <permission> <role>
   peaq_ros2.sh access-grant-role <role> <user>
 
-  peaq_ros2.sh tether-start
-  peaq_ros2.sh tether-start-fg
-  peaq_ros2.sh tether-stop
-  peaq_ros2.sh tether-wallet-create <label> [export_mnemonic]
-  peaq_ros2.sh tether-usdt-balance <address>
-  peaq_ros2.sh tether-usdt-transfer <from_address> <to_address> <amount> [dry_run]
-
 Notes:
   - Set PEAQ_ROS2_ROOT to the peaq-robotics-ros2 repo root.
   - Set PEAQ_ROS2_CONFIG_YAML to your peaq_robot.yaml path.
   - Set ROS_DOMAIN_ID to avoid collisions when multiple ROS 2 graphs are running.
-  - Install runs 'colcon build --symlink-install' unless --skip-build is set.
-  - Network pinning: set PEAQ_ROS2_NETWORK_PRIMARY (default quicknode3) and PEAQ_ROS2_NETWORK_FALLBACKS (CSV).
-    Set PEAQ_ROS2_PIN_NETWORK=0 to leave the config network untouched.
-  - Funding uses the wallet from config (wallet.path). Keep it funded to onboard new agents.
-  - Value-transfer commands are disabled by default; set PEAQ_ROS2_ENABLE_TRANSFERS=1 to enable fund/usdt transfer.
+  - Funding requests are informational only; value transfer commands are intentionally excluded from core.
   - LOG/PID dirs default to ~/.peaq_ros2/logs-<ROS_DOMAIN_ID> and ~/.peaq_ros2/pids-<ROS_DOMAIN_ID>.
 USAGE
 }
 
 # shellcheck source=lib/utils.sh
 source "$LIB_DIR/utils.sh"
-# shellcheck source=lib/config.sh
-source "$LIB_DIR/config.sh"
 # shellcheck source=lib/env.sh
 source "$LIB_DIR/env.sh"
 # shellcheck source=lib/nodes.sh
@@ -87,13 +70,9 @@ source "$LIB_DIR/nodes.sh"
 source "$LIB_DIR/core.sh"
 # shellcheck source=lib/wallet.sh
 source "$LIB_DIR/wallet.sh"
-# shellcheck source=lib/install.sh
-source "$LIB_DIR/install.sh"
 
 ROOT=""
 CONFIG=""
-WS_SETUP="${WS_SETUP:-}"
-ROS_SETUP="${ROS_SETUP:-/opt/ros/humble/setup.bash}"
 
 auto_set_ros_domain_id
 ROS_DOMAIN_SUFFIX=""
@@ -106,11 +85,7 @@ PID_DIR="${PEAQ_ROS2_PID_DIR:-$HOME/.peaq_ros2/pids${ROS_DOMAIN_SUFFIX}}"
 CORE_NODE_NAME="${PEAQ_ROS2_CORE_NODE_NAME:-peaq_core_node}"
 STORAGE_NODE_NAME="${PEAQ_ROS2_STORAGE_NODE_NAME:-peaq_storage_bridge_node}"
 EVENTS_NODE_NAME="${PEAQ_ROS2_EVENTS_NODE_NAME:-peaq_events_node}"
-TETHER_NODE_NAME="${PEAQ_ROS2_TETHER_NODE_NAME:-peaq_tether_node}"
 HUMANOID_NODE_NAME="${PEAQ_ROS2_HUMANOID_NODE_NAME:-peaq_humanoid_bridge_node}"
-
-NETWORK_PRIMARY="${PEAQ_ROS2_NETWORK_PRIMARY:-wss://quicknode3.peaq.xyz}"
-NETWORK_FALLBACKS="${PEAQ_ROS2_NETWORK_FALLBACKS:-wss://quicknode1.peaq.xyz,wss://quicknode2.peaq.xyz,wss://peaq.api.onfinality.io/public-ws,wss://peaq-rpc.publicnode.com}"
 
 cmd="${1:-}"
 shift || true
@@ -120,23 +95,16 @@ case "$cmd" in
     usage
     exit 0
     ;;
-  install)
-    install_repo "$@"
-    exit 0
-    ;;
   env)
     require_root
     cat <<'ENV'
 PEAQ_ROS2_ROOT=$ROOT
 PEAQ_ROS2_CONFIG_YAML=$CONFIG
-ROS_SETUP=$ROS_SETUP
-WS_SETUP=$WS_SETUP
 LOG_DIR=$LOG_DIR
 PID_DIR=$PID_DIR
 CORE_NODE_NAME=$CORE_NODE_NAME
 STORAGE_NODE_NAME=$STORAGE_NODE_NAME
 EVENTS_NODE_NAME=$EVENTS_NODE_NAME
-TETHER_NODE_NAME=$TETHER_NODE_NAME
 HUMANOID_NODE_NAME=$HUMANOID_NODE_NAME
 ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-}
 ENV
@@ -150,12 +118,10 @@ ENV
 
   core-start)
     ensure_env
-    ensure_config_network
     run_bg "$CORE_NODE_NAME" ros2 run peaq_ros2_core core_node --ros-args -p config.yaml_path:="$CONFIG"
     ;;
   core-start-fg)
     ensure_env
-    ensure_config_network
     ros2 run peaq_ros2_core core_node --ros-args -p config.yaml_path:="$CONFIG"
     ;;
   core-stop)
@@ -163,7 +129,6 @@ ENV
     ;;
   core-configure)
     ensure_env
-    ensure_config_network
     state="$(core_state)"
     if [[ "$state" == "inactive" || "$state" == "active" ]]; then
       exit 0
@@ -183,30 +148,7 @@ ENV
       fi
       break
     done
-
-    # Retry with fallback networks
-    mapfile -t nets < <(network_candidates)
-    tried=0
-    for net in "${nets[@]}"; do
-      tried=$((tried+1))
-      # skip first (already attempted) if it matches primary
-      if [[ "$tried" -eq 1 ]]; then
-        continue
-      fi
-      echo "core-configure failed; trying network: $net"
-      set_config_network "$net"
-      stop_bg "$CORE_NODE_NAME"
-      run_bg "$CORE_NODE_NAME" ros2 run peaq_ros2_core core_node --ros-args -p config.yaml_path:="$CONFIG"
-      sleep 2
-      out="$(ros2 lifecycle set "/$CORE_NODE_NAME" configure 2>&1 || true)"
-      echo "$out"
-      if echo "$out" | grep -q "Transitioning successful"; then
-        echo "core-configure succeeded on $net"
-        exit 0
-      fi
-    done
-
-    fatal "core-configure failed for all networks"
+    fatal "core-configure failed"
     ;;
   core-activate)
     ensure_env
@@ -257,12 +199,10 @@ PY
 
   storage-start)
     ensure_env
-    ensure_storage_mode
     run_bg "$STORAGE_NODE_NAME" ros2 run peaq_ros2_core storage_bridge_node --ros-args -p config.yaml_path:="$CONFIG"
     ;;
   storage-start-fg)
     ensure_env
-    ensure_storage_mode
     ros2 run peaq_ros2_core storage_bridge_node --ros-args -p config.yaml_path:="$CONFIG"
     ;;
   storage-stop)
@@ -298,7 +238,9 @@ PY
     if [[ -z "${1:-}" ]]; then
       metadata='{"type":"robot"}'
     else
-      metadata="$(read_json_arg "$1")"
+      if ! metadata="$(read_json_arg "$1")"; then
+        fatal "Invalid DID metadata JSON input"
+      fi
     fi
     payload="$(python3 - <<'PY' "$metadata"
 import json, sys
@@ -310,173 +252,6 @@ PY
   did-read)
     ensure_env
     ros2_service_call_json "/$CORE_NODE_NAME/identity/read" peaq_ros2_interfaces/srv/IdentityRead "{}"
-    ;;
-  balance)
-    ensure_env
-    address="${1:-}"
-    info="$(wallet_info_from_config)"
-    python3 - <<'PY' "$info" "$address"
-import json
-import base64
-import sys
-from decimal import Decimal, getcontext
-
-info = json.loads(sys.argv[1])
-address = sys.argv[2] if len(sys.argv) > 2 else ""
-
-from substrateinterface import SubstrateInterface
-from substrateinterface.keypair import Keypair
-
-net = info.get("network") or ""
-wallet_path = info.get("wallet_path") or ""
-
-kp = None
-if not address:
-    with open(wallet_path, "r") as f:
-        obj = json.load(f)
-    typ = (obj.get("type") or "").lower()
-    enc = (obj.get("encoding") or "base64").lower()
-    payload = obj.get("data") or ""
-    if enc == "base64":
-        secret = base64.b64decode(payload).decode("utf-8") if payload else ""
-    else:
-        secret = payload
-
-    if typ == "mnemonic":
-        kp = Keypair.create_from_mnemonic(secret)
-    elif typ in ("private_key", "private_key_hex"):
-        kp = Keypair.create_from_private_key(secret)
-    else:
-        raise SystemExit(f"Unsupported wallet type: {typ}")
-    address = kp.ss58_address
-
-client = SubstrateInterface(url=net)
-decimals = 18
-props = {}
-try:
-    if hasattr(client, "get_chain_properties"):
-        props = client.get_chain_properties() or {}
-    else:
-        resp = client.rpc_request("system_properties", [])
-        props = resp.get("result") or {}
-    if props.get("tokenDecimals"):
-        decimals = int(props["tokenDecimals"][0])
-except Exception:
-    pass
-
-account_info = client.query("System", "Account", [address]).value
-free = int(account_info["data"]["free"])
-getcontext().prec = 50
-human = (Decimal(free) / (Decimal(10) ** Decimal(decimals))).normalize()
-print(f"address: {address}")
-print(f"free_planck: {free}")
-print(f"free_human: {human}")
-PY
-    ;;
-  fund)
-    ensure_env
-    ensure_transfers_enabled "fund"
-    to_address="${1:-}"
-    amount="${2:-}"
-    unit="${3:-}"
-    [[ -n "$to_address" ]] || fatal "fund requires <to_address>"
-    [[ -n "$amount" ]] || fatal "fund requires <amount>"
-    planck=0
-    if [[ "$unit" == "--planck" ]]; then
-      planck=1
-    fi
-    info="$(wallet_info_from_config)"
-    python3 - <<'PY' "$info" "$to_address" "$amount" "$planck"
-import json
-import base64
-import sys
-import time
-from decimal import Decimal, getcontext
-
-info = json.loads(sys.argv[1])
-dest = sys.argv[2]
-amount = sys.argv[3]
-planck = sys.argv[4] == "1"
-
-from substrateinterface import SubstrateInterface
-from substrateinterface.keypair import Keypair
-
-net = info.get("network") or ""
-wallet_path = info.get("wallet_path") or ""
-
-with open(wallet_path, "r") as f:
-    obj = json.load(f)
-typ = (obj.get("type") or "").lower()
-enc = (obj.get("encoding") or "base64").lower()
-payload = obj.get("data") or ""
-if enc == "base64":
-    secret = base64.b64decode(payload).decode("utf-8") if payload else ""
-else:
-    secret = payload
-
-if typ == "mnemonic":
-    kp = Keypair.create_from_mnemonic(secret)
-elif typ in ("private_key", "private_key_hex"):
-    kp = Keypair.create_from_private_key(secret)
-else:
-    raise SystemExit(f"Unsupported wallet type: {typ}")
-
-client = SubstrateInterface(url=net)
-decimals = 18
-props = {}
-try:
-    if hasattr(client, "get_chain_properties"):
-        props = client.get_chain_properties() or {}
-    else:
-        resp = client.rpc_request("system_properties", [])
-        props = resp.get("result") or {}
-    if props.get("tokenDecimals"):
-        decimals = int(props["tokenDecimals"][0])
-except Exception:
-    pass
-
-getcontext().prec = 50
-if planck:
-    value = int(amount)
-else:
-    value = int((Decimal(amount) * (Decimal(10) ** Decimal(decimals))).to_integral_value())
-
-def get_balance(addr: str) -> int:
-    account_info = client.query("System", "Account", [addr]).value
-    return int(account_info["data"]["free"])
-
-sender_addr = kp.ss58_address
-dest_before = get_balance(dest)
-sender_before = get_balance(sender_addr)
-
-try:
-    call = client.compose_call(
-        call_module="Balances",
-        call_function="transfer_keep_alive",
-        call_params={"dest": dest, "value": value},
-    )
-    extrinsic = client.create_signed_extrinsic(call=call, keypair=kp)
-    receipt = client.submit_extrinsic(extrinsic, wait_for_inclusion=True)
-    print(receipt.extrinsic_hash)
-except Exception as e:
-    # If the websocket drops after broadcast, confirm via balance delta before failing.
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        time.sleep(6)
-        try:
-            dest_after = get_balance(dest)
-        except Exception:
-            continue
-        if dest_after >= dest_before + value:
-            print(f"success: dest_balance_increased={dest_after}")
-            sys.exit(0)
-    sender_after = None
-    try:
-        sender_after = get_balance(sender_addr)
-    except Exception:
-        pass
-    raise SystemExit(f"fund failed: {e} (dest_before={dest_before}, dest_after_check={dest_after if 'dest_after' in locals() else 'n/a'}, sender_before={sender_before}, sender_after={sender_after})")
-PY
     ;;
   fund-request)
     ensure_env
@@ -490,7 +265,9 @@ PY
     [[ -n "$key" ]] || fatal "store-add requires <key>"
     [[ -n "$value_json" ]] || fatal "store-add requires <value_json>"
     require_safe_token "$key" "storage key"
-    value_json="$(read_json_arg "$value_json")"
+    if ! value_json="$(read_json_arg "$value_json")"; then
+      fatal "Invalid storage JSON input"
+    fi
     payload="$(python3 - <<'PY' "$key" "$value_json" "$mode"
 import json, sys
 print(json.dumps({
@@ -628,110 +405,6 @@ PY
     ros2_service_call_json "/$CORE_NODE_NAME/access/grant_role" peaq_ros2_interfaces/srv/AccessGrantRole "$payload"
     ;;
 
-  tether-start)
-    ensure_env
-    run_bg "$TETHER_NODE_NAME" ros2 run peaq_ros2_tether tether_node --ros-args -p config.yaml_path:="$CONFIG"
-    ;;
-  tether-start-fg)
-    ensure_env
-    ros2 run peaq_ros2_tether tether_node --ros-args -p config.yaml_path:="$CONFIG"
-    ;;
-  tether-stop)
-    stop_bg "$TETHER_NODE_NAME"
-    ;;
-  tether-wallet-create)
-    ensure_env
-    label="${1:-}"; export_mnemonic="${2:-false}"
-    [[ -n "$label" ]] || fatal "tether-wallet-create requires <label>"
-    export_mnemonic="$(normalize_bool "$export_mnemonic")"
-    payload="$(python3 - <<'PY' "$label" "$export_mnemonic"
-import json, sys
-print(json.dumps({
-    "label": sys.argv[1],
-    "export_mnemonic": sys.argv[2].lower() == "true",
-}, separators=(",", ":")))
-PY
-)"
-    ros2_service_call_json "/$TETHER_NODE_NAME/wallet/create" peaq_ros2_interfaces/srv/TetherCreateWallet "$payload"
-    ;;
-  tether-usdt-balance)
-    ensure_env
-    address="${1:-}"
-    [[ -n "$address" ]] || fatal "tether-usdt-balance requires <address>"
-    payload="$(python3 - <<'PY' "$address"
-import json, sys
-print(json.dumps({"address": sys.argv[1]}, separators=(",", ":")))
-PY
-)"
-    ros2_service_call_json "/$TETHER_NODE_NAME/usdt/balance" peaq_ros2_interfaces/srv/TetherGetUsdtBalance "$payload"
-    ;;
-  tether-usdt-transfer)
-    ensure_env
-    ensure_transfers_enabled "tether-usdt-transfer"
-    from_address="${1:-}"; to_address="${2:-}"; amount="${3:-}"; dry_run="${4:-true}"
-    [[ -n "$from_address" ]] || fatal "tether-usdt-transfer requires <from_address>"
-    [[ -n "$to_address" ]] || fatal "tether-usdt-transfer requires <to_address>"
-    [[ -n "$amount" ]] || fatal "tether-usdt-transfer requires <amount>"
-    dry_run="$(normalize_bool "$dry_run")"
-    payload="$(python3 - <<'PY' "$from_address" "$to_address" "$amount" "$dry_run"
-import json, sys
-print(json.dumps({
-    "from_address": sys.argv[1],
-    "to_address": sys.argv[2],
-    "amount": sys.argv[3],
-    "dry_run": sys.argv[4].lower() == "true",
-}, separators=(",", ":")))
-PY
-)"
-    ros2_service_call_json "/$TETHER_NODE_NAME/usdt/transfer" peaq_ros2_interfaces/srv/TetherTransferUsdt "$payload"
-    ;;
-
-  onboard)
-    amount="0.05"
-    reason="DID + storage init"
-    amount_set="0"
-    reason_set="0"
-    force_install="0"
-    install_args=()
-
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --install)
-          force_install="1"
-          shift
-          ;;
-        --skip-build|--update)
-          install_args+=("$1")
-          shift
-          ;;
-        --dir|--ref)
-          install_args+=("$1" "${2:-}")
-          shift 2
-          ;;
-        *)
-          if [[ "$amount_set" == "0" ]]; then
-            amount="$1"
-            amount_set="1"
-          elif [[ "$reason_set" == "0" ]]; then
-            reason="$1"
-            reason_set="1"
-          fi
-          shift
-          ;;
-      esac
-    done
-
-    if [[ "$force_install" == "1" ]] || [[ -z "$(resolve_root)" ]]; then
-      install_repo "${install_args[@]}"
-    fi
-
-    "$0" core-stop
-    "$0" core-start
-    sleep 2
-    "$0" core-configure
-    "$0" core-activate
-    "$0" fund-request "$amount" "$reason"
-    ;;
   *)
     fatal "Unknown command: $cmd"
     ;;
