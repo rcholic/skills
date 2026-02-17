@@ -6,7 +6,7 @@ set -e -o pipefail
 # Файл: yandex-tracker.sh (можно скопировать/переименовать в yandex-tracker)
 
 # Приоритет 1: переменные окружения TOKEN и ORG_ID
-# Приоритет 2: файл ~/.yandex-tracker-env с TOKEN и ORG_ID
+# Приоритет 2: файл ~/.yandex-tracker-env (читается как key=value, без выполнения кода)
 
 if [[ -z "${TOKEN}" || -z "${ORG_ID}" ]]; then
   CONFIG="${HOME}/.yandex-tracker-env"
@@ -14,8 +14,20 @@ if [[ -z "${TOKEN}" || -z "${ORG_ID}" ]]; then
     echo "Error: Neither TOKEN/ORG_ID env vars nor config file $CONFIG found" >&2
     exit 1
   fi
-  # File is executed as shell (source); prefer env vars for security.
-  source "$CONFIG"
+  # Safe parse: only TOKEN and ORG_ID are read from KEY=value lines (no shell execution)
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" ]] && continue
+    if [[ "$line" =~ ^(TOKEN|ORG_ID)=(.+)$ ]]; then
+      key="${BASH_REMATCH[1]}"
+      value="${BASH_REMATCH[2]}"
+      if [[ "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"; fi
+      if [[ "$value" =~ ^\"(.*)\"$ ]]; then value="${BASH_REMATCH[1]}"; fi
+      export "$key=$value"
+    fi
+  done < "$CONFIG"
 fi
 
 # Проверка, что TOKEN и ORG_ID определены
