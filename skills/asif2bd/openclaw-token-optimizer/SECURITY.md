@@ -4,18 +4,40 @@ This document provides detailed security analysis of the OpenClaw Token Optimize
 
 ## Purpose
 
-This skill helps reduce OpenClaw API costs by optimizing context loading and model selection. All operations are performed locally with no external network communication.
+This skill helps reduce OpenClaw API costs by optimizing context loading and model selection.
 
-## False Positive Explanation
+## Two-Part Architecture — Read This First
 
-**Why some antivirus tools flag this skill:**
+This skill has **two distinct categories of files** with different security profiles:
 
-1. **"Optimizer" keyword** - AV heuristics often flag tools with "optimizer" in the name, especially when combined with file operations
-2. **Generated configuration** - The skill generates AGENTS.md and HEARTBEAT.md templates containing configuration commands, which can trigger heuristics
-3. **Executable Python scripts** - Scripts with `#!/usr/bin/env python3` shebang are sometimes flagged as potentially malicious
-4. **File state tracking** - Writing JSON files to track usage patterns can trigger "data collection" heuristics
+### Category 1: Executable Scripts (`scripts/*.py`)
+These are the actual working components of the skill.
+- **Network access:** None
+- **External API keys:** None required
+- **Code execution:** No eval/exec/compile
+- **Data storage:** Local JSON files in `~/.openclaw/workspace/memory/` only
+- **Verdict:** ✅ Safe to run
 
-**These are all false positives.** The skill contains no malicious code.
+### Category 2: Reference Documentation (`references/PROVIDERS.md`, `assets/config-patches.json`)
+These are informational guides describing optional multi-provider strategies.
+- **Network access:** Described (not performed by these files)
+- **External API keys:** Referenced as examples (`${OPENROUTER_API_KEY}`, `${TOGETHER_API_KEY}`)
+- **Code execution:** None — these are JSON/Markdown documentation
+- **Purpose:** Help users who *choose* to configure alternative providers (OpenRouter, Together.ai, etc.)
+- **Verdict:** ✅ Safe files — but describe services that require external credentials if you choose to use them
+
+**Why this matters:** Security scanners that flag API key patterns or external service references in documentation files are technically correct — those references exist. They are not executable, not auto-applied, and require explicit manual user action to use.
+
+## Security Flag Explanation
+
+**Why VirusTotal or AV tools may flag this skill:**
+
+1. **API key patterns in config-patches.json** — `${OPENROUTER_API_KEY}`, `${TOGETHER_API_KEY}` are placeholder strings for optional manual configuration. They are not credentials and not automatically used.
+2. **External URLs in PROVIDERS.md** — References to openrouter.ai, together.ai, etc. are documentation links, not network calls.
+3. **"Optimizer" keyword + file operations** — Common AV heuristic false positive.
+4. **Executable Python scripts with shebang** — Standard Python scripts, no dangerous operations.
+
+These are documentation-level references, not executable network code.
 
 ## Script-by-Script Security Analysis
 

@@ -1,13 +1,18 @@
 {
   "owner": "asif2bd",
   "slug": "openclaw-token-optimizer",
-  "displayName": "Token Optimizer",
+  "displayName": "OpenClaw Token Optimizer",
   "latest": {
-    "version": "1.2.9",
-    "publishedAt": 1771325117973,
-    "commit": "https://github.com/openclaw/skills/commit/ef6b3dc1f194190ef6a7cf4b793bc960dccf0967"
+    "version": "1.4.0",
+    "publishedAt": 1771345048989,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.9",
+      "publishedAt": 1771325117973,
+      "commit": "https://github.com/openclaw/skills/commit/ef6b3dc1f194190ef6a7cf4b793bc960dccf0967"
+    },
     {
       "version": "1.2.8",
       "publishedAt": 1770882681787,

@@ -1,6 +1,16 @@
 ---
 name: token-optimizer
-description: Reduce OpenClaw token usage and API costs through smart model routing, heartbeat optimization, budget tracking, and multi-provider fallbacks. Use when token costs are high, API rate limits are being hit, or hosting multiple agents at scale. Includes ready-to-use scripts for task classification, usage monitoring, and optimized heartbeat scheduling. All operations are local file analysis only - no network requests, no code execution. See SECURITY.md for details.
+description: Reduce OpenClaw token usage and API costs through smart model routing, heartbeat optimization, budget tracking, and native 2026.2.15 features (session pruning, bootstrap size limits, cache TTL alignment). Use when token costs are high, API rate limits are being hit, or hosting multiple agents at scale. The 4 executable scripts (context_optimizer, model_router, heartbeat_optimizer, token_tracker) are local-only — no network requests, no subprocess calls, no system modifications. Reference files (PROVIDERS.md, config-patches.json) document optional multi-provider strategies that require external API keys and network access if you choose to use them. See SECURITY.md for full breakdown.
+version: 1.4.0
+security:
+  verified: true
+  auditor: Oracle (Matrix Zion)
+  audit_date: 2026-02-17
+  scripts_no_network: true
+  scripts_no_code_execution: true
+  scripts_no_subprocess: true
+  scripts_data_local_only: true
+  reference_files_describe_external_services: true
 ---
 
 # Token Optimizer
@@ -28,10 +38,11 @@ Comprehensive toolkit for reducing token usage and API costs in OpenClaw deploym
    cp assets/HEARTBEAT.template.md ~/.openclaw/workspace/HEARTBEAT.md
    ```
 
-4. **Enforce cheap models for casual chat:**
+4. **Enforce cheaper models for casual chat:**
    ```bash
    python3 scripts/model_router.py "thanks!"
-   # Shows: Use Haiku, not Opus!
+   # Single-provider Anthropic setup: Use Sonnet, not Opus
+   # Multi-provider setup (OpenRouter/Together): Use Haiku for max savings
    ```
 
 5. **Check current token budget:**
@@ -367,9 +378,14 @@ See `assets/config-patches.json` for advanced optimizations:
 - ✅ Token budget tracking (fully functional)
 - ✅ Model routing logic (fully functional)
 
+**Native OpenClaw 2026.2.15 — apply directly:**
+- ✅ Session pruning (`contextPruning: cache-ttl`) — auto-trims old tool results after Anthropic cache TTL expires
+- ✅ Bootstrap size limits (`bootstrapMaxChars` / `bootstrapTotalMaxChars`) — caps workspace file injection size
+- ✅ Cache retention long (`cacheRetention: "long"` for Opus) — amortizes cache write costs
+
 **Requires OpenClaw core support:**
-- ⏳ Prompt caching (Anthropic API feature, OpenClaw integration pending)
-- ⏳ Lazy context loading (requires core changes)
+- ⏳ Prompt caching (Anthropic API feature — verify current status)
+- ⏳ Lazy context loading (use `context_optimizer.py` script today)
 - ⏳ Multi-provider fallback (partially supported)
 
 **Apply config patches:**
@@ -377,6 +393,67 @@ See `assets/config-patches.json` for advanced optimizations:
 # Example: Enable multi-provider fallback
 gateway config.patch --patch '{"providers": [...]}'
 ```
+
+## Native OpenClaw Diagnostics (2026.2.15+)
+
+OpenClaw 2026.2.15 added built-in commands that complement this skill's Python scripts. Use these first for quick diagnostics before reaching for the scripts.
+
+### Context breakdown
+```
+/context list    → token count per injected file (shows exactly what's eating your prompt)
+/context detail  → full breakdown including tools, skills, and system prompt sections
+```
+**Use before applying `bootstrap_size_limits`** — see which files are oversized, then set `bootstrapMaxChars` accordingly.
+
+### Per-response usage tracking
+```
+/usage tokens    → append token count to every reply
+/usage full      → append tokens + cost estimate to every reply
+/usage cost      → show cumulative cost summary from session logs
+/usage off       → disable usage footer
+```
+**Combine with `token_tracker.py`** — `/usage cost` gives session totals; `token_tracker.py` tracks daily budget.
+
+### Session status
+```
+/status          → model, context %, last response tokens, estimated cost
+```
+
+---
+
+## Cache TTL Heartbeat Alignment (NEW in v1.4.0)
+
+**The problem:** Anthropic charges ~3.75x more for cache *writes* than cache *reads*. If your agent goes idle and the 1h cache TTL expires, the next request re-writes the entire prompt cache — expensive.
+
+**The fix:** Set heartbeat interval to **55min** (just under the 1h TTL). The heartbeat keeps the cache warm, so every subsequent request pays cache-read rates instead.
+
+```bash
+# Get optimal interval for your cache TTL
+python3 scripts/heartbeat_optimizer.py cache-ttl
+# → recommended_interval: 55min (3300s)
+# → explanation: keeps 1h Anthropic cache warm
+
+# Custom TTL (e.g., if you've configured 2h cache)
+python3 scripts/heartbeat_optimizer.py cache-ttl 7200
+# → recommended_interval: 115min
+```
+
+**Apply to your OpenClaw config:**
+```json
+{
+  "agents": {
+    "defaults": {
+      "heartbeat": {
+        "every": "55m"
+      }
+    }
+  }
+}
+```
+
+**Who benefits:** Anthropic API key users only. OAuth profiles already default to 1h heartbeat (OpenClaw smart default). API key profiles default to 30min — bumping to 55min is both cheaper (fewer calls) and cache-warm.
+
+---
 
 ## Deployment Patterns
 
