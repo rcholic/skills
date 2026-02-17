@@ -3,11 +3,16 @@
   "slug": "raindrop",
   "displayName": "Raindrop.io Bookmarks",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1769379934129,
-    "commit": "https://github.com/clawdbot/skills/commit/eaa1c9a7c530ecc5d14152f34df3e8b3391a8690"
+    "version": "1.0.3",
+    "publishedAt": 1771333268117,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1769379934129,
+      "commit": "https://github.com/clawdbot/skills/commit/eaa1c9a7c530ecc5d14152f34df3e8b3391a8690"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1769340084434,

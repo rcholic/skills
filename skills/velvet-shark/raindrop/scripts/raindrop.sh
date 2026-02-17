@@ -72,6 +72,10 @@ EOF
 
 die() { echo "Error: $1" >&2; exit 1; }
 
+is_int() {
+  [[ "${1:-}" =~ ^-?[0-9]+$ ]]
+}
+
 # Rate limiting helper
 rate_limit() {
   if [[ "$DELAY" -gt 0 ]]; then
@@ -144,7 +148,8 @@ case "$cmd" in
   create-collection)
     [[ -z "${1:-}" ]] && die "Collection name required"
     name="$1"
-    api POST "/collection" -d "{\"title\":\"$name\"}" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Created: \(.item.title)\nID: \(.item._id)"'; fi
+    payload=$(jq -cn --arg title "$name" '{title: $title}')
+    api POST "/collection" -d "$payload" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Created: \(.item.title)\nID: \(.item._id)"'; fi
     ;;
   
   list)
@@ -187,7 +192,9 @@ case "$cmd" in
     [[ -z "${1:-}" ]] && die "URL required"
     url="$1"
     collection="${2:--1}"
-    api POST "/raindrop" -d "{\"link\":\"$url\",\"collectionId\":$collection}" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Added: \(.item.title)\nID: \(.item._id)"'; fi
+    is_int "$collection" || die "Collection ID must be an integer"
+    payload=$(jq -cn --arg link "$url" --argjson collectionId "$collection" '{link: $link, collectionId: $collectionId}')
+    api POST "/raindrop" -d "$payload" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Added: \(.item.title)\nID: \(.item._id)"'; fi
     ;;
   
   delete)
@@ -200,39 +207,42 @@ case "$cmd" in
     [[ -z "${2:-}" ]] && die "Collection ID required"
     id="$1"
     collection="$2"
-    api PUT "/raindrop/$id" -d "{\"collectionId\":$collection}" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Moved: \(.item.title) -> collection \(.item.collectionId)"'; fi
+    is_int "$collection" || die "Collection ID must be an integer"
+    payload=$(jq -cn --argjson collectionId "$collection" '{collectionId: $collectionId}')
+    api PUT "/raindrop/$id" -d "$payload" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Moved: \(.item.title) -> collection \(.item.collectionId)"'; fi
     ;;
   
   update)
     [[ -z "${1:-}" ]] && die "Bookmark ID required"
     id="$1"
     
-    # Build update payload
-    payload="{"
-    needs_comma=false
-    
-    if [[ -n "$UPDATE_TAGS" ]]; then
-      # Convert comma-separated tags to JSON array
-      tags_json=$(echo "$UPDATE_TAGS" | tr ',' '\n' | jq -R . | jq -s .)
-      payload+='"tags":'"$tags_json"
-      needs_comma=true
-    fi
-    
-    if [[ -n "$UPDATE_TITLE" ]]; then
-      [[ "$needs_comma" == "true" ]] && payload+=","
-      payload+='"title":"'"$UPDATE_TITLE"'"'
-      needs_comma=true
-    fi
-    
     if [[ -n "$UPDATE_COLLECTION" ]]; then
-      [[ "$needs_comma" == "true" ]] && payload+=","
-      payload+='"collectionId":'"$UPDATE_COLLECTION"
+      is_int "$UPDATE_COLLECTION" || die "--collection must be an integer"
     fi
-    
-    payload+="}"
-    
+
+    payload=$(jq -cn \
+      --arg tags "$UPDATE_TAGS" \
+      --arg title "$UPDATE_TITLE" \
+      --arg collection "$UPDATE_COLLECTION" \
+      '
+      (if ($tags | length) > 0 then
+        {
+          tags: (
+            $tags
+            | split(",")
+            | map(gsub("^\\s+|\\s+$"; ""))
+            | map(select(length > 0))
+          )
+        }
+      else {} end)
+      +
+      (if ($title | length) > 0 then {title: $title} else {} end)
+      +
+      (if ($collection | length) > 0 then {collectionId: ($collection | tonumber)} else {} end)
+      ')
+
     [[ "$payload" == "{}" ]] && die "No update options provided. Use --tags, --title, or --collection"
-    
+
     api PUT "/raindrop/$id" -d "$payload" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Updated: \(.item.title)\nTags: \(.item.tags | join(", "))\nCollection: \(.item.collectionId)"'; fi
     ;;
   
@@ -242,12 +252,21 @@ case "$cmd" in
     ids="$1"
     target_collection="$2"
     source_collection="${3:--1}"  # Default to Unsorted (-1) if not specified
-    
-    # Convert comma-separated IDs to JSON array
-    ids_json=$(echo "$ids" | tr ',' '\n' | jq -R 'tonumber' | jq -s .)
-    
+
+    is_int "$target_collection" || die "Target collection ID must be an integer"
+    is_int "$source_collection" || die "Source collection ID must be an integer"
+
+    ids_json=$(jq -cn --arg ids "$ids" '
+      $ids
+      | split(",")
+      | map(gsub("^\\s+|\\s+$"; ""))
+      | map(select(length > 0))
+      | map(tonumber)
+    ')
+    payload=$(jq -cn --argjson ids "$ids_json" --argjson target "$target_collection" '{ids: $ids, collection: {"$id": $target}}')
+
     # Use bulk update API - requires source collection in path, target as collection.$id in body
-    api PUT "/raindrops/${source_collection}" -d "{\"ids\":$ids_json,\"collection\":{\"\$id\":$target_collection}}" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Moved \(.modified) bookmarks to collection '"$target_collection"'"'; fi
+    api PUT "/raindrops/${source_collection}" -d "$payload" | if [[ "$FORMAT" == "json" ]]; then cat; else jq -r '"Moved \(.modified) bookmarks to collection '"$target_collection"'"'; fi
     ;;
   
   tags)
