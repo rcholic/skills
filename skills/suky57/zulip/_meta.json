@@ -1,0 +1,11 @@
+{
+  "owner": "suky57",
+  "slug": "zulip",
+  "displayName": "Zulip",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1771232728314,
+    "commit": null
+  },
+  "history": []
+}
