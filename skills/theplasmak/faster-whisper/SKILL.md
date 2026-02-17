@@ -33,7 +33,8 @@ Use this skill when you need to:
 - Only add `--format srt/vtt` if the user asks for subtitles/captions
 - Only add `--word-timestamps` if the user needs word-level timing
 - Only add `--initial-prompt` if there's domain-specific jargon to prime
-- Each extra feature adds overhead; `--diarize` especially adds ~20-30s
+- Any word-level feature auto-runs wav2vec2 alignment (~5-10s overhead)
+- `--diarize` adds ~20-30s on top of that
 
 **When NOT to use:**
 - Real-time/streaming transcription (use streaming-optimized tools instead)
@@ -47,6 +48,7 @@ Use this skill when you need to:
 | **Basic transcription** | `./scripts/transcribe audio.mp3` | Batched inference, VAD on, distil-large-v3.5 |
 | **SRT subtitles** | `./scripts/transcribe audio.mp3 --format srt -o subs.srt` | Word timestamps auto-enabled |
 | **VTT subtitles** | `./scripts/transcribe audio.mp3 --format vtt -o subs.vtt` | WebVTT format |
+| **Word timestamps** | `./scripts/transcribe audio.mp3 --word-timestamps --format srt` | wav2vec2 aligned (~10ms) |
 | **Speaker diarization** | `./scripts/transcribe audio.mp3 --diarize` | Requires pyannote.audio |
 | **YouTube/URL** | `./scripts/transcribe https://youtube.com/watch?v=...` | Auto-downloads via yt-dlp |
 | **Batch process** | `./scripts/transcribe *.mp3 -o ./transcripts/` | Output to directory |
@@ -217,7 +219,7 @@ Model & Language:
 
 Output Format:
   -f, --format FMT      text | json | srt | vtt (default: text)
-  --word-timestamps     Include word-level timestamps (auto-enabled for --diarize)
+  --word-timestamps     Include word-level timestamps (wav2vec2 aligned automatically)
   -o, --output PATH     Output file or directory (directory for batch mode)
 
 Inference Tuning:
@@ -321,6 +323,23 @@ Identifies who spoke when using [pyannote.audio](https://github.com/pyannote/pya
 
 Speakers are labeled `SPEAKER_1`, `SPEAKER_2`, etc. in order of first appearance. Diarization runs on GPU automatically if CUDA is available.
 
+## Precise Word Timestamps
+
+Whenever word-level timestamps are computed (`--word-timestamps`, `--diarize`, or `--min-confidence`), a wav2vec2 forced alignment pass automatically refines them from Whisper's ~100-200ms accuracy to ~10ms. No extra flag needed.
+
+```bash
+# Word timestamps with automatic wav2vec2 alignment
+./scripts/transcribe audio.mp3 --word-timestamps --format json
+
+# Diarization also gets precise alignment automatically
+./scripts/transcribe meeting.wav --diarize
+
+# Precise subtitles
+./scripts/transcribe audio.mp3 --word-timestamps --format srt -o subtitles.srt
+```
+
+Uses the MMS (Massively Multilingual Speech) model from torchaudio — supports 1000+ languages. The model is cached after first load, so batch processing stays fast.
+
 ## URL & YouTube Input
 
 Pass any URL as input — audio is downloaded automatically via yt-dlp:
@@ -384,6 +403,7 @@ Batch mode prints a summary after all files complete:
 | **--diarize without HuggingFace token** | Model download fails | Run `huggingface-cli login` and accept model agreements |
 | **URL input without yt-dlp** | Download fails | Install: `pipx install yt-dlp` |
 | **--min-confidence too high** | Drops good segments with natural pauses | Start at 0.5, adjust up; check JSON output for probabilities |
+| **Using --word-timestamps for basic transcription** | Adds ~5-10s overhead for negligible benefit | Only use when word-level precision matters |
 | **Batch without -o directory** | All output mixed in stdout | Use `-o ./transcripts/` to write one file per input |
 
 ## Performance Notes
@@ -394,6 +414,7 @@ Batch mode prints a summary after all files complete:
 - **Quantization**: INT8 used on CPU for ~4x speedup with minimal accuracy loss
 - **Performance stats**: Every transcription shows audio duration, processing time, and realtime factor
 - **Benchmark** (RTX 3070, 21-min file): **~24s** with batched inference (both distil-large-v3 and v3.5) vs ~69s without
+- **--precise overhead**: Adds ~5-10s for wav2vec2 model load + alignment (model cached for batch)
 - **Diarization overhead**: Adds ~10-30s depending on audio length (runs on GPU if available)
 - **Memory**:
   - `distil-large-v3`: ~2GB RAM / ~1GB VRAM
@@ -410,6 +431,7 @@ Batch mode prints a summary after all files complete:
 - **Production-ready**: Stable C++ backend (CTranslate2)
 - **Distilled models**: ~6x faster with <1% accuracy loss
 - **Subtitles**: Native SRT/VTT output
+- **Precise alignment**: Automatic wav2vec2 refinement (~10ms word boundaries)
 - **Diarization**: Optional speaker identification via pyannote
 - **URLs**: Direct YouTube/URL input
 
