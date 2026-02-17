@@ -3,11 +3,16 @@
   "slug": "guava-guard",
   "displayName": "Guava Guard",
   "latest": {
-    "version": "9.3.0",
-    "publishedAt": 1771285888174,
-    "commit": "https://github.com/openclaw/skills/commit/da0d2c4322d78c786d3943da61e29d70dc886fd4"
+    "version": "1.2.0",
+    "publishedAt": 1771320441390,
+    "commit": null
   },
   "history": [
+    {
+      "version": "9.3.0",
+      "publishedAt": 1771285888174,
+      "commit": "https://github.com/openclaw/skills/commit/da0d2c4322d78c786d3943da61e29d70dc886fd4"
+    },
     {
       "version": "9.1.0",
       "publishedAt": 1771094344526,

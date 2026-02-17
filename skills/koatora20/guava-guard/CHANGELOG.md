@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## v10.0.0 — Runtime-Only Final (2026-02-17)
+
+### ✅ Scope Simplification (開発完了版)
+- GuavaGuardは **runtime guard専用** に正式固定
+- Soul Lock / SoulChain 由来の機能・運用前提を本体スコープから除外
+- 公式Hook API制約に合わせて **warn-only運用** を明示（Issue #18677待ち）
+
+### 🔐 Security Posture
+- before_tool_callの12 runtime checksを維持
+- 監査ログ `~/.openclaw/guava-guard/audit.jsonl` を継続
+- ブロック実行はcancel/veto API追加後に再有効化予定
+
+### 📣 Positioning
+- **静的スキャンは guard-scanner を推奨**（pre-install gate）
+- GuavaGuardは「実行時監視」、guard-scannerは「導入前検査」に役割分離
+
 ## v9.0.0 — SoulChain Edition (2026-02-14)
 
 ### ⛓️ SoulChain: On-Chain Identity Verification (Layer 3)
