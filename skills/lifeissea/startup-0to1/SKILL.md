@@ -1,7 +1,7 @@
 ---
 name: raon-os
-version: 0.7.7
-description: AI-powered startup companion for Korean founders. Evaluate business plans, match government funding programs (TIPS/DeepTech/Global TIPS), connect with 3,972+ TIPS-selected startups, get investor recommendations, and integrate with Kakao i OpenBuilder — all through natural conversation. Features Agentic RAG (HyDE, Multi-Query, CRAG), structured extraction, and Track B financial matching. Use when a founder asks to evaluate a business plan, find government funding, search TIPS companies, get valuation estimates, or needs startup lifecycle support (ideation → funding → growth → exit).
+version: 0.7.9
+description: "AI-powered startup companion for Korean founders. Evaluate business plans, match government funding programs (TIPS/DeepTech/Global TIPS), connect with 3,972+ TIPS-selected startups, get investor recommendations, and integrate with Kakao i OpenBuilder. Features Agentic RAG (HyDE, Multi-Query, CRAG), structured extraction, and Track B financial matching."
 metadata:
   openclaw:
     env:
@@ -27,11 +27,11 @@ metadata:
         description: "Managed API key (optional, for SaaS mode)"
         required: false
     requires:
-      bins: ["python3"]
-    notes: "At least one LLM API key is required. Falls back to local Ollama if no keys are set."
+      bins: ["python3", "node"]
+    notes: "At least one LLM API key (GEMINI, OPENROUTER, ANTHROPIC, or OPENAI) is recommended. Falls back to local Ollama if no keys are set. API keys are stored in ~/.openclaw/.env (user-managed, chmod 600 recommended). The skill includes a local HTTP server (port 8400) and crawlers for public government data collection."
 ---
 
-# Raon OS — Startup Companion (v0.7.6)
+# Raon OS — Startup Companion (v0.7.9)
 
 ## 설치 요구사항
 

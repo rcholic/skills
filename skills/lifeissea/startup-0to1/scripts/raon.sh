@@ -293,29 +293,6 @@ if [ ! -f "$RAON_INIT_FILE" ]; then
   touch "$RAON_INIT_FILE"
 fi
 
-# --- Version Check (background, non-blocking) ---
-_check_update() {
-  local local_ver latest cache_file cache_age
-  cache_file="/tmp/.raon-os-update-check"
-  # Only check once per day
-  if [[ -f "$cache_file" ]]; then
-    cache_age=$(( $(date +%s) - $(stat -f%m "$cache_file" 2>/dev/null || stat -c%Y "$cache_file" 2>/dev/null || echo 0) ))
-    [[ "$cache_age" -lt 86400 ]] && return
-  fi
-  local_ver=$(grep '"version"' "$BASE_DIR/package.json" 2>/dev/null | head -1 | sed 's/.*"version".*"\([^"]*\)".*/\1/')
-  latest=$(npm view @yeomyeonggeori/raon-os version 2>/dev/null || echo "")
-  if [[ -n "$latest" ]]; then
-    echo "$latest" > "$cache_file"
-    if [[ "$latest" != "$local_ver" ]]; then
-      echo -e "${YELLOW}⚡ raon-os v${latest} 사용 가능! (현재 v${local_ver}) → npm update -g @yeomyeonggeeri/raon-os${NC}" >&2
-    fi
-  fi
-}
-# Run in background (don't slow down CLI)
-if command -v npm &>/dev/null && [[ "$MODULE" != "version" && "$MODULE" != "--version" ]]; then
-  _check_update &
-fi
-
 # --- Router ---
 case "$MODULE" in
   biz-plan)
@@ -417,20 +394,6 @@ case "$MODULE" in
     ;;
   idea)
     python3 "$SCRIPT_DIR/idea.py" "${COMMAND:-list}" "$@"
-    ;;
-  version|--version|-v)
-    local_ver=$(grep '"version"' "$BASE_DIR/package.json" 2>/dev/null | head -1 | sed 's/.*"version".*"\([^"]*\)".*/\1/')
-    echo -e "${BLUE}raon-os${NC} v${local_ver:-unknown}"
-    # Background version check
-    if command -v npm &>/dev/null; then
-      latest=$(npm view @yeomyeonggeori/raon-os version 2>/dev/null || echo "")
-      if [[ -n "$latest" && "$latest" != "$local_ver" ]]; then
-        echo -e "${YELLOW}⚡ 새 버전 v${latest} 사용 가능!${NC} (현재 v${local_ver})"
-        echo -e "   업데이트: ${GREEN}npm update -g @yeomyeonggeori/raon-os${NC}"
-      elif [[ -n "$latest" ]]; then
-        echo -e "${GREEN}✅ 최신 버전입니다${NC}"
-      fi
-    fi
     ;;
   help|--help|-h|"")
     show_help
