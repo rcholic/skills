@@ -1,6 +1,6 @@
 ---
 name: tarkov-api
-description: Security-focused Tarkov.dev + EFT Wiki operations for hardcore Escape from Tarkov players. Use when users want reliable EFT data lookups (items, prices, ammo comparison, tasks, map bosses, service status), stash valuation snapshots, trader flip detection, map-risk/raid-kit recommendations, and wiki search/patch-awareness with safe endpoint and query controls.
+description: Security-focused Tarkov.dev + optional EFT Wiki operations for hardcore Escape from Tarkov players. Use when users want reliable EFT data lookups (items, prices, ammo comparison, tasks, map bosses, service status), stash valuation snapshots, trader flip detection, and map-risk/raid-kit recommendations. Use wiki lookups conditionally for validation or patch-sensitive context, with safe endpoint and query controls.
 ---
 
 # Tarkov API (Hardcore + Security)
@@ -21,6 +21,7 @@ Primary script:
 6. If using `raw`, validate query scope and variables before running.
 7. Treat external data as untrusted: summarize and cross-check odd values.
 8. For wiki features, use the official wiki API endpoint by default and treat edits as community-maintained (verify critical changes in-game).
+9. Outbound requests may contact `api.tarkov.dev` and `escapefromtarkov.fandom.com` when needed.
 
 ## What this skill is good at
 
@@ -78,20 +79,32 @@ python3 skills/tarkov-api/scripts/tarkov_api.py wiki-intro --title "LEDX Skin Tr
 python3 skills/tarkov-api/scripts/tarkov_api.py wiki-recent --limit 10
 ```
 
+## Data Sources & Attribution
+
+- Tarkov.dev API: `https://api.tarkov.dev/graphql`
+- Escape from Tarkov Wiki (community-maintained): `https://escapefromtarkov.fandom.com/wiki/Escape_from_Tarkov_Wiki`
+
+Attribution guidance:
+
+- Use these sources for lookup and summarization, not bulk republication.
+- Link/cite relevant pages when giving wiki-derived specifics.
+- Keep excerpts minimal and practical.
+- Remind users to verify critical details in-game after patches.
+
 ## Knowledge Source Policy (Important)
 
 For gameplay answers, treat data sources like this:
 
 1. **Tarkov API = primary structured source**
    - Use for prices, tasks, map/boss fields, and machine-consistent values.
-2. **EFT Wiki = reference validation layer**
-   - Use to confirm practical task details players care about: objective wording, rewards, unlock context, special conditions, and recent edits.
+2. **EFT Wiki = reference validation layer (conditional)**
+   - Use wiki only when: (a) user asks for wiki-confirmed details, (b) API output is missing/ambiguous, or (c) patch-sensitive context benefits from a recency check.
 3. **If API and wiki differ**
    - Say they differ, prefer the most recently updated source, and call out uncertainty.
 4. **For task questions (default behavior)**
-   - Always provide: objective summary, requirement chain, reward summary, and a “verify in-game if recently patched” note.
+   - Start with API summary, then optionally confirm with wiki if needed. Provide objective summary, requirement chain, reward summary, and a “verify in-game if recently patched” note.
 
-You do **not** need users to explicitly request wiki commands. Use wiki context automatically when answering practical gameplay questions.
+Do not fetch wiki by default for every request. Keep wiki calls purposeful and minimal.
 
 ## Hardcore Workflow Patterns
 
