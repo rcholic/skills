@@ -1,11 +1,17 @@
 {
   "owner": "lksrz",
   "slug": "email-webhook",
-  "displayName": "Generic Email Webhook Receiver",
+  "displayName": "Email Webhook",
   "latest": {
-    "version": "1.2.0",
-    "publishedAt": 1771360293721,
-    "commit": "https://github.com/openclaw/skills/commit/b65c4face8514b3feb63cc8a7a058f2e96c65b5c"
+    "version": "1.6.0",
+    "publishedAt": 1771406388072,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.2.0",
+      "publishedAt": 1771360293721,
+      "commit": "https://github.com/openclaw/skills/commit/b65c4face8514b3feb63cc8a7a058f2e96c65b5c"
+    }
+  ]
 }
