@@ -1,19 +1,14 @@
 ---
 name: ai-podcast-creation
-description: |
-  Create AI-powered podcasts with text-to-speech, music, and audio editing.
-  Tools: Kokoro TTS, DIA TTS, Chatterbox, AI music generation, media merger.
-  Capabilities: multi-voice conversations, background music, intro/outro, full episodes.
-  Use for: podcast production, audiobooks, voice content, audio newsletters.
-  Triggers: podcast, ai podcast, text to speech podcast, audio content, voice over,
-  ai audiobook, multi voice, conversation ai, notebooklm alternative, audio generation,
-  podcast automation, ai narrator, voice content, audio newsletter, podcast maker
+description: "Create AI-powered podcasts with text-to-speech, music, and audio editing. Tools: Kokoro TTS, DIA TTS, Chatterbox, AI music generation, media merger. Capabilities: multi-voice conversations, background music, intro/outro, full episodes. Use for: podcast production, audiobooks, voice content, audio newsletters. Triggers: podcast, ai podcast, text to speech podcast, audio content, voice over, ai audiobook, multi voice, conversation ai, notebooklm alternative, audio generation, podcast automation, ai narrator, voice content, audio newsletter, podcast maker"
 allowed-tools: Bash(infsh *)
 ---
 
 # AI Podcast Creation
 
 Create AI-powered podcasts and audio content via [inference.sh](https://inference.sh) CLI.
+
+![AI Podcast Creation](https://cloud.inference.sh/u/4mg21r6ta37mpaz6ktzwtt8krr/01jz00krptarq4bwm89g539aea.png)
 
 ## Quick Start
 
@@ -26,6 +21,8 @@ infsh app run infsh/kokoro-tts --input '{
   "voice": "am_michael"
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Available Voices
 
@@ -274,19 +271,19 @@ Outro
 
 ```bash
 # Text-to-speech models
-npx skills add inference-sh/agent-skills@text-to-speech
+npx skills add inference-sh/skills@text-to-speech
 
 # AI music generation
-npx skills add inference-sh/agent-skills@ai-music-generation
+npx skills add inference-sh/skills@ai-music-generation
 
 # LLM for scripts
-npx skills add inference-sh/agent-skills@llm-models
+npx skills add inference-sh/skills@llm-models
 
 # Content pipelines
-npx skills add inference-sh/agent-skills@ai-content-pipeline
+npx skills add inference-sh/skills@ai-content-pipeline
 
 # Full platform skill
-npx skills add inference-sh/agent-skills@inference-sh
+npx skills add inference-sh/skills@inference-sh
 ```
 
 Browse all apps: `infsh app list --category audio`
