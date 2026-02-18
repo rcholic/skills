@@ -7,6 +7,8 @@ use crate::client::XClient;
 use crate::config::Config;
 use crate::costs;
 use crate::models::*;
+use crate::output_meta;
+use crate::reliability;
 
 fn woeid_map() -> HashMap<&'static str, u32> {
     let mut m = HashMap::new();
@@ -102,10 +104,11 @@ fn resolve_woeid(input: &str) -> Result<u32> {
         }
     }
 
-    anyhow::bail!("Unknown location: \"{}\". Use --locations to list known locations.", input);
+    anyhow::bail!("Unknown location: \"{input}\". Use --locations to list known locations.");
 }
 
 pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result<()> {
+    let started_at = std::time::Instant::now();
     let token = config.require_bearer_token()?;
 
     // --locations flag
@@ -123,7 +126,7 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
         sorted.sort_by(|a, b| a.1.cmp(&b.1));
         for (woeid, name) in &sorted {
             let display = format!("{}{}", &name[..1].to_uppercase(), &name[1..]);
-            println!("  {:<20} WOEID {}", display, woeid);
+            println!("  {display:<20} WOEID {woeid}");
         }
         return Ok(());
     }
@@ -137,15 +140,36 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
     let woeid = resolve_woeid(&location)?;
 
     // Check cache
-    let cache_key = format!("trends:{}", woeid);
+    let cache_key = format!("trends:{woeid}");
     let cache_ttl = 15 * 60 * 1000u64;
 
     if !args.no_cache {
         let cached: Option<TrendsResult> =
             crate::cache::get(&config.cache_dir(), &cache_key, "", cache_ttl);
         if let Some(result) = cached {
+            if result.source == "search_fallback" {
+                reliability::mark_command_fallback("trends");
+            }
             if args.json {
-                println!("{}", serde_json::to_string_pretty(&result)?);
+                let is_fallback = result.source == "search_fallback";
+                let meta = output_meta::build_meta(
+                    if is_fallback {
+                        "x_api_v2_search_fallback"
+                    } else {
+                        "x_api_v2"
+                    },
+                    started_at,
+                    true,
+                    if is_fallback { 0.7 } else { 1.0 },
+                    if is_fallback {
+                        "/2/tweets/search/recent"
+                    } else {
+                        "/2/trends/by/woeid"
+                    },
+                    0.0,
+                    &config.costs_path(),
+                );
+                output_meta::print_json_with_meta(&meta, &result)?;
             } else {
                 print_trends(&result, args.limit);
             }
@@ -165,8 +189,9 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
             // Fallback to search-based estimation
             eprintln!("[trends] Falling back to search-based estimation");
             let lang = location_lang(woeid);
-            let query = format!("-is:retweet lang:{}", lang);
-            let tweets = twitter::search(client, token, &query, 1, "recency", None, None, false).await?;
+            let query = format!("-is:retweet lang:{lang}");
+            let tweets =
+                twitter::search(client, token, &query, 1, "recency", None, None, false).await?;
 
             costs::track_cost(
                 &config.costs_path(),
@@ -188,7 +213,10 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
                         let tag = word.to_lowercase();
                         *hashtag_counts.entry(tag).or_default() += 1;
                     }
-                    if word.starts_with('$') && word.len() > 1 && word[1..].chars().all(|c| c.is_alphabetic()) {
+                    if word.starts_with('$')
+                        && word.len() > 1
+                        && word[1..].chars().all(|c| c.is_alphabetic())
+                    {
                         let tag = word.to_uppercase();
                         *hashtag_counts.entry(tag).or_default() += 1;
                     }
@@ -204,7 +232,7 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
             let trends: Vec<Trend> = sorted
                 .into_iter()
                 .map(|(name, count)| Trend {
-                    url: format!("https://x.com/search?q={}", name),
+                    url: format!("https://x.com/search?q={name}"),
                     name,
                     tweet_count: Some(count),
                     category: None,
@@ -222,10 +250,32 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
     };
 
     // Cache result
+    if result.source == "search_fallback" {
+        reliability::mark_command_fallback("trends");
+    }
     crate::cache::set(&config.cache_dir(), &cache_key, "", &result);
 
     if args.json {
-        println!("{}", serde_json::to_string_pretty(&result)?);
+        let is_fallback = result.source == "search_fallback";
+        let estimated_cost = if is_fallback { 0.5 } else { 0.1 };
+        let meta = output_meta::build_meta(
+            if is_fallback {
+                "x_api_v2_search_fallback"
+            } else {
+                "x_api_v2"
+            },
+            started_at,
+            false,
+            if is_fallback { 0.7 } else { 1.0 },
+            if is_fallback {
+                "/2/tweets/search/recent"
+            } else {
+                "/2/trends/by/woeid"
+            },
+            estimated_cost,
+            &config.costs_path(),
+        );
+        output_meta::print_json_with_meta(&meta, &result)?;
     } else {
         print_trends(&result, args.limit);
     }
@@ -234,7 +284,7 @@ pub async fn run(args: &TrendsArgs, config: &Config, client: &XClient) -> Result
 }
 
 async fn fetch_trends_api(client: &XClient, token: &str, woeid: u32) -> Option<TrendsResult> {
-    let path = format!("trends/by/woeid/{}", woeid);
+    let path = format!("trends/by/woeid/{woeid}");
     let raw = client.bearer_get(&path, token).await.ok()?;
 
     // Check if response has data
@@ -246,9 +296,12 @@ async fn fetch_trends_api(client: &XClient, token: &str, woeid: u32) -> Option<T
         .filter_map(|t| {
             let name = t.get("trend_name")?.as_str()?.to_string();
             let tweet_count = t.get("tweet_count").and_then(|v| v.as_u64());
-            let category = t.get("category").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let category = t
+                .get("category")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             Some(Trend {
-                url: format!("https://x.com/search?q={}", name),
+                url: format!("https://x.com/search?q={name}"),
                 name,
                 tweet_count,
                 category,
@@ -295,7 +348,7 @@ fn print_trends(result: &TrendsResult, limit: usize) {
         format!("Trending (estimated from search) -- {}", result.location)
     };
 
-    println!("\n{}\n", header);
+    println!("\n{header}\n");
 
     let display: Vec<_> = result.trends.iter().take(limit).collect();
 
@@ -304,19 +357,24 @@ fn print_trends(result: &TrendsResult, limit: usize) {
         return;
     }
 
-    let name_width = display.iter().map(|t| t.name.len()).max().unwrap_or(8).max(8);
+    let name_width = display
+        .iter()
+        .map(|t| t.name.len())
+        .max()
+        .unwrap_or(8)
+        .max(8);
 
     for (i, t) in display.iter().enumerate() {
         let rank = format!("{}.", i + 1);
         let name = format!("{:<width$}", t.name, width = name_width);
         let count_str = match t.tweet_count {
-            Some(n) if result.source == "search_fallback" => format!(" -- seen {} times", n),
+            Some(n) if result.source == "search_fallback" => format!(" -- seen {n} times"),
             Some(n) if n >= 1_000_000 => format!(" -- {:.1}M tweets", n as f64 / 1_000_000.0),
             Some(n) if n >= 1_000 => format!(" -- {:.1}K tweets", n as f64 / 1_000.0),
-            Some(n) => format!(" -- {} tweets", n),
+            Some(n) => format!(" -- {n} tweets"),
             None => String::new(),
         };
-        println!("{:>4} {}{}", rank, name, count_str);
+        println!("{rank:>4} {name}{count_str}");
     }
 
     println!();

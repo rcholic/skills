@@ -21,6 +21,20 @@ credentials:
   - name: X_CLIENT_ID
     description: X OAuth 2.0 client ID for user-context operations (bookmarks, likes, following, diff)
     required: false
+required_env_vars:
+  - X_BEARER_TOKEN
+requiredEnvVars:
+  - X_BEARER_TOKEN
+primary_credential: X_BEARER_TOKEN
+primaryCredential: X_BEARER_TOKEN
+security:
+  always: false
+  autonomous: false
+  local_data_dir: data/
+  network_endpoints:
+    - https://api.x.com
+    - https://x.com
+    - https://api.x.ai
 ---
 
 # xint — X Intelligence CLI (Rust)
@@ -47,14 +61,20 @@ This skill requires sensitive credentials. Follow these guidelines:
 - Only use webhooks you control (your own servers, Slack/Discord you own)
 - Don't pass sensitive URLs as webhook targets
 
-### Agent Autonomy
-- This skill is designed to be added to agent skills directories
-- The instructions to "clone into skills directory" are intentional for skill functionality
-- Agents should ask before installing new skills if not explicitly requested
+### Agent Execution Boundaries
+- This file documents commands and safety limits only
+- Require explicit user approval before install/clone actions
+- Use only documented commands and flags
+- Require explicit user approval before network-facing modes (`mcp --sse`, `watch --webhook`)
 
 ### Installation
-- For Bun: prefer OS package managers over `curl | bash` when possible
+- For required tools: prefer OS package managers over `curl | bash` when possible
 - Verify any installer scripts before running
+
+### MCP Server (Optional)
+- `xint mcp` starts a local MCP server exposing xint commands as tools
+- Default mode is stdio/local integration; no inbound web server unless `--sse` is explicitly enabled
+- Respect `--policy read_only|engagement|moderation` and budget guardrails
 
 ## Setup
 
@@ -86,7 +106,7 @@ xint search "AI agents" --save                # Save to data/exports/
 ```bash
 xint watch "AI agents" -i 5m                  # Poll every 5 minutes
 xint watch "@elonmusk" -i 30s                 # Watch user (auto-expands to from:)
-xint watch "bitcoin" --webhook https://...    # POST new tweets to webhook
+xint watch "bitcoin" --webhook https://example.com/webhook  # POST new tweets to webhook
 xint watch "topic" --jsonl                    # Machine-readable output
 ```
 
@@ -132,7 +152,7 @@ xint trends --locations                     # List supported locations
 xint analyze "What's the sentiment around AI?"
 xint analyze --tweets saved.json              # Analyze tweets from file
 cat tweets.json | xint analyze --pipe         # Analyze from stdin
-xint analyze "question" --system "You are..."  # Custom system prompt
+xint analyze "question"                              # Free-form analysis request
 ```
 
 ### Intelligence Reports
