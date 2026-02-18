@@ -3,11 +3,16 @@
   "slug": "jules-and-lobster",
   "displayName": "Jules and the Lobster API headless",
   "latest": {
-    "version": "1.0.4",
-    "publishedAt": 1771221191198,
-    "commit": "https://github.com/openclaw/skills/commit/fe72f2b798b65add344783cb464a371aefb8156d"
+    "version": "1.0.5",
+    "publishedAt": 1771348732286,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.4",
+      "publishedAt": 1771221191198,
+      "commit": "https://github.com/openclaw/skills/commit/fe72f2b798b65add344783cb464a371aefb8156d"
+    },
     {
       "version": "1.0.3",
       "publishedAt": 1769966909126,

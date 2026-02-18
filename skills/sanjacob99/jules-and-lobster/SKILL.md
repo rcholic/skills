@@ -1,6 +1,6 @@
 ---
 name: jules-api
-description: "Use the Jules REST API (v1alpha) via curl to list sources, create sessions, monitor activities, approve plans, send messages, and retrieve outputs (e.g., PR URLs). Use when the user wants to delegate coding tasks to Jules programmatically."
+description: "Use the Jules REST API (v1alpha) via curl to list sources, create sessions, monitor activities, approve plans, send messages, and retrieve outputs (e.g., PR URLs). Use when the user wants to delegate coding tasks to Jules programmatically. Requires JULES_API_KEY env var (obtain from https://jules.google.com/settings#api)."
 env:
   JULES_API_KEY:
     required: true
@@ -25,6 +25,9 @@ dependencies:
 ## Quick Start
 
 ```bash
+# 0. Set your API key (required — get one at https://jules.google.com/settings#api)
+export JULES_API_KEY="your-api-key-here"
+
 # 1. Verify available sources (pre-flight check)
 ./scripts/jules_api.sh sources
 
