@@ -279,6 +279,7 @@ If omitted, the gateway uses the default (oldest) active connection for that app
 | Xero | `xero` | `api.xero.com` |
 | YouTube | `youtube` | `www.googleapis.com` |
 | Zoho Bigin | `zoho-bigin` | `www.zohoapis.com` |
+| Zoho Bookings | `zoho-bookings` | `www.zohoapis.com` |
 | Zoho Books | `zoho-books` | `www.zohoapis.com` |
 | Zoho Calendar | `zoho-calendar` | `calendar.zoho.com` |
 | Zoho CRM | `zoho-crm` | `www.zohoapis.com` |
@@ -391,6 +392,7 @@ See [references/](references/) for detailed routing guides per provider:
 - [Xero](references/xero.md) - Contacts, invoices, reports
 - [YouTube](references/youtube.md) - Videos, playlists, channels, subscriptions
 - [Zoho Bigin](references/zoho-bigin.md) - Contacts, companies, pipelines, products
+- [Zoho Bookings](references/zoho-bookings.md) - Appointments, services, staff, workspaces
 - [Zoho Books](references/zoho-books.md) - Invoices, contacts, bills, expenses
 - [Zoho Calendar](references/zoho-calendar.md) - Calendars, events, attendees, reminders
 - [Zoho CRM](references/zoho-crm.md) - Leads, contacts, accounts, deals, search
