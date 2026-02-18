@@ -3,11 +3,16 @@
   "slug": "cron-backup",
   "displayName": "Cron Backup",
   "latest": {
-    "version": "0.3.1",
-    "publishedAt": 1771301231312,
-    "commit": "https://github.com/openclaw/skills/commit/01d0478559d6fb1ad15bbe20027416598dd8d0f3"
+    "version": "0.3.2",
+    "publishedAt": 1771428967657,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.3.1",
+      "publishedAt": 1771301231312,
+      "commit": "https://github.com/openclaw/skills/commit/01d0478559d6fb1ad15bbe20027416598dd8d0f3"
+    },
     {
       "version": "0.3.0",
       "publishedAt": 1770486789687,
