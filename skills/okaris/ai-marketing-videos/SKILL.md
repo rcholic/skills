@@ -1,19 +1,14 @@
 ---
 name: ai-marketing-videos
-description: |
-  Create AI marketing videos for ads, promos, product launches, and brand content.
-  Models: Veo, Seedance, Wan, FLUX for visuals, Kokoro for voiceover.
-  Types: product demos, testimonials, explainers, social ads, brand videos.
-  Use for: Facebook ads, YouTube ads, product launches, brand awareness.
-  Triggers: marketing video, ad video, promo video, commercial, brand video,
-  product video, explainer video, ad creative, video ad, facebook ad video,
-  youtube ad, instagram ad, tiktok ad, promotional video, launch video
+description: "Create AI marketing videos for ads, promos, product launches, and brand content. Models: Veo, Seedance, Wan, FLUX for visuals, Kokoro for voiceover. Types: product demos, testimonials, explainers, social ads, brand videos. Use for: Facebook ads, YouTube ads, product launches, brand awareness. Triggers: marketing video, ad video, promo video, commercial, brand video, product video, explainer video, ad creative, video ad, facebook ad video, youtube ad, instagram ad, tiktok ad, promotional video, launch video"
 allowed-tools: Bash(infsh *)
 ---
 
 # AI Marketing Videos
 
 Create professional marketing videos via [inference.sh](https://inference.sh) CLI.
+
+![AI Marketing Videos](https://cloud.inference.sh/app/files/u/4mg21r6ta37mpaz6ktzwtt8krr/01kg2c0egyg243mnyth4y6g51q.jpeg)
 
 ## Quick Start
 
@@ -25,6 +20,8 @@ infsh app run google/veo-3-1-fast --input '{
   "prompt": "Sleek product reveal video, smartphone emerging from light particles, premium tech aesthetic, commercial quality"
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Video Ad Types
 
@@ -277,19 +274,19 @@ done
 
 ```bash
 # Video generation
-npx skills add inference-sh/agent-skills@ai-video-generation
+npx skills add inference-sh/skills@ai-video-generation
 
 # Image generation for thumbnails
-npx skills add inference-sh/agent-skills@ai-image-generation
+npx skills add inference-sh/skills@ai-image-generation
 
 # Text-to-speech for voiceover
-npx skills add inference-sh/agent-skills@text-to-speech
+npx skills add inference-sh/skills@text-to-speech
 
 # Social media content
-npx skills add inference-sh/agent-skills@ai-social-media-content
+npx skills add inference-sh/skills@ai-social-media-content
 
 # Full platform skill
-npx skills add inference-sh/agent-skills@inference-sh
+npx skills add inference-sh/skills@inference-sh
 ```
 
 Browse all apps: `infsh app list`

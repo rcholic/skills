@@ -3,9 +3,15 @@
   "slug": "ai-marketing-videos",
   "displayName": "Ai Marketing Videos",
   "latest": {
-    "version": "0.1.0",
-    "publishedAt": 1770363032829,
-    "commit": "https://github.com/openclaw/skills/commit/90d6459201b1a7fe6c10c38970de258eaf7296d3"
+    "version": "0.1.5",
+    "publishedAt": 1771402998595,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.1.0",
+      "publishedAt": 1770363032829,
+      "commit": "https://github.com/openclaw/skills/commit/90d6459201b1a7fe6c10c38970de258eaf7296d3"
+    }
+  ]
 }
