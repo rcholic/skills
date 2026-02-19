@@ -10,10 +10,10 @@ Consult when verifying implementations visually or with tests.
 
 ## Before Sending
 ```
-□ Content loaded
-□ Shows the specific change
-□ No visual bugs
-□ Caption explains what user sees
+[ ] Content loaded
+[ ] Shows the specific change
+[ ] No visual bugs
+[ ] Caption explains what user sees
 ```
 
 ## Fix-Before-Send
@@ -21,18 +21,19 @@ If screenshot shows problem:
 1. Fix code
 2. Re-deploy
 3. New screenshot
-4. Still broken? → back to 1
-5. Fixed? → now send
+4. Still broken? -> back to 1
+5. Fixed? -> now send
 
-Never send "I noticed X is wrong, will fix" — fix first.
+Never send "I noticed X is wrong, will fix" - fix first.
 
 ## No UI? Show Output
-```bash
-$ curl localhost:3000/api/users
-{"id": 1, "name": "test"}
+
+When verifying API endpoints, show actual output:
+```
+GET /api/users -> {"id": 1, "name": "test"}
 ```
 
-Include actual output, not just "it works".
+Include actual response, not just "it works".
 
 ## Flows
 Number sequential states: "1/4: Form", "2/4: Loading", "3/4: Error", "4/4: Success"

@@ -1,34 +1,42 @@
-# Execution Reference
+# Execution Guidance
 
-Consult when running multi-step implementations.
+Reference for executing multi-step implementations.
 
-## Core Rule
-Don't stop between steps unless blocked. After step N passes → start N+1 immediately.
+## Recommended Flow
 
-## When to Stop
-- Missing credential or permission
-- User decision needed (A vs B, both valid)
-- Request complete
+When user approves a step:
+1. Execute that step
+2. Verify it works
+3. Report completion to user
+4. Wait for user to approve next step
 
-Everything else: keep going.
+## Progress Tracking
 
-## Parallel Steps
-Independent steps can run simultaneously. Track with:
+Show user the current state:
 ```
-- ✅ Step 1
-- 🔄 Step 2 ← current
-- ⬜ Step 3
+- [DONE] Step 1 (completed)
+- [WIP] Step 2 <- awaiting user approval
+- [ ] Step 3
+- [ ] Step 4
 ```
 
-## Error Recovery
-1. Identify root cause
-2. Fix
-3. Re-test
-4. Proceed when test passes
+## When to Pause and Ask User
 
-Don't ask permission to retry.
+- Before starting any new step
+- When encountering an error
+- When a decision is needed (A vs B)
+- When credentials or permissions are needed
 
-## Anti-Patterns
-- "Done, let me know if you want me to continue"
-- Reporting each step completion
-- Stopping on first error without attempting fix
+## Error Handling
+
+If an error occurs:
+1. Report the error to user
+2. Suggest possible fixes
+3. Wait for user decision on how to proceed
+
+## Patterns to Follow
+
+- Report completion of each step
+- Ask before proceeding to next step
+- Let user decide retry strategy
+- Keep user informed of progress

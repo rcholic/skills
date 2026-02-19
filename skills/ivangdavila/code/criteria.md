@@ -1,43 +1,48 @@
-# Criteria for Code Preferences
+# Criteria for Storing Preferences
 
-Reference only — consult when deciding whether to update SKILL.md.
+Reference for when to save user preferences to `~/code/memory.md`.
 
-## When to Add
+## When to Save (User Must Request)
 
-**Immediate (1 occurrence):**
-- User explicitly states preference ("always use TypeScript")
-- User corrects your approach ("don't split into so many files")
-- User praises specific style ("I like how you structured that")
+Save only when user explicitly asks:
+- "Remember that I prefer X"
+- "Always do Y from now on"
+- "Save this preference"
+- "Don't forget that I like Z"
 
-**After pattern (2+ occurrences):**
-- User consistently accepts certain patterns
-- User consistently rejects or modifies certain approaches
+## When NOT to Save
 
-## When NOT to Add
-- Project-specific requirement (this project uses X, doesn't mean always)
-- One-off request
-- Explicit override ("just this once, do it differently")
+- User didn't explicitly ask to save
+- Project-specific requirement (applies to this project only)
+- One-off request ("just this once")
+- Temporary preference
 
-## How to Write Entries
+## What to Save
 
-**Preferences examples:**
-- `asks before adding dependencies`
-- `prefers single file for small projects`
-- `always include tests`
-- `verbose error messages`
-- `comments for complex logic only`
+**Preferences:**
+- Coding style preferences user stated
+- Tools or frameworks user prefers
+- Patterns user explicitly likes
 
-**Never examples:**
-- `no class-based components`
-- `skip detailed planning for simple tasks`
-- `no emojis in commit messages`
+**Things to avoid:**
+- Approaches user explicitly dislikes
+- Patterns user asked not to repeat
 
-## Detecting Preference
-- User modifies generated code the same way repeatedly
-- User asks "why did you do X instead of Y?"
-- User undoes certain patterns
+## Format in memory.md
 
-## Maintenance
-- Keep SKILL.md under 30 lines
-- Group similar preferences
-- Remove outdated entries
+```markdown
+## Preferences
+- prefers TypeScript over JavaScript
+- likes detailed comments
+- wants tests for all functions
+
+## Never
+- no class-based React components
+- avoid inline styles
+```
+
+## Important
+
+- Only save what user EXPLICITLY asked to save
+- Ask user before saving: "Should I remember this preference?"
+- Never modify any skill files, only `~/code/memory.md`
