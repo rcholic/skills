@@ -1,11 +1,17 @@
 {
   "owner": "lifeissea",
   "slug": "openclaw-cache-kit",
-  "displayName": "Openclaw Cache Kit",
+  "displayName": "OpenClaw Cache Kit",
   "latest": {
-    "version": "1.0.2",
-    "publishedAt": 1771494924663,
-    "commit": "https://github.com/openclaw/skills/commit/f5b54819206c758161be58d25fbc0487a2f0edf1"
+    "version": "1.0.5",
+    "publishedAt": 1771510362901,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.2",
+      "publishedAt": 1771494924663,
+      "commit": "https://github.com/openclaw/skills/commit/f5b54819206c758161be58d25fbc0487a2f0edf1"
+    }
+  ]
 }
