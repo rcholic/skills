@@ -25,8 +25,11 @@ When the user mentions eating something:
 2. **Update Daily Log**: Add values to `nutrition/daily_macros.json`.
 3. **Update Memory**: Log the meal in the agent's current daily memory file (e.g., `memory/YYYY-MM-DD.md`) using the `write` or `edit` tool.
 4. **Update Dashboard**: 
-   - Read the latest data from `nutrition/daily_macros.json`.
-   - Use the `edit` tool to update the `const fallbackData` variable in `canvas/index.html` with the new JSON data.
+   - Read the latest data from `nutrition/daily_macros.json`, `nutrition/targets.json`, and `nutrition/insights.json`.
+   - Use the `edit` tool to update the following variables in `canvas/index.html`:
+     - `const fallbackData`: Update with the full array from `daily_macros.json`.
+     - `const fallbackGoals`: Update with the full JSON object from `targets.json`.
+     - `const fallbackInsights`: Update with the full JSON object from `insights.json`.
    - Use `canvas(action=present, url='canvas/index.html')` to show the updated dashboard.
 5. **Generate Insights**: Analyze progress against goals in `nutrition/targets.json` and update `nutrition/insights.json`.
 

@@ -66,14 +66,16 @@
     </div>
 
     <script>
-        const fallbackGoals = { calories: 2000, protein: 120, carbs: 250, fats: 85 };
+        const fallbackGoals = { "daily_goals": { "calories": 2000, "protein": 120, "carbs": 250, "fats": 85 } };
+        const fallbackInsights = { "tips": ["Log your first meal to see AI insights!"] };
         const fallbackData = [
           { "date": "2026-02-16", "calories": 862, "protein": 42, "carbs": 75, "fats": 38 },
           { "date": "2026-02-17", "calories": 1480, "protein": 100, "carbs": 90, "fats": 80 },
           { "date": "2026-02-18", "calories": 1192, "protein": 58.4, "carbs": 93.6, "fats": 45.6 }
         ];
 
-        function renderUI(data, goals, insights) {
+        function renderUI(data, goalsJson, insights) {
+            const goals = goalsJson.daily_goals;
             const latest = data[data.length - 1];
             document.getElementById('headerDate').innerText = `Macro Distribution - ${latest.date}`;
             document.getElementById('totalCalories').innerText = `Current: ${latest.calories} / Target: ${goals.calories} kcal`;
@@ -159,16 +161,13 @@
         async function init() {
             let data = fallbackData;
             let goals = fallbackGoals;
-            let insights = null;
+            let insights = fallbackInsights;
             try {
                 const dRes = await fetch('../nutrition/daily_macros.json?v=' + Date.now());
                 if (dRes.ok) data = await dRes.json();
                 
                 const gRes = await fetch('../nutrition/targets.json?v=' + Date.now());
-                if (gRes.ok) {
-                    const gJson = await gRes.json();
-                    goals = gJson.daily_goals;
-                }
+                if (gRes.ok) goals = await gRes.json();
 
                 const iRes = await fetch('../nutrition/insights.json?v=' + Date.now());
                 if (iRes.ok) insights = await iRes.json();
