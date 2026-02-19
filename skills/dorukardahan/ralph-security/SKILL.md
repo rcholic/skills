@@ -8,7 +8,9 @@ metadata: { "openclaw": { "emoji": "🛡️" }, "author": "dorukardahan", "versi
 
 Comprehensive security audit with balanced depth and duration.
 
-For severity definitions, false positive identification, and triage guidance, see `{baseDir}/references/severity-guide.md`.
+## References
+
+- [Severity definitions and triage guidance](references/severity-guide.md)
 
 ## Instructions
 
