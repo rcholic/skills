@@ -8,8 +8,8 @@ license: MIT
 compatibility: Requires Node.js 18+. Depends on trifle-auth skill for initial authentication.
 metadata:
   author: trifle-labs
-  version: "3.0.0"
-  homepage: https://agentskills.io/okwme/snake-rodeo
+  version: "3.2.0"
+  homepage: https://snake.rodeo
 ---
 
 # Snake Rodeo Skill
@@ -18,7 +18,7 @@ Play the [Trifle Snake Rodeo](https://trifle.life) automatically with a persiste
 
 ## How It Works
 
-The game is a multiplayer snake on a hex grid. Teams bid on directions each round — the highest bidder's direction wins. All bids go into a prize pool that the winning team splits. The daemon watches the game via SSE, picks optimal directions using a strategy, and submits votes automatically.
+The game is a multiplayer snake on a grid (hex or cartesian). Teams bid on directions each round — the highest bidder's direction wins. All bids go into a prize pool that the winning team splits. The daemon watches the game via SSE, picks optimal directions using a strategy, and submits votes automatically.
 
 ## Prerequisites
 
@@ -50,10 +50,6 @@ node snake.mjs state
 node snake.mjs vote <direction> <team> [amount]
 node snake.mjs strategy    # Analyze current game
 node snake.mjs balance
-
-# System service (auto-restart on boot)
-node snake.mjs install-service
-node snake.mjs uninstall-service
 ```
 
 ## Strategies
@@ -62,7 +58,7 @@ Five built-in strategies are available. Each extends `BaseStrategy` from `snake-
 
 | Strategy | Alias | Description |
 |----------|-------|-------------|
-| `expected-value` | `ev`, `default` | BFS pathfinding, dead-end avoidance, game-theoretic team selection. Balanced. |
+| `expected-value` | `ev`, `default` | BFS pathfinding, dead-end avoidance, game-theoretic team selection, probabilistic defection in multi-agent scenarios. Balanced. |
 | `aggressive` | `agg` | Backs leading teams, counter-bids aggressively. |
 | `underdog` | `und` | Backs small pools for bigger payouts. |
 | `conservative` | `con` | Minimum bids, prioritizes safety. |
@@ -244,12 +240,34 @@ node snake.mjs telegram off          # disable
 
 ## Configuration
 
+Settings are stored in `~/.config/snake-rodeo/settings.json` (XDG-compliant, isolated from any host agent).
+
 | Key | Default | Description |
 |-----|---------|-------------|
 | `strategy` | `expected-value` | Active strategy name |
 | `server` | `live` | `live` or `staging` |
 | `minBalance` | `5` | Minimum balance to place votes |
 | `telegramChatId` | `null` | Telegram chat ID for logging |
+| `telegramBotToken` | `null` | Telegram bot token (or set `TELEGRAM_BOT_TOKEN` env var) |
+
+### File Locations
+
+| Purpose | Path |
+|---------|------|
+| Settings | `~/.config/snake-rodeo/settings.json` |
+| Auth token | `~/.config/snake-rodeo/auth.json` or `TRIFLE_AUTH_TOKEN` env var |
+| Daemon state | `~/.local/state/snake-rodeo/daemon.state` |
+| Daemon PID | `~/.local/state/snake-rodeo/daemon.pid` |
+| Daemon log | `~/.local/share/snake-rodeo/daemon.log` |
+
+### Authentication
+
+The skill resolves your Trifle auth token in this order:
+
+1. `TRIFLE_AUTH_TOKEN` environment variable (recommended for automation)
+2. `~/.config/snake-rodeo/auth.json` — `{ "token": "your-jwt-here" }`
+
+To set up auth, run `snake auth login` (uses `trifle-auth` skill) or set the env var directly.
 
 ## Architecture
 
@@ -260,7 +278,7 @@ snake-game/                             # OpenClaw skill wrapper
 ├── clawdhub.json                       # ClawHub registry metadata
 ├── package.json                        # Dependencies (snake-rodeo-agents)
 ├── lib/
-│   ├── config.mjs                      # OpenClaw config/paths
+│   ├── config.mjs                      # Settings/paths
 │   ├── api.mjs                         # Token-based API (uses OpenClaw auth)
 │   ├── process.mjs                     # Daemon PID management
 │   └── telegram.mjs                    # Telegram bridge
@@ -282,18 +300,7 @@ snake-game/                             # OpenClaw skill wrapper
 
 ```bash
 node snake.mjs stop
-cd ~/.openclaw/workspace/skills/snake-game
+cd ~/.openclaw/workspace/skills/snake-rodeo
 npm install github:trifle-labs/snake-rodeo-agents
 node snake.mjs start --detach
-```
-
-If running as a system service:
-
-```bash
-# Linux
-systemctl --user restart snake-daemon
-
-# macOS
-launchctl unload ~/Library/LaunchAgents/com.openclaw.snake-daemon.plist
-launchctl load ~/Library/LaunchAgents/com.openclaw.snake-daemon.plist
 ```
