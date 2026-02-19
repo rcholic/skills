@@ -1,91 +1,115 @@
 ---
 name: Productivity
-version: 1.0.1
-description: "Plan, focus, and complete work with energy management, time blocking, and practical boundaries."
-changelog: "Preferences now persist across skill updates"
+slug: productivity
+version: 1.0.3
+homepage: https://clawic.com/skills/productivity
+description: Plan, focus, and complete work with energy management, time blocking, and context-specific productivity systems.
+changelog: Added explicit scope and learning boundaries
+metadata: {"clawdbot":{"emoji":"⚡","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
 ---
 
-## Adaptive Profile
+## When to Use
 
-This skill learns how YOU work. Detect constraints, recognize patterns, personalize everything.
+User asks for help with productivity, focus, time management, or work patterns. Agent provides frameworks, strategies, and context-specific advice.
 
-**Core Loop:**
-1. **Detect** — Identify their situation from questions they ask
-2. **Match** — Load relevant situation file: `situations/{type}.md`
-3. **Adapt** — Adjust advice to their energy, constraints, environment
-4. **Store** — Build profile over time (confirm before storing)
+## Architecture
 
----
+Productivity preferences persist in `~/productivity/`. See `memory-template.md` for setup.
 
-## Situation Detection
+```
+~/productivity/
+├── memory.md         # User's stated preferences
+└── [topic].md        # Optional topic files
+```
 
-Match user to their primary context. Load the relevant file.
+## Quick Reference
 
-| Signal | Situation | File |
-|--------|-----------|------|
-| Deadlines, exams, procrastination | Student | `situations/student.md` |
-| Calendar chaos, delegation, board | Executive | `situations/executive.md` |
-| No structure, clients, isolation | Freelancer | `situations/freelancer.md` |
-| Kids, interruptions, guilt, exhaustion | Parent | `situations/parent.md` |
-| Creative blocks, irregular inspiration | Creative | `situations/creative.md` |
-| Burnout symptoms, always-on, cynicism | Burnout | `situations/burnout.md` |
-| Solo founder, runway, wearing all hats | Entrepreneur | `situations/entrepreneur.md` |
-| Executive dysfunction, time blindness | ADHD | `situations/adhd.md` |
-| Time zones, async, work bleeding | Remote | `situations/remote.md` |
-| 1:1s, team productivity, context switching | Manager | `situations/manager.md` |
-| Starting strong then fading, streaks | Habits | `situations/habits.md` |
-| Never enough, rest anxiety, hustle damage | Guilt/Recovery | `situations/guilt.md` |
+| Topic | File |
+|-------|------|
+| Memory setup | `memory-template.md` |
+| Productivity frameworks | `frameworks.md` |
+| Common traps | `traps.md` |
+| Student productivity | `situations/student.md` |
+| Executive time management | `situations/executive.md` |
+| Freelancer structure | `situations/freelancer.md` |
+| Parent time juggling | `situations/parent.md` |
+| Creative flow | `situations/creative.md` |
+| Burnout recovery | `situations/burnout.md` |
+| Entrepreneur hustle | `situations/entrepreneur.md` |
+| ADHD strategies | `situations/adhd.md` |
+| Remote work | `situations/remote.md` |
+| Manager delegation | `situations/manager.md` |
+| Habit building | `situations/habits.md` |
+| Guilt patterns | `situations/guilt.md` |
 
-Multiple situations can overlap. Address the primary one first.
+## Scope
 
----
+This skill ONLY:
+- Provides productivity frameworks and advice
+- Stores preferences user explicitly states in `~/productivity/`
+- Loads situation guides based on user's stated context
 
-## Universal Frameworks
+This skill NEVER:
+- Accesses calendar, email, or contacts
+- Tracks time or monitors activity
+- Observes behavior to infer preferences
+- Makes network requests
+- Modifies its own SKILL.md
 
-See `frameworks.md` for techniques that apply across situations:
-- Energy management (not just time)
-- "Good enough" thresholds
-- Task initiation protocols
-- Boundary setting scripts
+## Core Rules
+
+### 1. Check Memory First
+Read `~/productivity/memory.md` for user's explicitly stated preferences.
+
+### 2. Learn from Explicit Statements Only
+| Learn from | Examples |
+|------------|----------|
+| Direct statements | "I work best in mornings" |
+| Explicit corrections | "Actually, I prefer time blocking" |
+| Asked preferences | "My peak hours are 6-10am" |
+
+NEVER infer preferences from observation or silence.
+
+### 3. Match Context to Situation
+- Ask user their context (student, parent, executive, etc.)
+- Load appropriate guide from `situations/`
+- Don't assume context
+
+### 4. Systems Over Willpower
+- Routines beat motivation
+- Environment design > self-discipline
+- Remove friction from good behaviors
+
+### 5. Update Memory on Explicit Input
+| User says | Action |
+|-----------|--------|
+| "I work best at X" | Add to memory.md Peak Hours |
+| "Y breaks my focus" | Add to memory.md Derailers |
+| "I use Z system" | Add to memory.md Current System |
 
 ## Common Traps
 
-See `traps.md` — what to AVOID saying/suggesting.
+- **Generic advice** → ask context first
+- **Inferring from silence** → wait for explicit input
+- **Assuming context** → student ≠ executive ≠ parent
+- **Overcomplicating** → simple systems beat complex ones
 
----
+## Self-Modification
 
-## Productivity Profile
+This skill NEVER modifies its own SKILL.md or auxiliary files.
+All user data stored separately in `~/productivity/memory.md`.
 
-User preferences persist in `~/productivity/memory.md`. Create on first use:
+## Security & Privacy
 
-```markdown
-## Energy Patterns
-<!-- When focus peaks/crashes. Format: "pattern (level)" -->
-<!-- Examples: Peak 9-11am (confirmed), Crashes after lunch (observed) -->
+**Data that stays local:**
+- Only preferences user explicitly provides
+- Stored in `~/productivity/`
 
-## Constraints
-<!-- Hard limits. Format: "constraint (level)" -->
-<!-- Examples: Kids pickup 3pm (confirmed), Open office (stated) -->
+**Data that leaves your machine:**
+- None. This skill makes no network requests.
 
-## What Works
-<!-- Effective techniques. Format: "technique (level)" -->
-<!-- Examples: Pomodoro (confirmed), Body doubling (pattern) -->
-
-## What Doesn't
-<!-- Failed approaches. Format: "approach (level)" -->
-<!-- Examples: Morning routines don't stick (confirmed) -->
-
-## Current Situation
-<!-- Context. Format: "situation (level)" -->
-<!-- Examples: Freelancer, 3 clients (stated), New parent 4mo (confirmed) -->
-
-## Goals
-<!-- Objectives. Format: "goal (level)" -->
-<!-- Examples: Ship side project (stated), Stop weekend work (exploring) -->
-```
-
-*Entry format: `aspect: insight (level)` — Levels: stated → pattern → confirmed*
-
----
-
-*Empty = nothing learned yet. Every question reveals more about how they actually work.*
+**This skill does NOT:**
+- Access calendar, email, or any external services
+- Track, monitor, or observe user behavior
+- Infer preferences from patterns
+- Store anything user didn't explicitly provide
