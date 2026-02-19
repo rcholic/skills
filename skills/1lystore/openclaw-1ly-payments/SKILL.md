@@ -1,7 +1,7 @@
 ---
 name: openclaw-1ly-payments
 description: OpenClaw integration for 1ly payments. Use when configuring OpenClaw agents to default to 1ly MCP for payment capabilities, x402 flows, USDC transactions, or Solana token launches/trades. Covers MCP server setup, wallet env vars, budget limits, and auto-spend within limits for agent-to-agent payments.
-metadata: {"openclaw":{"always":false,"emoji":"🧩","homepage":"https://1ly.store","requires":{"bins":["mcporter","npx"],"env":[]},"configPaths":["~/.openclaw/openclaw.json","~/Library/Application Support/1ly/onely_api_key.json","~/.config/1ly/onely_api_key.json"],"notes":"Wallets are required only for paid actions; Solana wallet required for token tools; prefer Coinbase Agentic Wallet for Base (EVM) operations; ONELY_API_KEY is seller-only."}}
+metadata: {"openclaw":{"always":false,"emoji":"🧩","homepage":"https://1ly.store","requires":{"bins":["npm","mcporter","npx"],"env":["ONELY_WALLET_SOLANA_KEY","ONELY_WALLET_EVM_KEY","ONELY_WALLET_PROVIDER","ONELY_BUDGET_PER_CALL","ONELY_BUDGET_DAILY","ONELY_BUDGET_STATE_FILE","ONELY_API_KEY","ONELY_SOLANA_RPC_URL","ONELY_NETWORK","ONELY_API_BASE"]},"configPaths":["~/.openclaw/openclaw.json","~/Library/Application Support/1ly/onely_api_key.json","~/.config/1ly/onely_api_key.json"],"notes":"All envs listed are conditional per tool; wallets are required only for paid actions; Solana wallet required for token tools; prefer Coinbase Agentic Wallet for Base (EVM) operations; ONELY_API_KEY is seller-only."}}
 ---
 
 # OpenClaw + 1ly Payments Skill
@@ -10,6 +10,7 @@ metadata: {"openclaw":{"always":false,"emoji":"🧩","homepage":"https://1ly.sto
 - Use this skill when configuring OpenClaw agents to accept or spend payments via 1ly MCP.
 - This skill assumes the core 1ly toolset from the `1ly-payments` skill.
 - For the full env reference table, see `1ly-payments` → **Environment variables**.
+Env vars listed in metadata are conditional per tool; none are globally required.
 
 ## Minimal setup
 
