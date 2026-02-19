@@ -3,9 +3,15 @@
   "slug": "adspirer-ads-agent",
   "displayName": "Adspirer Ads Agent",
   "latest": {
-    "version": "1.0.0",
-    "publishedAt": 1771466440581,
-    "commit": "https://github.com/openclaw/skills/commit/7bc5d3d6d8bda4bd0ce5a0705ebf13156d72be77"
+    "version": "1.1.0",
+    "publishedAt": 1771476207034,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.0",
+      "publishedAt": 1771466440581,
+      "commit": "https://github.com/openclaw/skills/commit/7bc5d3d6d8bda4bd0ce5a0705ebf13156d72be77"
+    }
+  ]
 }

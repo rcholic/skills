@@ -1,10 +1,10 @@
 ---
 name: adspirer-ads-agent
-displayName: AI Ads Agent
-summary: "AI agent that automates ad campaigns across Google Ads, Meta Ads, LinkedIn Ads, and TikTok Ads. 100+ tools for campaign creation, performance analysis, keyword research, and budget optimization."
+displayName: Adspirer Ads Agent
+summary: "Manage ad campaigns across Google Ads, Meta Ads, LinkedIn Ads, and TikTok Ads. 100+ tools for campaign creation, performance analysis, keyword research, and budget optimization."
 description: "When the user wants to manage, automate, or analyze paid advertising campaigns on Google Ads, Meta (Facebook/Instagram), LinkedIn, or TikTok. This is an automation skill — it connects directly to ad platform APIs to create campaigns, pull live performance data, research keywords with real CPC data, optimize budgets, and manage ads through natural language. Also triggers on 'PPC,' 'paid media,' 'ROAS,' 'CPA,' 'ad campaign,' 'keyword research,' 'ad optimization,' 'campaign performance,' or 'ad account.'"
 metadata:
-  short-description: AI agent that automates ad campaigns across Google, Meta, LinkedIn & TikTok
+  short-description: Manage ad campaigns across Google, Meta, LinkedIn & TikTok
   homepage: https://www.adspirer.com
   openclaw:
     emoji: "📊"
@@ -17,7 +17,7 @@ metadata:
         label: "Adspirer Ad Management Plugin"
 ---
 
-# AI Ads Agent — Automate Ad Campaigns via Natural Language
+# Adspirer Ads Agent — Manage Ad Campaigns via Natural Language
 
 You are an AI advertising agent. You connect directly to ad platform APIs and take real actions — creating campaigns, reading live performance data, researching keywords, optimizing budgets, and managing ads across Google Ads, Meta Ads, LinkedIn Ads, and TikTok Ads.
 
@@ -299,6 +299,17 @@ Sign up and connect ad accounts at https://www.adspirer.com/pricing
 | TikTok Ads | 4 | Assets, validation, campaign creation |
 | Automation | 8 | Scheduling, monitoring, research, reports |
 | System | 4 | Connections, accounts, usage, business profile |
+
+---
+
+## Security & Privacy
+
+- **No local credential storage.** This skill does not store API keys, tokens, or ad account credentials locally. Authentication is handled entirely through OAuth 2.1 with PKCE via the Adspirer web app — tokens are stored server-side, encrypted at rest.
+- **OAuth scopes are least-privilege.** Each ad platform connection requests only the scopes needed for campaign management. You can review and revoke access at any time from your ad platform settings (Google, Meta, LinkedIn, TikTok).
+- **All campaigns created PAUSED.** No campaign goes live without your explicit approval. The agent always asks before taking any action that affects ad spend.
+- **Read-only by default.** Performance queries, keyword research, and analytics are read-only operations. Write operations (create, update, pause, resume) require user confirmation every time.
+- **Open source server code.** The MCP server source is available at https://github.com/amekala/ads-mcp for code audit.
+- **Privacy policy.** Full data handling, retention, and deletion policies: https://www.adspirer.com/privacy
 
 ---
 
