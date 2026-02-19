@@ -8,8 +8,21 @@ export async function getAccessToken(profile, scopes = ['Calendars.Read']) {
   if (!fs.existsSync(cachePath)) throw new Error(`Missing token cache: ${cachePath} (run auth-devicecode.mjs)`);
 
   const cfg = readJson(cfgPath);
-  let cache = fs.readFileSync(cachePath, 'utf8');
+  const cacheText = fs.readFileSync(cachePath, 'utf8');
 
+  // Fallback: if cache is a raw OAuth token JSON (not MSAL cache), use it directly.
+  // Raw token file shape: { access_token, expires_in, scope, token_type, refresh_token?, obtainedAt, ... }
+  try {
+    const raw = JSON.parse(cacheText);
+    if (raw && typeof raw === 'object' && raw.access_token) {
+      return raw.access_token;
+    }
+  } catch {
+    // not json or not raw token
+  }
+
+  // Default: MSAL token cache
+  let cache = cacheText;
   const pca = new PublicClientApplication({
     auth: {
       clientId: cfg.clientId,

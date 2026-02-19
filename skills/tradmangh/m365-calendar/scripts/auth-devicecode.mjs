@@ -20,10 +20,13 @@ const email = getArg('email', undefined);
 const clientId = mustGetArg('clientId');
 
 // Minimum scopes for our use-cases
+const wantOffline = process.argv.includes('--offline');
+
 const scopes = [
   'Calendars.Read',
   'Calendars.ReadWrite',
-  'offline_access',
+  // offline_access is optional; without it we avoid long-lived refresh tokens on disk.
+  ...(wantOffline ? ['offline_access'] : []),
   'openid',
   'profile',
   'email',
@@ -68,10 +71,14 @@ writeJson(cfgPath, {
   clientId,
   tenant,
   email,
-  scopes: ['Calendars.Read', 'Calendars.ReadWrite', 'offline_access'],
-  authFlow: 'device_code_delegated',
+  scopes: wantOffline
+    ? ['Calendars.Read', 'Calendars.ReadWrite', 'offline_access']
+    : ['Calendars.Read', 'Calendars.ReadWrite'],
+  authFlow: wantOffline ? 'device_code_delegated_offline' : 'device_code_delegated',
   createdAt: new Date().toISOString(),
-  notes: 'Token cache stored separately. Do not commit secrets.',
+  notes: wantOffline
+    ? 'offline_access enabled (refresh tokens may be stored in local token cache). Do not commit secrets.'
+    : 'offline_access disabled (no refresh token expected). Do not commit secrets.',
 });
 
 console.log(`OK: authenticated profile=${profile} tenant=${tenant} user=${result?.account?.username || 'unknown'}`);
