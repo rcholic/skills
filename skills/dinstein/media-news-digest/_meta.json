@@ -3,11 +3,16 @@
   "slug": "media-news-digest",
   "displayName": "Media News Digest",
   "latest": {
-    "version": "1.6.3",
-    "publishedAt": 1771375582182,
-    "commit": "https://github.com/openclaw/skills/commit/43e2fd70fbd7b9a09a50458f9144e10c702a15cf"
+    "version": "1.7.1",
+    "publishedAt": 1771470668230,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.6.3",
+      "publishedAt": 1771375582182,
+      "commit": "https://github.com/openclaw/skills/commit/43e2fd70fbd7b9a09a50458f9144e10c702a15cf"
+    },
     {
       "version": "1.6.1",
       "publishedAt": 1771329585077,
