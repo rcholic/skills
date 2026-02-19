@@ -1,0 +1,11 @@
+{
+  "owner": "kidehen",
+  "slug": "query-wikidata",
+  "displayName": "Query Wikidata using Natural Language",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771428015510,
+    "commit": null
+  },
+  "history": []
+}
