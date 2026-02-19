@@ -3,11 +3,16 @@
   "slug": "agent-brain",
   "displayName": "Agent Brain",
   "latest": {
-    "version": "1.0.9",
-    "publishedAt": 1771288589612,
-    "commit": "https://github.com/openclaw/skills/commit/9c441c30af543617269070eccdb43751345dcd2a"
+    "version": "1.0.10",
+    "publishedAt": 1771358695972,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.9",
+      "publishedAt": 1771288589612,
+      "commit": "https://github.com/openclaw/skills/commit/9c441c30af543617269070eccdb43751345dcd2a"
+    },
     {
       "version": "1.0.1",
       "publishedAt": 1771287055212,

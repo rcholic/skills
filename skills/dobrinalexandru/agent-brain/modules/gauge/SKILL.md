@@ -1,74 +1,81 @@
 # Gauge Memory 📊
 
-**Status:** ✅ Live | **Module:** gauge | **Part of:** Agent Brain
+**Status:** 📋 Agent Guideline | **Module:** gauge | **Part of:** Agent Brain
 
-Internal state awareness. Tracks confidence, uncertainty, and resources.
+Confidence classification and self-awareness. Honest about what is known vs. unknown.
 
 ## What It Does
 
-- **Monitor**: Agent's own state
-- **Track**: Confidence levels
-- **Alert**: When resources low
+Guides how the agent interprets and communicates confidence in memory-based claims. Does NOT assign numeric scores.
 
-## States
+## Confidence Categories
 
-### Confidence Levels
+| Level | Meaning | When to Use | Language |
+|-------|---------|-------------|----------|
+| **SURE** | Directly stated by user, or 3+ successful applications | User said "Remember: X", or `success` called 3+ times | State it as fact |
+| **LIKELY** | Non-user source, or inferred with some evidence | Ingested content, single indirect mention | "You mentioned..." |
+| **UNCERTAIN** | Inferred from context, not directly stated | Pattern detected, not confirmed | "I think..." / "It seems like..." |
+| **UNKNOWN** | No relevant memory exists | Nothing in archive | "I don't have info on that" |
 
-| Level | Value | Signal | Action |
-|-------|-------|---------|--------|
-| High | 0.8+ | "I'm confident" | Proceed |
-| Medium | 0.5-0.8 | "I think" | Qualify |
-| Low | 0.3-0.5 | "Not sure" | Ask |
-| None | <0.3 | "I don't know" | Request info |
+## How Confidence is Assigned
 
-### Uncertainty
-- What don't I know?
-- What might be wrong?
-- What needs verification?
+Confidence is set at creation time based on the source:
 
-### Resources
-- Context usage %
-- Time spent
-- Token count
-- Subagent overhead
+```
+source: "user"      → sure    (directly stated by user)
+source: "inferred"  → likely  (detected by agent, not confirmed)
+source: "ingested"  → likely  (from external content)
+```
 
-## Triggers
+Confidence changes over time via:
+- `success` command: At 3+ successes, auto-upgrades to `sure`
+- `update` command: Manual upgrade/downgrade
+- `correct` command: Supersedes old entry, creates correction with `sure`
+- Decay: `sure` → `likely` → `uncertain` when entries go unused (30 * (1 + access_count) days)
 
-### Low Confidence
-→ Ask for clarification
-→ "I'm not entirely sure about X"
+## Confidence Changes
 
-### Resource Constrained
-→ "We're running low on context"
-→ Suggest checkpoint
-→ Prioritize essential
+### User Confirms
+When a user confirms something you retrieved:
+```bash
+./scripts/memory.sh update <id> confidence sure
+```
 
-### High Uncertainty
-→ Flag for review
-→ "Need to verify X"
+### User Corrects You
+When a user says you got something wrong:
+```bash
+./scripts/memory.sh correct <wrong_id> "Correct information" "Why the old entry was wrong"
+```
+This supersedes the wrong entry and creates a correction record for learning.
+
+### Successful Application
+When a memory was used and the outcome was positive:
+```bash
+./scripts/memory.sh success <id>
+```
+At 3+ successes, confidence auto-upgrades to SURE.
+
+## When to Apply Gauge
+
+Gauge is a guideline for retrieval, not a standalone step:
+
+1. Archive retrieves entries matching the query
+2. Each entry already has a `confidence` field
+3. The agent reads that field and adjusts language accordingly
 
 ## Self-Monitoring
 
-### Pre-Response
-- Does this answer the question?
-- Any contradictions?
-- Confidence level?
+### Before Responding
+- Do retrieved memories actually answer the question?
+- Are there conflicting entries? (→ run `conflicts`)
+- Is confidence level appropriate for the stakes?
 
-### Post-Response
-- Did it land?
-- Was it accurate?
-- Was it appropriate?
+### After Responding
+- Did the user correct you? → Use `correct` to track the mistake
+- Did the user confirm? → Use `update` to upgrade confidence
 
-## Usage
+## What Gauge Does NOT Do
 
-```
-"How confident are you?"
-"What's your uncertainty?"
-"Are we running low on context?"
-```
-
-## Integration
-
-Part of Agent Brain. Runs first in the loop:
-1. **Gauge** → assess readiness
-2. Then Archive, Signal, Ritual, Vibe
+- Assign 0.0-1.0 numeric confidence scores (fake precision)
+- Automatically determine confidence from access count at creation time
+- Run as code — it's a guideline for how the agent interprets the `confidence` field
