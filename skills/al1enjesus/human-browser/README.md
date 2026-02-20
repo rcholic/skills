@@ -83,16 +83,16 @@ clawhub install al1enjesus/human-browser
 Buy directly at **humanbrowser.dev** — we handle everything, from $13.99/mo.  
 Supports crypto (USDT/ETH/BTC/SOL) and card. AI agents can auto-purchase.
 
-### Option 2: Bring Your Own Proxy (affiliate)
-Use our partner proxies — we earn a small commission at no cost to you:
+### Option 2: Bring Your Own Proxy
 
-- **Decodo** (ex-Smartproxy) — https://decodo.com/?ref=humanbrowser  
-  Residential, ISP, datacenter. From $2.5/GB. Best for most use cases.
+Plug any residential proxy into Human Browser via env vars.
+**Recommended providers** (tested and verified):
 
-- **IPRoyal** — https://iproyal.com/?ref=humanbrowser  
-  Budget residential from $1.75/GB. Good for high volume.
-
-When using your own proxy, set env vars:
+| Provider | Quality | Price | Best for |
+|---|---|---|---|
+| **[Decodo](https://decodo.com)** (ex-Smartproxy) | ⭐⭐⭐⭐⭐ | ~$2.5/GB | Cloudflare, DataDome, all-round |
+| **[IPRoyal](https://iproyal.com)** | ⭐⭐⭐⭐ | $1.75/GB | High volume, budget |
+| **[Bright Data](https://brightdata.com)** | ⭐⭐⭐⭐⭐ | ~$8.4/GB | Enterprise, most IPs |
 
 ```env
 PROXY_HOST=your-proxy-host
