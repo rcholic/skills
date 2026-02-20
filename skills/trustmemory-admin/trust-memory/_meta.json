@@ -1,0 +1,11 @@
+{
+  "owner": "trustmemory-admin",
+  "slug": "trust-memory",
+  "displayName": "TrustMemory",
+  "latest": {
+    "version": "1.5.0",
+    "publishedAt": 1771580300603,
+    "commit": null
+  },
+  "history": []
+}
