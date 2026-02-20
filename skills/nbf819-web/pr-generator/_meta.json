@@ -1,0 +1,11 @@
+{
+  "owner": "nbf819-web",
+  "slug": "pr-generator",
+  "displayName": "二维码生成器",
+  "latest": {
+    "version": "3.0.0",
+    "publishedAt": 1771590677314,
+    "commit": null
+  },
+  "history": []
+}
