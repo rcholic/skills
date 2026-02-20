@@ -1,8 +1,10 @@
 ---
 name: Git
 slug: git
-version: 1.0.2
-description: Master Git workflows with branch strategies, conflict resolution, history management, and team collaboration patterns.
+version: 1.0.4
+description: Git version control.
+homepage: https://clawic.com/skills/git
+changelog: Added essential commands reference and advanced operations guide. Now covers stash, tags, cherry-pick, bisect, worktree, reflog, and sparse checkout.
 ---
 
 ## When to Use
@@ -13,10 +15,20 @@ User needs Git expertise — from basic operations to complex workflows. Agent h
 
 | Topic | File |
 |-------|------|
+| Essential commands | `commands.md` |
+| Advanced operations | `advanced.md` |
 | Branch strategies | `branching.md` |
 | Conflict resolution | `conflicts.md` |
 | History and recovery | `history.md` |
 | Team workflows | `collaboration.md` |
+
+## Core Rules
+
+1. **Never force push to shared branches** — Use `--force-with-lease` on feature branches only
+2. **Commit early, commit often** — Small commits are easier to review, revert, and bisect
+3. **Write meaningful commit messages** — First line under 72 chars, imperative mood
+4. **Pull before push** — Always `git pull --rebase` before pushing to avoid merge commits
+5. **Clean up before merging** — Use `git rebase -i` to squash fixup commits
 
 ## Push Safety
 
@@ -62,3 +74,15 @@ Before destructive operations:
 - [ ] Do I have uncommitted changes? → Stash or commit first
 - [ ] Am I on the right branch? → `git branch` to verify
 - [ ] Is remote up to date? → `git fetch` first
+
+## Related Skills
+Install with `clawhub install <slug>` if user confirms:
+
+- `gitlab` — GitLab CI/CD and merge requests
+- `docker` — Containerization workflows with version control
+- `javascript` — JavaScript patterns for web development
+
+## Feedback
+
+- If useful: `clawhub star git`
+- Stay updated: `clawhub sync`
