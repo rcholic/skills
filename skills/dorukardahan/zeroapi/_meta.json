@@ -1,13 +1,18 @@
 {
   "owner": "dorukardahan",
   "slug": "zeroapi",
-  "displayName": "ZeroAPI",
+  "displayName": "ZeroAPI Model Router",
   "latest": {
-    "version": "2.3.0",
-    "publishedAt": 1771152298917,
-    "commit": "https://github.com/openclaw/skills/commit/c502e343b66ab86526c747d10925541dd942680d"
+    "version": "3.1.0",
+    "publishedAt": 1771467950662,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.3.0",
+      "publishedAt": 1771152298917,
+      "commit": "https://github.com/openclaw/skills/commit/c502e343b66ab86526c747d10925541dd942680d"
+    },
     {
       "version": "2.1.1",
       "publishedAt": 1770904152667,

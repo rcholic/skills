@@ -15,7 +15,7 @@ metadata: {"openclaw":{"emoji":"⚡","category":"routing","os":["darwin","linux"
 
 # ZeroAPI — Subscription-Based Model Routing
 
-You are an OpenClaw agent. This skill teaches you HOW to route tasks to the right model across your available providers. You do NOT call external APIs — OpenClaw handles connections. Your job is to CLASSIFY incoming tasks and DELEGATE to the appropriate agent/model.
+Route incoming tasks to the optimal AI model across available providers. OpenClaw handles all API connections — this skill defines the classification and delegation logic. Classify each task by type and delegate to the appropriate agent/model.
 
 ## First-Time Setup
 
@@ -29,7 +29,7 @@ When this skill is first loaded, determine the user's available providers:
 If only Claude is available, all tasks stay on Opus. No routing needed — but conflict resolution and collaboration patterns still apply for judging task complexity.
 
 To verify providers are actually working after setup, ask the user to run:
-```
+```bash
 openclaw models status
 ```
 Any model showing `missing` or `auth_expired` is not usable. Remove it from your active tiers until the user fixes it.
@@ -62,51 +62,27 @@ Walk through these 9 steps IN ORDER for every incoming task. The FIRST match win
 
 **Estimating token count for Step 1**: Count characters in the input and divide by 4. 100k tokens ≈ 400,000 characters. If the user pastes a large file, codebase, or says "analyze this entire repo," assume it exceeds 100k.
 
-### Step 1: Context > 100k tokens?
-**Signals**: large file, long document, paste, bulk, CSV, log dump, entire codebase, "analyze this PDF"
-→ Route to **RESEARCH** (Gemini Pro, 1M context window) / fallback: Opus (200K limit)
+| Step | Signals | Route to | Fallbacks |
+|------|---------|----------|-----------|
+| 1. Context >100k tokens | large file, long document, bulk, CSV, log dump, entire codebase, "analyze this PDF" | RESEARCH (Pro, 1M ctx) | Opus (200K) |
+| 2. Math / proof | calculate, solve, equation, proof, integral, probability, optimize, formula | CODE (Codex, Math 99.0) | Flash (97.0), Opus |
+| 3. Code writing | write code, implement, function, class, refactor, script, migration, test, PR, diff | CODE (Codex, Coding 49.3) | Opus |
+| 4. Code review / architecture | review, audit, architecture, design, trade-off, security review, best practice | DEEP (Opus, Intel 53.0) | stays on main |
+| 5. Speed critical / trivial | quick, fast, simple, format, convert, summarize, list, extract, translate, one-liner | FAST (Flash, 206 tok/s) | Flash-Lite, Opus |
+| 6. Research / scientific | research, find out, explain, compare, analyze, paper, evidence, fact-check, deep dive | RESEARCH (Pro, GPQA 0.908) | Opus |
+| 7. Multi-step tool pipeline | orchestrate, coordinate, pipeline, workflow, chain, parallel, fan-out | ORCHESTRATE (Kimi, TAU-2 0.959) | Codex, Opus |
+| 8. Structured output | follow rules exactly, JSON schema, strict template, structured, checklist, table | FAST (Flash, IFBench 0.780) | Opus |
+| 9. Default | no clear match | DEEP (Opus, Intel 53.0) | safest all-rounder |
 
-### Step 2: Math / proof / numerical reasoning?
-**Signals**: calculate, solve, equation, proof, integral, derivative, probability, statistics, optimize, formula, theorem
-→ Route to **CODE** (Codex, Math: 99.0) / fallback: Gemini Flash (Math: 97.0) / Opus
-
-### Step 3: Code writing / generation?
-**Signals**: write code, implement, function, class, refactor, create script, migration, API endpoint, test, unit test, pull request, diff, patch
-→ Route to **CODE** (Codex, Coding: 49.3) / fallback: Opus
-
-### Step 4: Code review / architecture / security?
-**Signals**: review, audit, architecture, design, trade-off, should I use, which approach, security review, best practice, code smell
-→ Stay on **DEEP** (Opus, Intelligence: 53.0) — always stays on main agent
-
-### Step 5: Speed critical / trivial task?
-**Signals**: quick, fast, simple, format, convert, summarize briefly, list, extract, translate short text, rename, timestamp, one-liner
-→ Route to **FAST** (Flash, 206 tok/s, IFBench 0.780) / fallback: Flash-Lite (for sub-second latency) / Opus
-
-**Note**: For tasks where sub-second TTFT matters more than intelligence (pings, health checks), use SIMPLE (Flash-Lite, 0.23s TTFT). For heartbeats and cron jobs, use FAST (Flash) — it has much better instruction following (IFBench 0.780; Flash-Lite has no verified IFBench score).
-
-### Step 6: Research / scientific / factual?
-**Signals**: research, find out, what is, explain, compare, analyze, paper, study, evidence, fact-check, deep dive, investigate
-→ Route to **RESEARCH** (Gemini Pro, GPQA: 0.908) / fallback: Opus
-
-### Step 7: Multi-step tool pipeline?
-**Signals**: orchestrate, coordinate, pipeline, multi-step, workflow, chain, sequence of tasks, parallel, fan-out, combine results
-→ Route to **ORCHESTRATE** (Kimi K2.5, TAU-2: 0.959) / fallback: Codex / Opus
-
-### Step 8: Instruction following / structured output?
-**Signals**: follow these rules exactly, format as, JSON schema, strict template, fill in, structured, comply, checklist, table generation
-→ Route to **FAST** (Gemini Flash, IFBench: 0.780) / fallback: Opus
-
-### Step 9: Default
-If no step above matched clearly:
-→ Stay on **DEEP** (Opus, Intelligence: 53.0) — safest all-rounder
+**Step 5 note**: For sub-second TTFT needs (pings, health checks), use SIMPLE (Flash-Lite, 0.23s TTFT). For heartbeats and cron jobs, use FAST (Flash) — better instruction following (IFBench 0.780).
 
 ### Disambiguation Examples
 
 When a task matches multiple steps:
-- "Analyze this 200-page PDF and write a Python parser for it" → Step 1 wins (context size), route to RESEARCH. Then delegate code writing to CODE as a follow-up.
-- "Quickly solve this integral" → Step 2 wins over Step 5 (math trumps speed).
-- "Generate a JSON schema for this API" → Step 8 wins (structured output, not code writing).
-- "Review this code and refactor the authentication module" → Step 4 wins for review, then Step 3 for the refactor (delegate to CODE).
+- "Analyze this 200-page PDF and write a Python parser for it" -- Step 1 wins (context size), route to RESEARCH. Then delegate code writing to CODE as a follow-up.
+- "Quickly solve this integral" -- Step 2 wins over Step 5 (math trumps speed).
+- "Generate a JSON schema for this API" -- Step 8 wins (structured output, not code writing).
+- "Review this code and refactor the authentication module" -- Step 4 wins for review, then Step 3 for the refactor (delegate to CODE).
 
 ## When NOT to Route
 
@@ -115,7 +91,7 @@ Do NOT route away from the current model when:
 1. **User explicitly requests a model.** "Use Opus for this" or "don't delegate this" — always respect direct instructions.
 2. **Security-sensitive tasks.** If the task involves credentials, private keys, secrets, or personally identifiable data, keep it on the main agent. Do not send sensitive content to sub-agents.
 3. **Debugging a specific model.** If the user is testing or comparing model behavior, route to the model they specify.
-4. **Mid-conversation continuity.** If you are deep in a multi-turn conversation and the user asks a quick follow-up, do not switch models just because the follow-up is "simple." Stay on the current model for context continuity unless the user explicitly asks to delegate.
+4. **Mid-conversation continuity.** In a multi-turn conversation where the user asks a quick follow-up, do not switch models just because the follow-up is "simple." Stay on the current model for context continuity unless the user explicitly asks to delegate.
 
 ## Conflict Resolution
 
@@ -123,16 +99,16 @@ When multiple steps seem to match, resolve with these priority rules:
 
 1. **Judgment trumps speed.** If the task has ambiguity, nuance, or risk — stay on Opus.
 2. **Specialist trumps generalist.** If a model has a standout benchmark for the exact task type, prefer it.
-3. **Code writing → Codex. Code review → Opus.** Different models for writing vs judging.
-4. **Context overflow → Gemini.** Only Gemini models handle 1M context.
+3. **Code writing -- Codex. Code review -- Opus.** Different models for writing vs judging.
+4. **Context overflow -- Gemini.** Only Gemini models handle 1M context.
 5. **TTFT matters for interactive tasks.** Flash-Lite (0.23s), Kimi (1.65s), and Opus (1.76s) respond fast. Codex (20s) and Pro (29.59s) are slow to start — don't use them for quick back-and-forth.
-6. **When truly tied → Opus.** Highest general intelligence, lowest risk of subtle errors.
+6. **When truly tied -- Opus.** Highest general intelligence, lowest risk of subtle errors.
 
 ## Sub-Agent Delegation
 
 Use OpenClaw's agent system to delegate:
 
-```
+```text
 /agent <agent-id> <instruction>
 ```
 
@@ -144,7 +120,7 @@ Use OpenClaw's agent system to delegate:
 
 ### Examples
 
-```
+```text
 /agent codex Write a Python function that parses RFC 3339 timestamps with timezone support. Return only the code.
 
 /agent gemini-researcher Analyze the differences between SQLite WAL mode and journal mode. Include benchmarks and a recommendation.
@@ -170,7 +146,7 @@ When a fallback is triggered, briefly inform the user:
 ## Multi-Turn Conversation Routing
 
 - **Stay on the same model** for follow-up messages in the same topic. Context continuity matters more than optimal model selection.
-- **Re-route only when the task type clearly changes.** Example: user discusses architecture (Opus) → then says "now write the implementation" → delegate code writing to Codex.
+- **Re-route only when the task type clearly changes.** Example: user discusses architecture (Opus) -- then says "now write the implementation" -- delegate code writing to Codex.
 
 When switching models mid-conversation:
 1. Summarize the relevant context from the current conversation.
@@ -185,31 +161,12 @@ When switching models mid-conversation:
 
 ## Collaboration Patterns
 
-### Pipeline (sequential)
-```
-Research Agent → Main Agent → Code Agent
-(gather facts)   (plan)       (implement)
-```
-Choose this when the task requires gathering facts before implementing.
-
-### Parallel + Merge
-```
-Main Agent ──┬── Code Agent (approach A)
-             └── Research Agent (approach B)
-Then: Main merges and picks the best parts.
-```
-Choose this when exploring multiple solutions or under time pressure.
-
-### Adversarial Review
-```
-Code Agent writes → Main Agent critiques → Code Agent revises
-```
-Choose this for security-sensitive code or production-critical changes.
-
-### Orchestrated (Kimi-led)
-```
-/agent kimi-orchestrator Plan and execute: <complex multi-agent task>
-```
+| Pattern | Flow | Use when |
+|---------|------|----------|
+| Pipeline | Research Agent -- Main Agent -- Code Agent | Task requires gathering facts before implementing |
+| Parallel + Merge | Main spawns Code (approach A) + Research (approach B), then merges | Exploring multiple solutions or under time pressure |
+| Adversarial Review | Code Agent writes -- Main critiques -- Code revises | Security-sensitive or production-critical code |
+| Orchestrated (Kimi) | `/agent kimi-orchestrator Plan and execute: <task>` | 3+ agents in complex dependency graphs (Kimi: slowest at 39 tok/s, best at TAU-2 0.959) |
 Choose this for tasks requiring 3+ agents in complex dependency graphs. Caution: Kimi is slowest (39 tok/s) but best at tool orchestration (TAU-2: 0.959).
 
 ## Fallback Chains
@@ -225,7 +182,7 @@ When a model is unavailable or rate-limited, fall through in reliability order.
 | Fast tasks | Flash-Lite | Flash | Opus | Codex |
 | Agentic | Kimi K2.5 | Codex | Gemini Pro | Opus |
 
-**Important**: Always use cross-provider fallbacks. Same-provider fallbacks (e.g., Gemini Pro → Flash) help with model-specific issues but not provider outages. Every fallback chain should span at least 2 different providers.
+**Important**: Always use cross-provider fallbacks. Same-provider fallbacks (e.g., Gemini Pro -- Flash) help with model-specific issues but not provider outages. Every fallback chain should span at least 2 different providers.
 
 ### Claude + Gemini (2 providers)
 | Task Type | Primary | Fallback 1 | Fallback 2 |
@@ -264,11 +221,11 @@ Quick reference:
 
 For detailed troubleshooting, consult `references/troubleshooting.md` (in the same directory as this SKILL.md). Common issues:
 
-- **"No API provider registered for api: undefined"** → Missing `api` field in provider config
-- **"API key not valid" with Gemini subscription** → Wrong API type; use `google-gemini-cli` not `google-generative-ai`
-- **Model shows `missing`** → Model ID mismatch; `gemini-2.5-flash-lite` (no `-preview` suffix)
-- **Codex 401 Unauthorized** → Token expired; re-run OAuth flow via `references/oauth-setup.md`
-- **Sub-agent "Unknown model"** → Provider missing from sub-agent's auth-profile
+- **"No API provider registered for api: undefined"** -- Missing `api` field in provider config
+- **"API key not valid" with Gemini subscription** -- Wrong API type; use `google-gemini-cli` not `google-generative-ai`
+- **Model shows `missing`** -- Model ID mismatch; `gemini-2.5-flash-lite` (no `-preview` suffix)
+- **Codex 401 Unauthorized** -- Token expired; re-run OAuth flow via `references/oauth-setup.md`
+- **Sub-agent "Unknown model"** -- Provider missing from sub-agent's auth-profile
 
 ## Cost Summary
 
@@ -281,4 +238,13 @@ For detailed troubleshooting, consult `references/troubleshooting.md` (in the sa
 | **Full stack** (all 4, ChatGPT Plus) | $250 | Full specialization |
 | **Full stack Pro** (all 4, ChatGPT Pro) | $430 | Maximum rate limits |
 
-Source: Artificial Analysis API v4, February 2026. Codex scores estimated (*) from OpenAI blog data. Structured benchmark data available in `benchmarks.json`.
+Source: Artificial Analysis API v4, February 2026. Codex scores estimated (*) from OpenAI blog data. Structured benchmark data available in `references/benchmarks.json`.
+
+## References
+
+| File | Content |
+|------|---------|
+| [references/oauth-setup.md](references/oauth-setup.md) | Auth setup, OAuth flows, multi-device safety |
+| [references/provider-config.md](references/provider-config.md) | openclaw.json, per-agent models.json, Gemini workarounds |
+| [references/troubleshooting.md](references/troubleshooting.md) | Common errors and fixes |
+| [references/benchmarks.json](references/benchmarks.json) | Raw benchmark data for all models |
