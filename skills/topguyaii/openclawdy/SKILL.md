@@ -1,8 +1,31 @@
+---
+name: openclawdy
+description: Memory infrastructure for AI agents. Persistent storage, semantic recall, reputation tracking, cross-agent pools, and time-travel snapshots. Wallet-based auth (signing only, no private key access).
+version: 1.1.0
+metadata:
+  openclaw:
+    requires:
+      env: []
+      bins: []
+    homepage: https://openclawdy.xyz
+    emoji: "\U0001F9E0"
+---
+
 # OpenClawdy
 
 **Memory Infrastructure for Autonomous Agents**
 
 Give your agent persistent memory that survives sessions. Store facts, preferences, decisions, and learnings - recall them semantically whenever needed. Advanced features include reputation tracking, cross-agent memory pools, and time-travel snapshots.
+
+## API Host & Protocol
+
+| Property | Value |
+|----------|-------|
+| **Base URL** | `https://openclawdy.xyz/api` |
+| **Protocol** | HTTPS (TLS 1.3) |
+| **Data Residency** | US-East (Vercel Edge + Qdrant Cloud) |
+| **Request Format** | JSON (`Content-Type: application/json`) |
+| **Response Format** | JSON |
 
 ## Installation
 
@@ -17,11 +40,48 @@ skills:
     name: openclawdy
 ```
 
-## Authentication
+## Authentication & Security
 
-OpenClawdy uses wallet-based authentication. Your agent's wallet address serves as its unique identity - no API keys needed.
+OpenClawdy uses **wallet-based authentication** with message signing only.
 
-Before using memory tools, ensure your agent has a wallet configured. Each wallet gets an isolated memory vault.
+### How It Works
+1. Your agent signs a timestamp message with its wallet
+2. The signature + address are sent in request headers
+3. Server verifies the signature (no private key ever leaves your agent)
+
+### Required Headers
+```
+X-Agent-Address: 0x...      # Your wallet address (public)
+X-Agent-Signature: 0x...    # Signed message (proves ownership)
+X-Agent-Timestamp: 123...   # Unix timestamp (ms, prevents replay)
+```
+
+### Message Format
+```
+OpenClawdy Auth
+Timestamp: {timestamp}
+```
+
+### Security Guarantees
+- **No private key access required** - Only signing capability needed
+- **Wallet isolation** - Each wallet gets its own isolated memory vault
+- **No env vars needed** - Authentication is header-based
+- **No stored credentials** - Signatures are verified per-request
+
+---
+
+## Privacy & Data Policy
+
+| Aspect | Policy |
+|--------|--------|
+| **Data Storage** | Qdrant Cloud (managed vector DB) + PostgreSQL |
+| **Encryption** | TLS in transit, encrypted at rest |
+| **Data Isolation** | Each wallet address has isolated storage |
+| **Retention** | Data persists until explicitly deleted |
+| **Pool Access** | Only agents with pool_id can access pool data |
+| **Export** | Full vault export available via `/memory/vault` |
+| **Deletion** | Permanent deletion via DELETE endpoints |
+| **No Telemetry** | No usage tracking or analytics collected |
 
 ---
 
@@ -31,21 +91,23 @@ Before using memory tools, ensure your agent has a wallet configured. Each walle
 
 Store information for later retrieval.
 
+**Endpoint:** `POST /api/memory/store`
+
 **Parameters:**
 - `content` (required): The information to remember
 - `type` (optional): Category of memory - one of: `fact`, `preference`, `decision`, `learning`, `history`, `context`. Default: `fact`
 - `tags` (optional): Array of tags for organization
 
-**Example:**
-```
-Store this as a preference: User prefers TypeScript over JavaScript for all new projects
+**Example Request:**
+```json
+{
+  "content": "User prefers TypeScript over JavaScript",
+  "type": "preference",
+  "tags": ["coding", "language"]
+}
 ```
 
-```
-Remember this fact with tags ["project", "tech-stack"]: The current project uses Next.js 14 with PostgreSQL
-```
-
-**Response:**
+**Example Response:**
 ```json
 {
   "success": true,
@@ -53,7 +115,7 @@ Remember this fact with tags ["project", "tech-stack"]: The current project uses
     "id": "mem_abc123",
     "content": "User prefers TypeScript over JavaScript",
     "type": "preference",
-    "tags": [],
+    "tags": ["coding", "language"],
     "createdAt": "2025-02-10T12:00:00Z"
   }
 }
@@ -65,21 +127,22 @@ Remember this fact with tags ["project", "tech-stack"]: The current project uses
 
 Retrieve relevant memories using semantic search. Finds memories by meaning, not just keywords.
 
+**Endpoint:** `POST /api/memory/recall`
+
 **Parameters:**
 - `query` (required): What to search for
 - `limit` (optional): Maximum results to return (1-20). Default: 5
 - `type` (optional): Filter by memory type
 
-**Example:**
-```
-Recall memories about programming language preferences
+**Example Request:**
+```json
+{
+  "query": "programming language preferences",
+  "limit": 3
+}
 ```
 
-```
-What do I know about the user's coding style? Limit to 3 results.
-```
-
-**Response:**
+**Example Response:**
 ```json
 {
   "success": true,
@@ -101,19 +164,12 @@ What do I know about the user's coding style? Limit to 3 results.
 
 List recent memories without semantic search.
 
+**Endpoint:** `GET /api/memory/list`
+
 **Parameters:**
 - `type` (optional): Filter by memory type
 - `limit` (optional): Maximum results (1-100). Default: 20
 - `offset` (optional): Pagination offset. Default: 0
-
-**Example:**
-```
-List my recent memories
-```
-
-```
-Show all preference memories, limit 10
-```
 
 ---
 
@@ -121,13 +177,10 @@ Show all preference memories, limit 10
 
 Delete a specific memory by ID.
 
+**Endpoint:** `DELETE /api/memory/{id}`
+
 **Parameters:**
 - `id` (required): The memory ID to delete
-
-**Example:**
-```
-Delete memory mem_abc123
-```
 
 ---
 
@@ -135,10 +188,7 @@ Delete memory mem_abc123
 
 Clear all memories in the vault. **Use with caution - this is irreversible.**
 
-**Example:**
-```
-Clear all my memories (I confirm this action)
-```
+**Endpoint:** `DELETE /api/memory/vault`
 
 ---
 
@@ -146,10 +196,7 @@ Clear all my memories (I confirm this action)
 
 Export all memories as JSON for backup.
 
-**Example:**
-```
-Export all my memories
-```
+**Endpoint:** `GET /api/memory/vault`
 
 ---
 
@@ -157,12 +204,9 @@ Export all my memories
 
 Get usage statistics for your agent.
 
-**Example:**
-```
-Show my memory usage stats
-```
+**Endpoint:** `GET /api/agent/stats`
 
-**Response:**
+**Example Response:**
 ```json
 {
   "success": true,
@@ -187,32 +231,27 @@ Show my memory usage stats
 
 **Track which memories lead to good outcomes.** Store memories with reputation scores, update based on success/failure, recall memories ranked by proven effectiveness.
 
-**Actions:**
+**Endpoints:**
+- `POST /api/memory/reputation/store` - Store with reputation
+- `POST /api/memory/reputation/recall` - Recall by reputation rank
+- `POST /api/memory/reputation/update` - Update reputation score
 
 #### store_ranked
-Store a memory with an initial reputation score.
-
-**Parameters:**
-- `action`: `store_ranked`
-- `content` (required): The information to store
-- `type` (optional): Memory type. Default: `fact`
-- `reputation` (optional): Initial score 0.0-1.0. Default: 0.5
-
-**Example:**
-```
-Store ranked memory: "Use retry logic for API calls" with reputation 0.8
+**Request:**
+```json
+{
+  "content": "Use retry logic for API calls",
+  "type": "learning",
+  "reputation": 0.8
+}
 ```
 
 #### recall_ranked
-Retrieve memories sorted by reputation (most effective first).
-
-**Parameters:**
-- `action`: `recall_ranked`
-- `query` (required): What to search for
-
-**Example:**
-```
-Recall ranked memories about error handling strategies
+**Request:**
+```json
+{
+  "query": "error handling strategies"
+}
 ```
 
 **Response:**
@@ -232,17 +271,13 @@ Recall ranked memories about error handling strategies
 ```
 
 #### update_reputation
-Update a memory's reputation based on outcome.
-
-**Parameters:**
-- `action`: `update_reputation`
-- `memory_id` (required): The memory to update
-- `outcome` (required): `success`, `failure`, or `neutral`
-- `impact` (optional): Weight of this outcome (0.0-1.0)
-
-**Example:**
-```
-Update reputation for mem_xyz: outcome was success
+**Request:**
+```json
+{
+  "memory_id": "mem_xyz",
+  "outcome": "success",
+  "impact": 0.8
+}
 ```
 
 ---
@@ -251,18 +286,18 @@ Update reputation for mem_xyz: outcome was success
 
 **Cross-Agent Memory Pools** - Share knowledge between multiple agents. Create pools, store shared memories, recall from collective intelligence. Perfect for agent teams and swarms.
 
-**Actions:**
+**Endpoints:**
+- `POST /api/memory/pool/create` - Create new pool
+- `POST /api/memory/pool/store` - Store in pool
+- `POST /api/memory/pool/recall` - Search pool
+- `GET /api/memory/pool/list` - List accessible pools
 
 #### create
-Create a new shared memory pool.
-
-**Parameters:**
-- `action`: `create`
-- `pool_name` (required): Name for the pool
-
-**Example:**
-```
-Create memory pool: "research-team"
+**Request:**
+```json
+{
+  "name": "research-team"
+}
 ```
 
 **Response:**
@@ -278,41 +313,22 @@ Create memory pool: "research-team"
 ```
 
 #### store
-Store a memory in a shared pool.
-
-**Parameters:**
-- `action`: `store`
-- `pool_id` (required): The pool ID
-- `content` (required): Information to share
-- `type` (optional): Memory type
-
-**Example:**
-```
-Store in pool pool_abc123: "Found bug in authentication module - fix applied"
+**Request:**
+```json
+{
+  "pool_id": "pool_abc123",
+  "content": "Found bug in authentication module - fix applied",
+  "type": "fact"
+}
 ```
 
 #### recall
-Search memories in a shared pool.
-
-**Parameters:**
-- `action`: `recall`
-- `pool_id` (required): The pool ID
-- `query` (required): What to search for
-
-**Example:**
-```
-Recall from pool pool_abc123: authentication issues
-```
-
-#### list
-List all accessible pools.
-
-**Parameters:**
-- `action`: `list`
-
-**Example:**
-```
-List my memory pools
+**Request:**
+```json
+{
+  "pool_id": "pool_abc123",
+  "query": "authentication issues"
+}
 ```
 
 ---
@@ -321,18 +337,18 @@ List my memory pools
 
 **Memory Time Travel** - Snapshot and restore agent memory states. Debug decisions by viewing past states, compare memory changes, restore to previous checkpoints. Essential for high-stakes agents.
 
-**Actions:**
+**Endpoints:**
+- `POST /api/memory/snapshot/create` - Create snapshot
+- `POST /api/memory/snapshot/restore` - Restore from snapshot
+- `GET /api/memory/snapshot/list` - List snapshots
+- `POST /api/memory/snapshot/compare` - Compare snapshots
 
 #### create
-Create a snapshot of current memory state.
-
-**Parameters:**
-- `action`: `create`
-- `name` (required): Descriptive name for the snapshot
-
-**Example:**
-```
-Create memory snapshot: "before-major-update"
+**Request:**
+```json
+{
+  "name": "before-major-update"
+}
 ```
 
 **Response:**
@@ -349,40 +365,23 @@ Create memory snapshot: "before-major-update"
 ```
 
 #### restore
-Restore memory state from a snapshot.
-
-**Parameters:**
-- `action`: `restore`
-- `snapshot_id` (required): The snapshot to restore
-- `mode` (optional): `read_only` (view only) or `overwrite` (replace current). Default: `read_only`
-
-**Example:**
-```
-Restore snapshot snap_abc123 in read_only mode
+**Request:**
+```json
+{
+  "snapshot_id": "snap_abc123",
+  "mode": "read_only"
+}
 ```
 
-#### list
-List all snapshots.
-
-**Parameters:**
-- `action`: `list`
-
-**Example:**
-```
-List my memory snapshots
-```
+Modes: `read_only` (view only) or `overwrite` (replace current state)
 
 #### compare
-Compare two snapshots or a snapshot with current state.
-
-**Parameters:**
-- `action`: `compare`
-- `snapshot_id` (required): First snapshot
-- `compare_to` (optional): Second snapshot ID or `current`. Default: `current`
-
-**Example:**
-```
-Compare snapshot snap_abc123 to current state
+**Request:**
+```json
+{
+  "snapshot_id": "snap_abc123",
+  "compare_to": "current"
+}
 ```
 
 **Response:**
@@ -393,8 +392,7 @@ Compare snapshot snap_abc123 to current state
     "added": 12,
     "removed": 3,
     "modified": 5,
-    "unchanged": 130,
-    "diff": [...]
+    "unchanged": 130
   }
 }
 ```
@@ -412,56 +410,7 @@ Compare snapshot snap_abc123 to current state
 | `history` | Historical events | "Deployed v2.1 on Jan 15" |
 | `context` | General context | "Working on e-commerce project" |
 
-## Best Practices
-
-### When to Store
-- User states a preference → Store as `preference`
-- Important decision made → Store as `decision`
-- Learned something new → Store as `learning`
-- Key project fact → Store as `fact`
-
-### When to Recall
-- Starting a new session → Recall recent context
-- Before making suggestions → Check preferences
-- Encountering similar problem → Check learnings
-
-### Using Reputation
-- After successful action → Update with `outcome: success`
-- After failed approach → Update with `outcome: failure`
-- When recalling strategies → Use `recall_ranked` for proven approaches
-
-### Using Pools
-- Team of agents working together → Create shared pool
-- Knowledge that benefits multiple agents → Store in pool
-- Looking for collective wisdom → Recall from pool
-
-### Using Snapshots
-- Before major changes → Create snapshot
-- Debugging unexpected behavior → Compare to past state
-- Rolling back mistakes → Restore from snapshot
-
-### Example Workflow
-
-```
-# Session 1: User mentions preference
-User: "I always want you to use TypeScript"
-Agent: [Stores as preference: "User prefers TypeScript for all code"]
-
-# Session 2: New task
-User: "Create a new API endpoint"
-Agent: [Recalls preferences about coding]
-Agent: "I'll create this in TypeScript based on your preference."
-
-# Session 3: Learning from outcome
-Agent: [Used retry logic, it worked]
-Agent: [Updates reputation: memory_id=mem_xyz, outcome=success]
-
-# Session 4: Making decisions
-Agent: [Recalls ranked memories about error handling]
-Agent: [Uses highest-reputation approach first]
-```
-
-## Pricing
+## Rate Limits
 
 | Tier | Memories | Recalls/Day | Pools | Snapshots | Price |
 |------|----------|-------------|-------|-----------|-------|
@@ -469,60 +418,25 @@ Agent: [Uses highest-reputation approach first]
 | Pro | 50,000 | Unlimited | 10 | 50 | $10/mo |
 | Enterprise | Unlimited | Unlimited | Unlimited | Unlimited | Custom |
 
-## API Endpoints
+## Error Responses
 
-Base URL: `https://openclawdy.xyz/api`
+All endpoints return consistent error format:
 
-### Core Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/memory/store` | Store a memory |
-| POST | `/memory/recall` | Semantic search |
-| GET | `/memory/list` | List memories |
-| GET | `/memory/{id}` | Get specific memory |
-| DELETE | `/memory/{id}` | Delete memory |
-| GET | `/memory/vault` | Export all |
-| DELETE | `/memory/vault` | Clear vault |
-| GET | `/agent/stats` | Usage stats |
-
-### Reputation Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/memory/reputation/store` | Store with reputation |
-| POST | `/memory/reputation/recall` | Recall by reputation |
-| POST | `/memory/reputation/update` | Update reputation |
-
-### Pool Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/memory/pool/create` | Create pool |
-| POST | `/memory/pool/store` | Store in pool |
-| POST | `/memory/pool/recall` | Recall from pool |
-| GET | `/memory/pool/list` | List pools |
-
-### Snapshot Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/memory/snapshot/create` | Create snapshot |
-| POST | `/memory/snapshot/restore` | Restore snapshot |
-| GET | `/memory/snapshot/list` | List snapshots |
-| POST | `/memory/snapshot/compare` | Compare snapshots |
-
-## Authentication Headers
-
-All requests require wallet signature authentication:
-
-```
-X-Agent-Address: 0x...      # Your wallet address
-X-Agent-Signature: 0x...    # Signed message
-X-Agent-Timestamp: 123...   # Unix timestamp (ms)
+```json
+{
+  "success": false,
+  "error": "Error message here",
+  "code": "ERROR_CODE"
+}
 ```
 
-Message format to sign:
-```
-OpenClawdy Auth
-Timestamp: {timestamp}
-```
+| Code | Description |
+|------|-------------|
+| `AUTH_REQUIRED` | Missing authentication headers |
+| `AUTH_INVALID` | Invalid signature or expired timestamp |
+| `NOT_FOUND` | Memory/pool/snapshot not found |
+| `RATE_LIMITED` | Rate limit exceeded |
+| `VALIDATION_ERROR` | Invalid request parameters |
 
 ## ACP Integration
 
@@ -538,9 +452,10 @@ OpenClawdy is available on the Agent Commerce Protocol (ACP). Other agents can p
 
 ## Support
 
-- Website: https://openclawdy.xyz
-- Twitter: @openclawdy
-- ACP Agent: OpenClawdy Memory
+- **Website:** https://openclawdy.xyz
+- **API Status:** https://openclawdy.xyz/api/health
+- **Twitter:** @openclawdy
+- **ACP Agent:** OpenClawdy Memory
 
 ## License
 
