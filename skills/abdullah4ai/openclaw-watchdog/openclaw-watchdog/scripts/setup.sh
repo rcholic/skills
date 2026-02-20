@@ -19,7 +19,7 @@ error() { echo -e "${RED}[✗]${NC} $*"; exit 1; }
 # ---------------------------------------------------------------------------
 # Parse arguments
 # ---------------------------------------------------------------------------
-TELEGRAM_TOKEN="" TELEGRAM_CHAT_ID="" OPENAI_KEY="" ANTHROPIC_KEY="" GATEWAY_PORT=""
+TELEGRAM_TOKEN="" TELEGRAM_CHAT_ID="" OPENAI_KEY="" ANTHROPIC_KEY=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -27,20 +27,9 @@ while [[ $# -gt 0 ]]; do
         --telegram-chat-id) TELEGRAM_CHAT_ID="$2"; shift 2 ;;
         --openai-key)      OPENAI_KEY="$2";      shift 2 ;;
         --anthropic-key)   ANTHROPIC_KEY="$2";   shift 2 ;;
-        --gateway-port)    GATEWAY_PORT="$2";    shift 2 ;;
         *) error "Unknown argument: $1" ;;
     esac
 done
-
-# Auto-detect gateway port if not specified
-if [[ -z "$GATEWAY_PORT" ]]; then
-    GATEWAY_PORT=$(grep -o '"port"[[:space:]]*:[[:space:]]*[0-9]*' "$HOME/.openclaw/openclaw.json" 2>/dev/null | head -1 | grep -o '[0-9]*' || echo "3117")
-    if [[ -z "$GATEWAY_PORT" ]]; then
-        GATEWAY_PORT="3117"
-    fi
-fi
-HEALTH_URL="http://127.0.0.1:${GATEWAY_PORT}/health"
-info "Gateway health endpoint: $HEALTH_URL"
 
 [[ -z "$TELEGRAM_TOKEN" ]] && error "Missing --telegram-token"
 [[ -z "$TELEGRAM_CHAT_ID" ]] && error "Missing --telegram-chat-id"
@@ -53,10 +42,8 @@ machine_password() {
     local parts=""
     if [[ "$(uname)" == "Darwin" ]]; then
         local uuid
-        uuid=$(ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | awk -F'"' '/IOPlatformUUID/{print $4}') || true
-        if [[ -n "$uuid" ]]; then
-            parts="${uuid}:"
-        fi
+        uuid=$(ioreg -rd1 -c IOPlatformExpertDevice | awk -F'"' '/IOPlatformUUID/{print $4}') || true
+        parts="${uuid}:"
     fi
     parts="${parts}$(hostname):${USER:-openclaw}"
     echo -n "$parts" | shasum -a 256 | awk '{print $1}'
@@ -126,13 +113,12 @@ plist = {
     'StandardOutPath': sys.argv[3] + '/watchdog.log',
     'StandardErrorPath': sys.argv[3] + '/watchdog-error.log',
     'EnvironmentVariables': {
-        'PATH': '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin',
-        'OPENCLAW_HEALTH_URL': sys.argv[5]
+        'PATH': '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin'
     }
 }
 with open(sys.argv[4], 'wb') as f:
     plistlib.dump(plist, f)
-" "$PYTHON_BIN" "$WATCHDOG_PY" "$WATCHDOG_DIR" "$PLIST" "$HEALTH_URL"
+" "$PYTHON_BIN" "$WATCHDOG_PY" "$WATCHDOG_DIR" "$PLIST"
 
     launchctl unload "$PLIST" 2>/dev/null || true
     launchctl load "$PLIST"
@@ -144,8 +130,8 @@ else
     SERVICE_FILE="$SERVICE_DIR/openclaw-watchdog.service"
     info "Installing systemd service → $SERVICE_FILE"
     mkdir -p "$SERVICE_DIR"
-    printf '[Unit]\nDescription=OpenClaw Watch Dog\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=%s %s\nRestart=always\nRestartSec=10\nEnvironment=PATH=/usr/local/bin:/usr/bin:/bin\nEnvironment=OPENCLAW_HEALTH_URL=%s\n\n[Install]\nWantedBy=default.target\n' \
-        "$PYTHON_BIN" "$WATCHDOG_PY" "$HEALTH_URL" > "$SERVICE_FILE"
+    printf '[Unit]\nDescription=OpenClaw Watch Dog\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=%s %s\nRestart=always\nRestartSec=10\nEnvironment=PATH=/usr/local/bin:/usr/bin:/bin\n\n[Install]\nWantedBy=default.target\n' \
+        "$PYTHON_BIN" "$WATCHDOG_PY" > "$SERVICE_FILE"
 
     systemctl --user daemon-reload
     systemctl --user enable openclaw-watchdog

@@ -26,7 +26,7 @@ WATCHDOG_DIR = Path.home() / ".openclaw" / "watchdog"
 CONFIG_FILE = WATCHDOG_DIR / "config.enc"
 LOG_FILE = WATCHDOG_DIR / "watchdog.log"
 STATE_FILE = WATCHDOG_DIR / "state.json"
-GATEWAY_HEALTH = os.environ.get("OPENCLAW_HEALTH_URL", "http://127.0.0.1:3117/health")
+GATEWAY_HEALTH = "http://127.0.0.1:3117/health"
 APPROVE_REINSTALL = WATCHDOG_DIR / "approve-reinstall"
 
 # ---------------------------------------------------------------------------

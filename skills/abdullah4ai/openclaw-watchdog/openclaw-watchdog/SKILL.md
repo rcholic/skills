@@ -52,8 +52,7 @@ python3 ~/.openclaw/workspace/openclaw-watchdog/scripts/validate.py "$TELEGRAM_T
 chmod +x ~/.openclaw/workspace/openclaw-watchdog/scripts/setup.sh
 ~/.openclaw/workspace/openclaw-watchdog/scripts/setup.sh \
   --telegram-token "$TELEGRAM_TOKEN" \
-  --telegram-chat-id "$TELEGRAM_CHAT_ID" \
-  --gateway-port "$GATEWAY_PORT"  # optional, auto-detected from openclaw.json
+  --telegram-chat-id "$TELEGRAM_CHAT_ID"
 ```
 
 ### 3. Connect via Telegram (Pairing)
@@ -80,7 +79,7 @@ Tell them Watch Dog is active, what it monitors, and that they'll get Telegram a
 
 ## How It Works
 
-- Pings gateway health endpoint every 15 seconds (auto-detects port from config, or set via `--gateway-port`)
+- Pings `localhost:3117/health` every 15 seconds
 - After 3 consecutive failures, attempts `openclaw gateway restart`
 - Up to 2 restart attempts, then asks user for reinstall permission via Telegram
 - User approves by running: `touch ~/.openclaw/watchdog/approve-reinstall`
