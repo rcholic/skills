@@ -1,23 +1,25 @@
 ---
 name: index1
-description: AI-native project knowledge base. BM25 + vector hybrid search via MCP Server.
-version: 2.0.1
+description: AI memory system for coding agents — code index + cognitive facts, persistent across sessions.
+version: 2.0.3
 license: Apache-2.0
 author: gladego
-tags: [mcp, knowledge-base, semantic-search, bm25, rag, code-search]
+tags: [mcp, memory, semantic-search, bm25, rag, cognitive, coding-agent]
 ---
 
 # index1
 
-AI-native project knowledge base with BM25 + vector hybrid search. Provides 5 MCP tools for intelligent code/doc search.
+AI memory system for coding agents with BM25 + vector hybrid search. Provides 6 MCP tools for intelligent code/doc search and cognitive fact recording.
 
 ## What it does
 
+- **Dual memory**: corpus (code index) + cognition (episodic facts)
 - **Hybrid search**: BM25 full-text + vector semantic search with RRF fusion
 - **Structure-aware chunking**: Markdown, Python, Rust, JavaScript, plain text
-- **MCP Server**: 5 tools (`docs_search`, `docs_get`, `docs_status`, `docs_reindex`, `docs_config`)
+- **MCP Server**: 6 tools (`recall`, `learn`, `read`, `status`, `reindex`, `config`)
 - **CJK optimized**: Chinese/Japanese/Korean query detection with dynamic weight tuning
-- **Graceful degradation**: Works without Ollama (BM25-only mode)
+- **Built-in ONNX embedding**: Vector search works out of the box, no Ollama required
+- **Graceful degradation**: Works without any embedding service (BM25-only mode)
 
 ## Install
 
@@ -30,6 +32,12 @@ pip install index1
 
 # Or via npm (auto-installs Python package)
 npx index1@latest
+```
+
+One-click plugin setup:
+
+```bash
+index1 setup                 # Auto-configure hooks + MCP for Claude Code
 ```
 
 Verify:
@@ -64,19 +72,19 @@ Add to your project's `.claude/CLAUDE.md`:
 ```markdown
 ## Search Strategy
 
-This project has index1 MCP Server configured (docs_search + 4 other tools). When searching code:
+This project has index1 MCP Server configured (recall + 5 other tools). When searching code:
 
 1. Known identifiers (function/class/file names) -> Grep/Glob directly (4ms)
-2. Exploratory questions ("how does XX work") -> docs_search first, then Grep for details
-3. CJK query for English code -> must use docs_search (Grep can't cross languages)
-4. High-frequency keywords (50+ expected matches) -> prefer docs_search (saves 90%+ context)
+2. Exploratory questions ("how does XX work") -> recall first, then Grep for details
+3. CJK query for English code -> must use recall (Grep can't cross languages)
+4. High-frequency keywords (50+ expected matches) -> prefer recall (saves 90%+ context)
 ```
 
 **Impact**:
 
 ```
 Without rules: Grep "search" -> 881 lines -> 35,895 tokens
-With rules:    docs_search  -> 5 summaries -> 460 tokens (97% savings)
+With rules:    recall        -> 5 summaries -> 460 tokens (97% savings)
 ```
 
 ## Index Your Project
@@ -87,9 +95,9 @@ index1 status                # Check index stats
 index1 search "your query"   # Test search
 ```
 
-## Optional: Vector Search
+## Optional: Multilingual Enhancement
 
-For semantic/cross-language search, install Ollama:
+index1 v2 has built-in ONNX embedding (bge-small-en-v1.5). For better multilingual support:
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
@@ -97,17 +105,11 @@ ollama pull nomic-embed-text           # Standard, 270MB
 # or
 ollama pull bge-m3                     # Best for CJK, 1.2GB
 
+index1 config embed_backend ollama
 index1 doctor                          # Verify setup
 ```
 
-Without Ollama, BM25 full-text search works perfectly (~60-80ms latency).
-
-## Optional: Chinese Support
-
-```bash
-pip install index1[chinese]
-index1 doctor    # Check 6 shows CJK status
-```
+Without Ollama, ONNX embedding provides vector search out of the box.
 
 ## Web UI
 
@@ -120,18 +122,19 @@ index1 web --port 8080       # Custom port
 
 | Tool | Description |
 |------|-------------|
-| `docs_search` | Hybrid BM25 + vector search, returns ranked results |
-| `docs_get` | Get full content of a chunk by ID |
-| `docs_status` | Index statistics (doc count, chunk count, collections) |
-| `docs_reindex` | Rebuild index for a path or collection |
-| `docs_config` | View or modify configuration |
+| `recall` | Unified search — code + cognitive facts, BM25 + vector hybrid |
+| `learn` | Record insights, decisions, lessons learned (auto-classify + dedup) |
+| `read` | Read file content + index metadata |
+| `status` | Index and cognition statistics |
+| `reindex` | Rebuild index for a path or collection |
+| `config` | View or modify configuration |
 
 ## Troubleshooting
 
 | Issue | Fix |
 |-------|-----|
 | Tools not showing | Check `.mcp.json` format and `index1` path |
-| AI doesn't use docs_search | Add search rules to CLAUDE.md (step 2) |
+| AI doesn't use recall | Add search rules to CLAUDE.md |
 | `command not found` | Use full path from `which index1` |
-| Chinese search returns 0 | `pip install index1[chinese]` |
-| No vector search | Install Ollama + pull model |
+| Chinese search returns 0 | Install Ollama + `bge-m3` model |
+| No vector search | Built-in ONNX should work; run `index1 doctor` |
