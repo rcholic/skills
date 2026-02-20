@@ -19,13 +19,16 @@ def parse_args() -> argparse.Namespace:
         "--state", help="Filter by state slug (e.g., new, waiting_on_you, closed)"
     )
     parser.add_argument("--team-id", help="Filter by team ID")
-    parser.add_argument("--assignee-id", help="Filter by assignee user ID")
     parser.add_argument("--requester-id", help="Filter by requester/contact ID")
     parser.add_argument(
         "--limit",
         type=int,
         default=50,
         help="Max issues to fetch (page size). Default: 50",
+    )
+    parser.add_argument(
+        "--assignee-id",
+        help="Only keep issues assigned to this user ID (client-side filter)",
     )
     parser.add_argument(
         "--start-time",
@@ -76,6 +79,13 @@ def main() -> int:
         params.setdefault("start_time", default_start)
 
     resp = api_request("/issues", params=params)
+    if args.assignee_id:
+        filtered = []
+        for issue in resp.get("data", []):
+            assignee = issue.get("assignee") or {}
+            if assignee.get("id") == args.assignee_id:
+                filtered.append(issue)
+        resp["data"] = filtered
     print(json.dumps(resp, indent=2))
     if resp.get("pagination", {}).get("has_next_page"):
         cursor = resp["pagination"].get("cursor")
