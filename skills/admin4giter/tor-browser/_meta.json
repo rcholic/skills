@@ -1,0 +1,11 @@
+{
+  "owner": "admin4giter",
+  "slug": "tor-browser",
+  "displayName": "Tor Browser Automation",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771582566656,
+    "commit": null
+  },
+  "history": []
+}
