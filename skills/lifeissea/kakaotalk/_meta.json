@@ -3,11 +3,16 @@
   "slug": "kakaotalk",
   "displayName": "KakaoTalk Agent",
   "latest": {
-    "version": "1.2.4",
-    "publishedAt": 1771501369392,
-    "commit": "https://github.com/openclaw/skills/commit/30a15cf42c97f547d410fa4d0c0ddf9706278317"
+    "version": "1.2.6",
+    "publishedAt": 1771510368474,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.4",
+      "publishedAt": 1771501369392,
+      "commit": "https://github.com/openclaw/skills/commit/30a15cf42c97f547d410fa4d0c0ddf9706278317"
+    },
     {
       "version": "1.2.3",
       "publishedAt": 1771499903071,
