@@ -1,5 +1,106 @@
 # Changelog - Web Search Plus
 
+## [2.8.4] - 2026-02-20
+
+### 🔒 Security Fix: SSRF protection in setup wizard
+
+- **Fixed:** `setup.py` SearXNG connection test had no SSRF protection (unlike `search.py`)
+- **Before:** Operator could be tricked into probing internal networks during setup
+- **After:** Same IP validation as `search.py` — blocks private IPs, cloud metadata, loopback
+- **Credit:** ClawHub security scanner
+
+## [2.8.3] - 2026-02-20
+
+### 🐛 Critical Fix: Perplexity results empty
+
+- **Fixed:** Perplexity provider returned 0 results because the AI-synthesized answer wasn't mapped into the results array
+- **Before:** Only extracted URLs from the answer text were returned as results (often 0)
+- **After:** The full answer is now the primary result (title, snippet with cleaned text), extracted source URLs follow as additional results
+- **Impact:** Perplexity queries now always return at least 1 result with the synthesized answer
+
+## [2.8.0] - 2026-02-20
+
+### 🆕 New Provider: Perplexity (AI-Synthesized Answers)
+
+Added Perplexity as the 6th search provider via Kilo Gateway — the first provider that returns **direct answers with citations** instead of just links:
+
+#### Features
+- **AI-Synthesized Answers**: Get a complete answer, not a list of links
+- **Inline Citations**: Every claim backed by `[1][2][3]` source references
+- **Real-Time Web Search**: Perplexity searches the web live, reads pages, and summarizes
+- **Zero Extra Config**: Works through Kilo Gateway with your existing `KILOCODE_API_KEY`
+- **Model**: `perplexity/sonar-pro` (best quality, supports complex queries)
+
+#### Auto-Routing Signals
+New direct-answer intent detection routes to Perplexity for:
+- Status queries: "status of", "current state of", "what is the status"
+- Local info: "events in [city]", "things to do in", "what's happening in"
+- Direct questions: "what is", "who is", "when did", "how many"
+- Current affairs: "this week", "this weekend", "right now", "today"
+
+#### Usage Examples
+```bash
+# Auto-routed
+python3 scripts/search.py -q "events in Graz Austria this weekend"  # → Perplexity
+python3 scripts/search.py -q "what is the current status of Ethereum"  # → Perplexity
+
+# Explicit
+python3 scripts/search.py -p perplexity -q "latest AI regulation news"
+```
+
+#### Configuration
+Requires `KILOCODE_API_KEY` environment variable (Kilo Gateway account).
+No additional API key needed — Perplexity is accessed through Kilo's unified API.
+
+```bash
+export KILOCODE_API_KEY="your-kilo-key"
+```
+
+### 🔧 Routing Rebalance
+
+Major overhaul of the auto-routing confidence scoring to fix Serper dominance:
+
+#### Problem
+Serper (Google) was winning ~90% of queries due to:
+- High recency multiplier boosting Serper on any query with dates/years
+- Default provider priority placing Serper first in ties
+- Research and discovery signals not strong enough to override
+
+#### Changes
+- **Lowered Serper recency multiplier** — date mentions no longer auto-route to Google
+- **Strengthened research signals** for Tavily:
+  - Added: "status of", "what happened with", "how does X compare"
+  - Boosted weights for comparison patterns (4.0 → 5.0)
+- **Strengthened discovery signals** for Exa:
+  - Added: "events in", "things to do in", "startups similar to"
+  - Boosted weights for local discovery patterns
+- **Updated provider priority order**: `tavily → exa → perplexity → serper → you → searxng`
+  - Serper moved from 1st to 4th in tie-breaking
+  - Research/discovery providers now win on ambiguous queries
+
+#### Routing Test Results
+
+| Query | Before | After | ✓ |
+|-------|--------|-------|---|
+| "latest OpenClaw version Feb 2026" | Serper | Serper | ✅ |
+| "Ethereum Pectra upgrade status" | Serper | **Tavily** | ✅ |
+| "events in Graz this weekend" | Serper | **Perplexity** | ✅ |
+| "compare SearXNG vs Brave for AI agents" | Serper | **Tavily** | ✅ |
+| "Sam Altman OpenAI news this week" | Serper | Serper | ✅ |
+| "find startups similar to Kilo Code" | Serper | **Exa** | ✅ |
+
+### 📊 Updated Provider Comparison
+
+| Feature | Serper | Tavily | Exa | Perplexity | You.com | SearXNG |
+|---------|:------:|:------:|:---:|:----------:|:-------:|:-------:|
+| Speed | ⚡⚡⚡ | ⚡⚡ | ⚡⚡ | ⚡⚡ | ⚡⚡⚡ | ⚡ |
+| Direct Answers | ✗ | ✗ | ✗ | ✓✓ | ✗ | ✗ |
+| Citations | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
+| Local Events | ✓ | ✗ | ✓ | ✓✓ | ✗ | ✓ |
+| Research | ✗ | ✓✓ | ✓ | ✓ | ✓ | ✗ |
+| Discovery | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ |
+| Self-Hosted | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
+
 ## [2.7.0] - 2026-02-14
 
 ### ✨ Added
