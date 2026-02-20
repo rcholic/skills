@@ -98,7 +98,7 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 120) -> di
         "Content-Type": "application/json",
         **headers,
     })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 
 
@@ -146,7 +146,7 @@ def detect_embed_provider() -> str:
 def _ollama_available() -> bool:
     """Ollama 서버 응답 여부 확인 (3초 타임아웃)."""
     try:
-        urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=3)  # nosec B310
+        urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=3)
         return True
     except Exception:
         return False

@@ -105,11 +105,11 @@ class KakaoWebhook:
         try:
             user_request = body.get("userRequest", {})
             raw = user_request.get("utterance", "")
-            # 프롬프트 인젝션 방지: 길이 제한 + 패턴 차단
-            raw = raw[:2000]
-            for _pat in ("ignore previous", "ignore all", "disregard", "system:", "[INST]", "###"):
-                raw = raw.replace(_pat, "")
-            utterance = raw.strip()
+        # 프롬프트 인젝션 방지: 길이 제한 + 패턴 차단
+        raw = raw[:2000]
+        for _pat in ("ignore previous", "ignore all", "disregard", "system:", "[INST]", "###"):
+            raw = raw.replace(_pat, "")
+        utterance = raw.strip()
             user_obj = user_request.get("user", {})
             user_id = user_obj.get("id", "unknown")
         except Exception:

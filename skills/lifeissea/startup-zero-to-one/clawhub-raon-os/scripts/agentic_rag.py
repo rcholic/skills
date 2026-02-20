@@ -593,7 +593,7 @@ class Tools:
                 url,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; RaonOS/3.0)"},
             )
-            with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 content = resp.read()
                 charset = "utf-8"
                 ct = resp.headers.get("Content-Type", "")

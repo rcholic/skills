@@ -308,7 +308,7 @@ def _route_feedback(evaluation_id, rating, comment=""):
                 },
                 method="POST",
             )
-            _ur.urlopen(req, timeout=5)  # nosec B310
+            _ur.urlopen(req, timeout=5)
             return True
         except Exception as e:
             print("[raon-server] SaaS 피드백 전송 실패 (무시): {}".format(e), file=sys.stderr)
@@ -1065,7 +1065,7 @@ def main():
     parser = argparse.ArgumentParser(description="🌅 Raon OS API Server")
     parser.add_argument("--port", "-p", type=int, default=DEFAULT_PORT)
     parser.add_argument("--model", "-m", default=DEFAULT_MODEL)
-    parser.add_argument("--host", default="0.0.0.0")  # nosec B104
+    parser.add_argument("--host", default="0.0.0.0")
     args = parser.parse_args()
 
     RaonHandler.model = args.model

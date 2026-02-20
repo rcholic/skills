@@ -1,5 +1,5 @@
 ---
-name: Raon OS
+name: raon-os
 version: 0.7.10
 description: "AI-powered startup companion for Korean founders. Evaluate business plans, match government funding programs (TIPS/DeepTech/Global TIPS), connect with 3,972+ TIPS-selected startups, get investor recommendations, and integrate with Kakao i OpenBuilder. Features Agentic RAG (HyDE, Multi-Query, CRAG), structured extraction, and Track B financial matching."
 metadata:

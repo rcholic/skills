@@ -92,7 +92,7 @@ def _request(method: str, table: str, data=None, extra_headers: dict = None):
     body = json.dumps(data, ensure_ascii=False).encode("utf-8") if data is not None else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
+        with urllib.request.urlopen(req, timeout=5) as resp:
             resp_body = resp.read()
             if resp_body:
                 return json.loads(resp_body.decode("utf-8"))
