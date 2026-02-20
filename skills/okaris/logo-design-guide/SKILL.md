@@ -1,11 +1,6 @@
 ---
 name: logo-design-guide
-description: |
-  Logo design principles and AI image generation best practices for creating logos.
-  Covers logo types, prompting techniques, scalability rules, and iteration workflows.
-  Use for: brand identity, startup logos, app icons, favicons, logo concepts.
-  Triggers: logo design, create logo, brand logo, logo generation, ai logo,
-  logo maker, icon design, brand mark, logo concept, startup logo, app icon logo
+description: "Logo design principles and AI image generation best practices for creating logos. Covers logo types, prompting techniques, scalability rules, and iteration workflows. Use for: brand identity, startup logos, app icons, favicons, logo concepts. Triggers: logo design, create logo, brand logo, logo generation, ai logo, logo maker, icon design, brand mark, logo concept, startup logo, app icon logo"
 allowed-tools: Bash(infsh *)
 ---
 
@@ -25,6 +20,8 @@ infsh app run falai/flux-dev-lora --input '{
   "height": 1024
 }'
 ```
+
+> **Install note:** The [install script](https://cli.inference.sh) only detects your OS/architecture, downloads the matching binary from `dist.inference.sh`, and verifies its SHA-256 checksum. No elevated permissions or background processes. [Manual install & verification](https://dist.inference.sh/cli/checksums.txt) available.
 
 ## Logo Types
 
@@ -183,8 +180,8 @@ Note: AI generates raster images (PNG). For true vector SVG, use the AI output a
 ## Related Skills
 
 ```bash
-npx skills add inferencesh/skills@ai-image-generation
-npx skills add inferencesh/skills@prompt-engineering
+npx skills add inference-sh/skills@ai-image-generation
+npx skills add inference-sh/skills@prompt-engineering
 ```
 
 Browse all apps: `infsh app list`
