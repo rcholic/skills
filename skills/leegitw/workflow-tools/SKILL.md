@@ -1,6 +1,6 @@
 ---
 name: workflow-tools
-version: 1.1.0
+version: 1.2.0
 description: Work smarter with loop detection, parallel decisions, and file size analysis
 author: Live Neon <contact@liveneon.dev>
 homepage: https://github.com/live-neon/skills/tree/main/agentic/workflow-tools
@@ -56,10 +56,10 @@ openclaw install leegitw/workflow-tools
 **Standalone usage**: Loop detection, parallel decisions, and MCE analysis work independently.
 Full integration provides constraint-aware workflow recommendations.
 
-**Data handling**: This skill operates within your agent's trust boundary. All workflow
-analysis uses your agent's configured model — no external APIs or third-party services are called.
-If your agent uses a cloud-hosted LLM (Claude, GPT, etc.), data is processed by that service
-as part of normal agent operation. Results are written to `output/` subdirectories in your workspace.
+**Data handling**: This skill is instruction-only (`disable-model-invocation: true`).
+It provides workflow utilities and analysis frameworks but does NOT invoke AI models itself.
+No external APIs or third-party services are called. Results are written to `output/` subdirectories
+in your workspace. The skill only accesses paths declared in its metadata.
 
 ## What This Solves
 
@@ -405,6 +405,32 @@ output/
         ├── status.json
         └── results.md
 ```
+
+## Security Considerations
+
+**What this skill accesses:**
+- Configuration files in `.openclaw/workflow-tools.yaml` and `.claude/workflow-tools.yaml`
+- Source files specified by user for MCE analysis (read-only)
+- Its own output directories:
+  - `output/loops/` — loop scan results
+  - `output/parallel-decisions/` — decision records
+  - `output/mce-analysis/` — file analysis results
+  - `output/subworkflows/` — subworkflow outputs
+
+**What this skill does NOT access:**
+- Files outside declared workspace paths (except user-specified analysis targets)
+- System environment variables
+- Network resources or external APIs
+
+**What this skill does NOT do:**
+- Invoke AI models (instruction-only skill)
+- Send data to external services
+- Execute arbitrary code
+- Modify source files (analysis is read-only)
+
+**Subworkflow note:**
+The `/wt subworkflow` command spawns other ClawHub skills. Those skills inherit their own
+declared privileges; this skill does not grant additional access beyond spawning.
 
 ## Acceptance Criteria
 
