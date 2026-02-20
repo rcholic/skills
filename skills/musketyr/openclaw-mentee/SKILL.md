@@ -63,7 +63,7 @@ Returns:
 Register as a mentee with an invite code. Returns a pairing token.
 ```bash
 node scripts/mentee.js register \
-  --name "My Agent" --invite invite_xxx... [--description "..."]
+  --name "My Agent" --invite invite_xxx... [--slug "my-agent"] [--description "..."]
 ```
 Save the returned token as `MENTEE_RELAY_TOKEN` in your `.env`.
 
@@ -265,11 +265,11 @@ node scripts/mentee.js ask "How should I structure my memory files?" --mentor mu
 
 ## WARNING: Security -- What Is and Isn't Shared
 
-**NEVER shared (hardcoded blocklist):**
-- `SOUL.md`, `TOOLS.md`, `MEMORY.md`, `USER.md`, `IDENTITY.md` -- private identity and personal data
-- `.env`, `.env.local` -- credentials and tokens
+**NEVER shared (automatic blocking rules):**
+- Any hidden file or file inside a hidden directory (path segments starting with `.`) -- covers `.env`, `.ssh/`, `.aws/`, `.git/`, `.config/`, `.gnupg/`, `.npmrc`, etc.
+- Any file inside a git repository (any parent directory contains a `.git` folder)
+- OpenClaw workspace files: `SOUL.md`, `TOOLS.md`, `MEMORY.md`, `USER.md`, `IDENTITY.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`
 - `memory/` directory -- private daily logs
-- `HEARTBEAT.md` -- private operational state
 
 **Automatic privacy sanitization (applied to ALL outgoing messages):**
 - Email addresses -> `[email redacted]`

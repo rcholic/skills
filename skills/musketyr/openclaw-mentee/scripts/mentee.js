@@ -14,32 +14,40 @@ const API_TOKEN = process.env.MENTOR_API_TOKEN; // tok_xxx for search/request-in
 const WORKSPACE = process.env.WORKSPACE || process.cwd();
 
 // SECURITY: Files that must NEVER be shared with mentors
+// OpenClaw workspace files that must never be shared
 const BLOCKED_FILES = [
-  // OpenClaw workspace files
   'SOUL.md', 'TOOLS.md', 'MEMORY.md', 'USER.md',
   'HEARTBEAT.md', 'IDENTITY.md', 'BOOTSTRAP.md',
   'memory/',
-  // Environment / secrets
-  '.env', '.env.local', '.env.production', '.env.development', '.env.staging',
-  // SSH and GPG
-  '.ssh/', '.gnupg/',
-  // Cloud credentials
-  '.aws/', '.azure/', '.config/gcloud/',
-  // Git internals
-  '.git/', '.git/config', '.gitconfig',
-  // Auth tokens and config
-  '.netrc', '.npmrc', '.pypirc', '.docker/config.json',
-  // OS-level config
-  '.config/', '.local/', '.cache/',
-  // Common secret files
-  'credentials', 'credentials.json', 'service-account.json',
-  'id_rsa', 'id_ed25519', 'id_ecdsa',
-  // OpenClaw state
-  '.openclaw/',
 ];
 
+/**
+ * Check if a file path should be blocked from sharing.
+ * Rules:
+ * 1. Any file inside a hidden directory or hidden file (path segment starting with ".")
+ * 2. Any file inside a git repository (any parent directory contains a .git folder)
+ * 3. Any file matching the explicit BLOCKED_FILES list
+ */
 function isBlockedFile(filePath) {
   const normalized = filePath.replace(/^\/+/, '').replace(/\\/g, '/');
+  const segments = normalized.split('/');
+
+  // Block anything in a hidden directory or hidden file (segment starts with ".")
+  // This covers .env, .ssh/, .aws/, .config/, .git/, .gnupg/, .netrc, .npmrc, etc.
+  if (segments.some(seg => seg.startsWith('.'))) return true;
+
+  // Block anything inside a git repository — walk up from the file looking for .git/
+  const resolved = path.resolve(filePath);
+  let dir = path.dirname(resolved);
+  const root = path.parse(dir).root;
+  while (dir !== root) {
+    try {
+      if (fs.statSync(path.join(dir, '.git')).isDirectory()) return true;
+    } catch { /* no .git here, keep walking */ }
+    dir = path.dirname(dir);
+  }
+
+  // Block explicit workspace files
   return BLOCKED_FILES.some(blocked => {
     if (blocked.endsWith('/')) return normalized.startsWith(blocked) || normalized.includes('/' + blocked);
     return normalized === blocked || normalized.endsWith('/' + blocked);
@@ -86,16 +94,22 @@ async function register() {
   const name = getArg('name');
   const description = getArg('description') || '';
   const invite = getArg('invite');
+  let slug = getArg('slug') || '';
 
   if (!name || !invite) {
-    console.error('Usage: node mentee.js register --name "Name" --invite "invite_xxx" [--description "..."]');
+    console.error('Usage: node mentee.js register --name "Name" --invite "invite_xxx" [--slug "my-slug"] [--description "..."]');
     process.exit(1);
+  }
+
+  // Auto-derive slug from name if not provided
+  if (!slug) {
+    slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
   const res = await fetch(`${RELAY_URL}/api/setup`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ agent_name: name, description, invite_code: invite }),
+    body: JSON.stringify({ agent_name: name, slug, description, invite_code: invite }),
   });
 
   const data = await res.json();
