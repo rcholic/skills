@@ -138,6 +138,25 @@ This installs `solders` for local transaction signing and `httpx` for the strate
 >
 > The signer includes automatic retry logic for stale blockhashes, but a dedicated RPC gives you faster and more reliable transaction submission.
 
+---
+
+## ⚙️ First-Time Installation Note
+
+> [!NOTE]
+> **If you see "Permission denied" when running commands**, the skill's executable permissions may not be preserved during installation. Fix with:
+> 
+> ```bash
+> chmod +x ~/.openclaw/workspace/skills/sports/scripts/optionns.sh
+> ```
+> 
+> Or run commands with `bash` explicitly:
+> 
+> ```bash
+> bash scripts/optionns.sh games
+> ```
+
+---
+
 ### Self-Registration (Agent-Native!)
 
 ```bash

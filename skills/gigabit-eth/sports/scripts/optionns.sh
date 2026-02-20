@@ -892,11 +892,12 @@ cmd_autonomous() {
     fi
     
     # Run strategy engine in autonomous mode
+    # strategy.py expects positional command "auto" (not --mode)
     # $sport validated via regex, safe to use
     if [[ "$sport" == "ANY" ]]; then
-        python3 "$SCRIPT_DIR/strategy.py" --mode autonomous
+        python3 "$SCRIPT_DIR/strategy.py" auto
     else
-        python3 "$SCRIPT_DIR/strategy.py" --mode autonomous --sport "$sport"
+        python3 "$SCRIPT_DIR/strategy.py" auto "$sport"
     fi
 }
 

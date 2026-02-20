@@ -328,6 +328,20 @@ class OptionnsTrader:
                     rpc_url=RPC_URL
                 )
                 print(f"  ✅ On-chain: {tx_signature[:16]}...{tx_signature[-4:]}")
+                
+                # Step 4: Confirm transaction with backend
+                if tx_signature and 'pending_id' in trade:
+                    print(f"  ⏳ Confirming transaction with backend...")
+                    confirm = self.api_call('POST', '/v1/vault/confirm', {
+                        'pending_id': trade['pending_id'],
+                        'tx_signature': tx_signature
+                    })
+                    if confirm and confirm.get('success'):
+                        print(f"  ✅ Position confirmed on backend: {confirm.get('position_id')}")
+                        trade['position_id'] = confirm.get('position_id')
+                    else:
+                        print(f"  ❌ Backend confirmation failed")
+                        
             except Exception as e:
                 print(f"  ❌ On-chain settlement failed: {e}")
                 # Continue with off-chain position tracking
