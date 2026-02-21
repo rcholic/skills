@@ -7,6 +7,7 @@ metadata:
     requires:
       env:
         - BEAVERHABITS_API_KEY
+        - SERVER_URL (optional, defaults to https://beaverhabits.com)
       bins:
         - curl
     primaryEnv: BEAVERHABITS_API_KEY
