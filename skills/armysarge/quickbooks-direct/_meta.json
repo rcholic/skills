@@ -1,0 +1,11 @@
+{
+  "owner": "armysarge",
+  "slug": "quickbooks-direct",
+  "displayName": "QuickBooks Direct",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1771665376207,
+    "commit": null
+  },
+  "history": []
+}
