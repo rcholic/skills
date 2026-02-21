@@ -1,339 +1,309 @@
 diff --git a/ui/src/ui/views/agents.ts b/ui/src/ui/views/agents.ts
-index fbcfc2658..b04cc3dc2 100644
+index 565777d85..64998d561 100644
 --- a/ui/src/ui/views/agents.ts
 +++ b/ui/src/ui/views/agents.ts
-@@ -1,4 +1,72 @@
- import { html, nothing } from "lit";
-+
-+const AGENT_EMOJIS: Array<{ emoji: string; label: string }> = [
-+  // Tech & AI
-+  { emoji: "\u{1F916}", label: "Robot" },
-+  { emoji: "\u{1F9E0}", label: "Brain" },
-+  { emoji: "\u{1F4BB}", label: "Laptop" },
-+  { emoji: "\u{1F5A5}\u{FE0F}", label: "Monitor" },
-+  { emoji: "\u{1F52E}", label: "Crystal Ball" },
-+  { emoji: "\u{26A1}", label: "Lightning" },
-+  { emoji: "\u{1F6E0}\u{FE0F}", label: "Tools" },
-+  { emoji: "\u{2699}\u{FE0F}", label: "Gear" },
-+  { emoji: "\u{1F52C}", label: "Microscope" },
-+  { emoji: "\u{1F52D}", label: "Telescope" },
-+  { emoji: "\u{1F4A1}", label: "Idea" },
-+  { emoji: "\u{1F4E1}", label: "Satellite" },
-+  { emoji: "\u{1F9EC}", label: "DNA" },
-+  { emoji: "\u{1F510}", label: "Locked" },
-+  // People & Roles
-+  { emoji: "\u{1F9D9}", label: "Wizard" },
-+  { emoji: "\u{1F575}\u{FE0F}", label: "Detective" },
-+  { emoji: "\u{1F468}\u{200D}\u{1F4BB}", label: "Developer" },
-+  { emoji: "\u{1F9D1}\u{200D}\u{1F52C}", label: "Scientist" },
-+  { emoji: "\u{1F469}\u{200D}\u{1F4BC}", label: "Executive" },
-+  { emoji: "\u{1F9D1}\u{200D}\u{1F3A8}", label: "Artist" },
-+  { emoji: "\u{1F3AD}", label: "Theater" },
-+  { emoji: "\u{1F9D1}\u{200D}\u{1F3EB}", label: "Teacher" },
-+  { emoji: "\u{1F9B8}", label: "Superhero" },
-+  { emoji: "\u{1F3C4}", label: "Surfer" },
-+  // Animals
-+  { emoji: "\u{1F43B}", label: "Bear" },
-+  { emoji: "\u{1F98A}", label: "Fox" },
-+  { emoji: "\u{1F43A}", label: "Wolf" },
-+  { emoji: "\u{1F981}", label: "Lion" },
-+  { emoji: "\u{1F42F}", label: "Tiger" },
-+  { emoji: "\u{1F43C}", label: "Panda" },
-+  { emoji: "\u{1F985}", label: "Eagle" },
-+  { emoji: "\u{1F989}", label: "Owl" },
-+  { emoji: "\u{1F409}", label: "Dragon" },
-+  { emoji: "\u{1F98B}", label: "Butterfly" },
-+  { emoji: "\u{1F42C}", label: "Dolphin" },
-+  { emoji: "\u{1F988}", label: "Shark" },
-+  { emoji: "\u{1F41D}", label: "Bee" },
-+  { emoji: "\u{1F98E}", label: "Lizard" },
-+  // Nature & Elements
-+  { emoji: "\u{1F525}", label: "Fire" },
-+  { emoji: "\u{2744}\u{FE0F}", label: "Ice" },
-+  { emoji: "\u{1F30A}", label: "Wave" },
-+  { emoji: "\u{2B50}", label: "Star" },
-+  { emoji: "\u{1F31F}", label: "Glowing Star" },
-+  { emoji: "\u{2600}\u{FE0F}", label: "Sun" },
-+  { emoji: "\u{1F319}", label: "Moon" },
-+  { emoji: "\u{1F4AB}", label: "Dizzy Star" },
-+  { emoji: "\u{1F308}", label: "Rainbow" },
-+  { emoji: "\u{1F340}", label: "Clover" },
-+  // Objects & Symbols
-+  { emoji: "\u{1F4DA}", label: "Books" },
-+  { emoji: "\u{1F4DD}", label: "Memo" },
-+  { emoji: "\u{1F3AF}", label: "Target" },
-+  { emoji: "\u{1F4AC}", label: "Chat" },
-+  { emoji: "\u{1F4CA}", label: "Chart" },
-+  { emoji: "\u{1F5C2}\u{FE0F}", label: "File Cabinet" },
-+  { emoji: "\u{1F3C6}", label: "Trophy" },
-+  { emoji: "\u{1F3AE}", label: "Game Controller" },
-+  { emoji: "\u{1F3B5}", label: "Music" },
-+  { emoji: "\u{1F310}", label: "Globe" },
-+  { emoji: "\u{1F680}", label: "Rocket" },
-+  { emoji: "\u{1F6F8}", label: "UFO" },
-+];
+@@ -16,6 +16,14 @@ const AGENT_EMOJIS: Array<{ emoji: string; label: string }> = [
+   { emoji: "\u{1F4E1}", label: "Satellite" },
+   { emoji: "\u{1F9EC}", label: "DNA" },
+   { emoji: "\u{1F510}", label: "Locked" },
++  { emoji: "\u{1F9F2}", label: "Magnet" },
++  { emoji: "\u{1F4F1}", label: "Phone" },
++  { emoji: "\u{1F3A9}", label: "Top Hat" },
++  { emoji: "\u{1F50D}", label: "Search" },
++  { emoji: "\u{1F9EA}", label: "Test Tube" },
++  { emoji: "\u{1F4BE}", label: "Floppy Disk" },
++  { emoji: "\u{1F5A8}\u{FE0F}", label: "Printer" },
++  { emoji: "\u{1F4F7}", label: "Camera" },
+   // People & Roles
+   { emoji: "\u{1F9D9}", label: "Wizard" },
+   { emoji: "\u{1F575}\u{FE0F}", label: "Detective" },
+@@ -27,6 +35,15 @@ const AGENT_EMOJIS: Array<{ emoji: string; label: string }> = [
+   { emoji: "\u{1F9D1}\u{200D}\u{1F3EB}", label: "Teacher" },
+   { emoji: "\u{1F9B8}", label: "Superhero" },
+   { emoji: "\u{1F3C4}", label: "Surfer" },
++  { emoji: "\u{1F477}", label: "Construction" },
++  { emoji: "\u{1F9D1}\u{200D}\u{1F373}", label: "Chef" },
++  { emoji: "\u{1F9D1}\u{200D}\u{2695}\u{FE0F}", label: "Doctor" },
++  { emoji: "\u{1F9D1}\u{200D}\u{1F680}", label: "Astronaut" },
++  { emoji: "\u{1F9D1}\u{200D}\u{2696}\u{FE0F}", label: "Judge" },
++  { emoji: "\u{1F9D9}\u{200D}\u{2640}\u{FE0F}", label: "Sorceress" },
++  { emoji: "\u{1F9DD}", label: "Elf" },
++  { emoji: "\u{1F9DB}", label: "Vampire" },
++  { emoji: "\u{1F47D}", label: "Alien" },
+   // Animals
+   { emoji: "\u{1F43B}", label: "Bear" },
+   { emoji: "\u{1F98A}", label: "Fox" },
+@@ -42,6 +59,16 @@ const AGENT_EMOJIS: Array<{ emoji: string; label: string }> = [
+   { emoji: "\u{1F988}", label: "Shark" },
+   { emoji: "\u{1F41D}", label: "Bee" },
+   { emoji: "\u{1F98E}", label: "Lizard" },
++  { emoji: "\u{1F99C}", label: "Parrot" },
++  { emoji: "\u{1F43D}", label: "Pig" },
++  { emoji: "\u{1F40D}", label: "Snake" },
++  { emoji: "\u{1F986}", label: "Duck" },
++  { emoji: "\u{1F992}", label: "Giraffe" },
++  { emoji: "\u{1F98F}", label: "Rhino" },
++  { emoji: "\u{1F9A1}", label: "Badger" },
++  { emoji: "\u{1F426}", label: "Bird" },
++  { emoji: "\u{1F54A}\u{FE0F}", label: "Dove" },
++  { emoji: "\u{1F99D}", label: "Raccoon" },
+   // Nature & Elements
+   { emoji: "\u{1F525}", label: "Fire" },
+   { emoji: "\u{2744}\u{FE0F}", label: "Ice" },
+@@ -53,6 +80,14 @@ const AGENT_EMOJIS: Array<{ emoji: string; label: string }> = [
+   { emoji: "\u{1F4AB}", label: "Dizzy Star" },
+   { emoji: "\u{1F308}", label: "Rainbow" },
+   { emoji: "\u{1F340}", label: "Clover" },
++  { emoji: "\u{26C8}\u{FE0F}", label: "Storm" },
++  { emoji: "\u{1F32A}\u{FE0F}", label: "Tornado" },
++  { emoji: "\u{1F30B}", label: "Volcano" },
++  { emoji: "\u{1F4A7}", label: "Droplet" },
++  { emoji: "\u{1F343}", label: "Leaves" },
++  { emoji: "\u{1F332}", label: "Evergreen" },
++  { emoji: "\u{1F31A}", label: "New Moon" },
++  { emoji: "\u{2604}\u{FE0F}", label: "Comet" },
+   // Objects & Symbols
+   { emoji: "\u{1F4DA}", label: "Books" },
+   { emoji: "\u{1F4DD}", label: "Memo" },
+@@ -66,6 +101,18 @@ const AGENT_EMOJIS: Array<{ emoji: string; label: string }> = [
+   { emoji: "\u{1F310}", label: "Globe" },
+   { emoji: "\u{1F680}", label: "Rocket" },
+   { emoji: "\u{1F6F8}", label: "UFO" },
++  { emoji: "\u{1F4B0}", label: "Money Bag" },
++  { emoji: "\u{1F511}", label: "Key" },
++  { emoji: "\u{1F5E1}\u{FE0F}", label: "Dagger" },
++  { emoji: "\u{1F6E1}\u{FE0F}", label: "Shield" },
++  { emoji: "\u{1FA84}", label: "Magic Wand" },
++  { emoji: "\u{1F9ED}", label: "Compass" },
++  { emoji: "\u{231B}", label: "Hourglass" },
++  { emoji: "\u{1F4E6}", label: "Package" },
++  { emoji: "\u{1F3B2}", label: "Dice" },
++  { emoji: "\u{265F}\u{FE0F}", label: "Chess" },
++  { emoji: "\u{1F52F}", label: "Dotted Star" },
++  { emoji: "\u{1F9E9}", label: "Puzzle" },
+ ];
  import type {
    AgentIdentityResult,
-   AgentsFilesListResult,
-@@ -18,9 +86,9 @@ import {
-   agentBadgeText,
-   buildAgentContext,
-   buildModelOptions,
-+  buildModelOptionsMulti,
-   normalizeAgentLabel,
-   normalizeModelValue,
--  parseFallbackList,
-   resolveAgentConfig,
-   resolveAgentEmoji,
-   resolveModelFallbacks,
-@@ -40,6 +108,27 @@ export type ModelInfo = {
- export type AgentsProps = {
-   loading: boolean;
-   error: string | null;
-+  // Create agent
-+  showCreateForm: boolean;
-+  createMode: "manual" | "wizard";
-+  createName: string;
-+  createWorkspace: string;
-+  createEmoji: string;
-+  creating: boolean;
-+  createError: string | null;
-+  // Wizard
-+  wizardDescription: string;
-+  wizardLoading: boolean;
-+  wizardResult: { name: string; emoji: string; soul: string } | null;
-+  onToggleCreateForm: () => void;
-+  onCreateModeChange: (mode: "manual" | "wizard") => void;
-+  onCreateNameChange: (v: string) => void;
-+  onCreateWorkspaceChange: (v: string) => void;
-+  onCreateEmojiChange: (v: string) => void;
-+  onCreateAgent: () => void;
-+  onWizardDescriptionChange: (v: string) => void;
-+  onWizardGenerate: () => void;
-+  onWizardAccept: () => void;
-   agentsList: AgentsListResult | null;
-   selectedAgentId: string | null;
-   activePanel: AgentsPanel;
-@@ -120,7 +209,7 @@ export function renderAgents(props: AgentsProps) {
-             <div class="card-sub">${agents.length} configured.</div>
-           </div>
-           <button class="btn btn--sm" ?disabled=${props.loading} @click=${props.onRefresh}>
--            ${props.loading ? "Loading?" : "Refresh"}
-+            ${props.loading ? "Loading\u{2026}" : "Refresh"}
-           </button>
-         </div>
-         ${
-@@ -128,6 +217,98 @@ export function renderAgents(props: AgentsProps) {
-             ? html`<div class="callout danger" style="margin-top: 12px;">${props.error}</div>`
-             : nothing
-         }
-+        <div style="margin-top: 12px;">
-+          <button class="btn btn--sm" style="width:100%;" @click=${props.onToggleCreateForm}>
-+            ${props.showCreateForm ? "\u{2715} Cancel" : "+ Create Agent"}
-+          </button>
-+        </div>
-+
-+        ${props.showCreateForm ? html`
-+          <div style="margin-top:12px; padding:14px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--bg-elevated); display:grid; gap:10px;">
-+            <!-- Mode tabs -->
-+            <div style="display:flex; gap:4px; border-bottom:1px solid var(--border); padding-bottom:8px;">
-+              <button class="btn btn--sm ${props.createMode === "manual" ? "primary" : ""}" style="font-size:11px; padding:3px 8px;"
-+                @click=${() => props.onCreateModeChange("manual")}>\u{270F}\u{FE0F} Manual</button>
-+              <button class="btn btn--sm ${props.createMode === "wizard" ? "primary" : ""}" style="font-size:11px; padding:3px 8px;"
-+                @click=${() => props.onCreateModeChange("wizard")}>\u{1FA84} AI Wizard</button>
-+            </div>
-+
-+            ${props.createMode === "wizard" ? html`
-+              <!-- AI Wizard -->
-+              <div style="font-size:12px; color:var(--muted);">Describe what you want this agent to do and AI will generate everything.</div>
-+              <textarea
-+                placeholder="e.g. A research assistant that specializes in finding and summarizing academic papers. Should be thorough but concise, cite sources, and flag when information might be outdated."
-+                rows="4"
-+                style="resize:vertical; font-size:13px;"
-+                .value=${props.wizardDescription}
-+                @input=${(e: Event) => props.onWizardDescriptionChange((e.target as HTMLTextAreaElement).value)}
-+              ></textarea>
-+              <button class="btn btn--sm"
-+                ?disabled=${props.wizardLoading || !props.wizardDescription.trim()}
-+                @click=${props.onWizardGenerate}>
-+                ${props.wizardLoading ? "\u{1FA84} Generating\u{2026}" : "\u{1FA84} Generate Agent"}
-+              </button>
-+
-+              ${props.wizardResult ? html`
-+                <div style="padding:12px; border:1px solid var(--ok); border-radius:var(--radius-md); background:var(--bg-elevated); display:grid; gap:8px;">
-+                  <div style="font-weight:600; font-size:13px;">
-+                    ${props.wizardResult.emoji} ${props.wizardResult.name}
-+                  </div>
-+                  <div style="font-size:12px; color:var(--muted); max-height:120px; overflow-y:auto; white-space:pre-wrap; font-family:var(--mono);">
-+                    ${props.wizardResult.soul.slice(0, 300)}${props.wizardResult.soul.length > 300 ? "\u{2026}" : ""}
-+                  </div>
-+                  <button class="btn primary btn--sm"
-+                    ?disabled=${props.creating}
-+                    @click=${props.onWizardAccept}>
-+                    ${props.creating ? "Creating\u{2026}" : "\u{2705} Create This Agent"}
-+                  </button>
-+                </div>
-+              ` : nothing}
-+            ` : html`
-+              <!-- Manual -->
-+              <label class="field">
-+                <span style="font-size:12px;">Name</span>
-+                <input type="text" placeholder="e.g. Research Assistant"
-+                  .value=${props.createName}
-+                  @input=${(e: Event) => props.onCreateNameChange((e.target as HTMLInputElement).value)} />
-+              </label>
-+              <label class="field">
-+                <span style="font-size:12px;">Workspace path</span>
-+                <input type="text"
-+                  .value=${props.createWorkspace}
-+                  placeholder="auto-generated from name"
-+                  @input=${(e: Event) => props.onCreateWorkspaceChange((e.target as HTMLInputElement).value)} />
-+              </label>
-+              <label class="field">
-+                <span style="font-size:12px;">Emoji</span>
-+                <div style="display:flex; gap:8px; align-items:center;">
-+                  <div style="font-size:28px; line-height:1; width:36px; text-align:center; flex-shrink:0;">
-+                    ${props.createEmoji || "\u{1F916}"}
-+                  </div>
-+                  <select
-+                    style="flex:1;"
-+                    .value=${props.createEmoji}
-+                    @change=${(e: Event) => props.onCreateEmojiChange((e.target as HTMLSelectElement).value)}
-+                  >
-+                    ${AGENT_EMOJIS.map(({ emoji, label }) => html`
-+                      <option value=${emoji} ?selected=${props.createEmoji === emoji}>
-+                        ${emoji} ${label}
-+                      </option>
-+                    `)}
-+                  </select>
-+                </div>
-+              </label>
-+              <button class="btn primary btn--sm"
-+                ?disabled=${props.creating || !props.createName.trim()}
-+                @click=${props.onCreateAgent}>
-+                ${props.creating ? "Creating\u{2026}" : "Create Agent"}
-+              </button>
-+            `}
-+
-+            ${props.createError ? html`<div class="callout danger" style="font-size:12px;">${props.createError}</div>` : nothing}
-+          </div>
-+        ` : nothing}
-+
-         <div class="agent-list" style="margin-top: 12px;">
-           ${
-             agents.length === 0
-@@ -395,7 +576,6 @@ function renderAgentOverview(params: {
-     (defaultModel !== "-" ? normalizeModelValue(defaultModel) : null);
-   const effectivePrimary = modelPrimary ?? defaultPrimary ?? null;
-   const modelFallbacks = resolveModelFallbacks(config.entry?.model);
--  const fallbackText = modelFallbacks ? modelFallbacks.join(", ") : "";
-   const identityName =
-     agentIdentity?.name?.trim() ||
-     agent.identity?.name?.trim() ||
-@@ -407,7 +587,7 @@ function renderAgentOverview(params: {
-   const skillFilter = Array.isArray(config.entry?.skills) ? config.entry?.skills : null;
-   const skillCount = skillFilter?.length ?? null;
-   const identityStatus = agentIdentityLoading
--    ? "Loading?"
-+    ? "Loading\u{2026}"
-     : agentIdentityError
-       ? "Unavailable"
+@@ -174,6 +221,21 @@ export type AgentsProps = {
+   onConfigSave: () => void;
+   onModelChange: (agentId: string, modelId: string | null) => void;
+   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
++  editAgentName: string;
++  editAgentWorkspace: string;
++  editAgentEmoji: string;
++  editAgentDirty: boolean;
++  editAgentSaving: boolean;
++  editAgentError: string | null;
++  onEditNameChange: (v: string) => void;
++  onEditWorkspaceChange: (v: string) => void;
++  onEditEmojiChange: (v: string) => void;
++  confirmDeleteAgentId: string | null;
++  deleteAgentInProgress: boolean;
++  deleteAgentError: string | null;
++  onDeleteStart: (agentId: string) => void;
++  onDeleteCancel: () => void;
++  onDeleteConfirm: (agentId: string) => void;
+   onChannelsRefresh: () => void;
+   onCronRefresh: () => void;
+   onSkillsFilterChange: (next: string) => void;
+@@ -384,6 +446,21 @@ export function renderAgents(props: AgentsProps) {
+                         onConfigSave: props.onConfigSave,
+                         onModelChange: props.onModelChange,
+                         onModelFallbacksChange: props.onModelFallbacksChange,
++                        editAgentName: props.editAgentName,
++                        editAgentWorkspace: props.editAgentWorkspace,
++                        editAgentEmoji: props.editAgentEmoji,
++                        editAgentDirty: props.editAgentDirty,
++                        editAgentSaving: props.editAgentSaving,
++                        editAgentError: props.editAgentError,
++                        onEditNameChange: props.onEditNameChange,
++                        onEditWorkspaceChange: props.onEditWorkspaceChange,
++                        onEditEmojiChange: props.onEditEmojiChange,
++                        confirmDeleteAgentId: props.confirmDeleteAgentId,
++                        deleteAgentInProgress: props.deleteAgentInProgress,
++                        deleteAgentError: props.deleteAgentError,
++                        onDeleteStart: props.onDeleteStart,
++                        onDeleteCancel: props.onDeleteCancel,
++                        onDeleteConfirm: props.onDeleteConfirm,
+                       })
+                     : nothing
+                 }
+@@ -557,6 +634,21 @@ function renderAgentOverview(params: {
+   onConfigSave: () => void;
+   onModelChange: (agentId: string, modelId: string | null) => void;
+   onModelFallbacksChange: (agentId: string, fallbacks: string[]) => void;
++  editAgentName: string;
++  editAgentWorkspace: string;
++  editAgentEmoji: string;
++  editAgentDirty: boolean;
++  editAgentSaving: boolean;
++  editAgentError: string | null;
++  onEditNameChange: (v: string) => void;
++  onEditWorkspaceChange: (v: string) => void;
++  onEditEmojiChange: (v: string) => void;
++  confirmDeleteAgentId: string | null;
++  deleteAgentInProgress: boolean;
++  deleteAgentError: string | null;
++  onDeleteStart: (agentId: string) => void;
++  onDeleteCancel: () => void;
++  onDeleteConfirm: (agentId: string) => void;
+ }) {
+   const {
+     agent,
+@@ -573,7 +665,23 @@ function renderAgentOverview(params: {
+     onConfigSave,
+     onModelChange,
+     onModelFallbacksChange,
++    editAgentName,
++    editAgentWorkspace,
++    editAgentEmoji,
++    editAgentDirty,
++    editAgentSaving,
++    editAgentError,
++    onEditNameChange,
++    onEditWorkspaceChange,
++    onEditEmojiChange,
++    confirmDeleteAgentId,
++    deleteAgentInProgress,
++    deleteAgentError,
++    onDeleteStart,
++    onDeleteCancel,
++    onDeleteConfirm,
+   } = params;
++  const isConfirmingDelete = confirmDeleteAgentId === agent.id;
+   const config = resolveAgentConfig(configForm, agent.id);
+   const workspaceFromFiles =
+     agentFilesList && agentFilesList.agentId === agent.id ? agentFilesList.workspace : null;
+@@ -607,33 +715,97 @@ function renderAgentOverview(params: {
        : "";
-@@ -422,10 +602,6 @@ function renderAgentOverview(params: {
-           <div class="label">Workspace</div>
-           <div class="mono">${workspace}</div>
+   const isDefault = Boolean(params.defaultId && agent.id === params.defaultId);
+ 
++  // When not dirty, inputs show live identity values; when dirty, they show tracked state
++  const displayName = editAgentDirty ? editAgentName : identityName !== "-" ? identityName : "";
++  const displayEmoji = editAgentDirty ? editAgentEmoji : identityEmoji !== "-" ? identityEmoji : "";
++  const displayWorkspace = editAgentDirty
++    ? editAgentWorkspace
++    : workspace !== "default"
++      ? workspace
++      : "";
++
+   return html`
+     <section class="card">
+-      <div class="card-title">Overview</div>
+-      <div class="card-sub">Workspace paths and identity metadata.</div>
+-      <div class="agents-overview-grid" style="margin-top: 16px;">
+-        <div class="agent-kv">
+-          <div class="label">Workspace</div>
+-          <div class="mono">${workspace}</div>
+-        </div>
+-        <div class="agent-kv">
+-          <div class="label">Identity Name</div>
+-          <div>${identityName}</div>
+-          ${identityStatus ? html`<div class="agent-kv-sub muted">${identityStatus}</div>` : nothing}
+-        </div>
+-        <div class="agent-kv">
+-          <div class="label">Default</div>
+-          <div>${isDefault ? "yes" : "no"}</div>
++      <div class="row" style="justify-content:space-between; align-items:flex-start;">
++        <div>
++          <div class="card-title">Overview</div>
++          <div class="card-sub">Workspace paths and identity metadata.</div>
          </div>
 -        <div class="agent-kv">
--          <div class="label">Primary Model</div>
--          <div class="mono">${model}</div>
--        </div>
-         <div class="agent-kv">
-           <div class="label">Identity Name</div>
-           <div>${identityName}</div>
-@@ -447,41 +623,42 @@ function renderAgentOverview(params: {
+-          <div class="label">Identity Emoji</div>
+-          <div>${identityEmoji}</div>
++        ${
++          isDefault || isConfirmingDelete
++            ? nothing
++            : html`
++          <button class="btn btn--sm" style="color:var(--danger); margin-top:2px;"
++            @click=${() => onDeleteStart(agent.id)}>
++            🗑️ Delete
++          </button>
++        `
++        }
++      </div>
++
++      ${
++        isConfirmingDelete
++          ? html`
++        <div class="callout danger" style="margin-top:16px;">
++          <div style="font-weight:600; margin-bottom:8px;">Delete "${identityName !== "-" ? identityName : agent.id}"?</div>
++          <div style="font-size:13px; margin-bottom:12px; color:var(--muted);">
++            The agent's workspace and session files will be moved to trash. This cannot be undone from the UI.
++          </div>
++          ${deleteAgentError ? html`<div style="color:var(--danger); margin-bottom:8px; font-size:13px;">${deleteAgentError}</div>` : nothing}
++          <div class="row" style="gap:8px;">
++            <button class="btn danger" ?disabled=${deleteAgentInProgress}
++              @click=${() => onDeleteConfirm(agent.id)}>
++              ${deleteAgentInProgress ? "Deleting\u{2026}" : "Yes, Delete"}
++            </button>
++            <button class="btn" ?disabled=${deleteAgentInProgress} @click=${() => onDeleteCancel()}>
++              Cancel
++            </button>
++          </div>
+         </div>
+-        <div class="agent-kv">
+-          <div class="label">Skills Filter</div>
+-          <div>${skillFilter ? `${skillCount} selected` : "all skills"}</div>
++      `
++          : html`
++        <div style="margin-top:16px; display:flex; flex-direction:column; gap:12px;">
++          <label class="field">
++            <span>Name</span>
++            <input type="text" .value=${displayName}
++              placeholder="Agent name"
++              ?disabled=${editAgentSaving}
++              @input=${(e: Event) => onEditNameChange((e.target as HTMLInputElement).value)} />
++          </label>
++          <label class="field">
++            <span>Emoji</span>
++            <div style="display:flex; gap:8px; align-items:center;">
++              <div style="font-size:28px; line-height:1; width:36px; text-align:center; flex-shrink:0;">
++                ${displayEmoji || "🤖"}
++              </div>
++              <select style="flex:1;" .value=${displayEmoji}
++                ?disabled=${editAgentSaving}
++                @change=${(e: Event) => onEditEmojiChange((e.target as HTMLSelectElement).value)}>
++                ${AGENT_EMOJIS.map(
++                  ({ emoji, label }) => html`
++                  <option value=${emoji} ?selected=${displayEmoji === emoji}>${emoji} ${label}</option>
++                `,
++                )}
++              </select>
++            </div>
++          </label>
++          <label class="field">
++            <span>Workspace path</span>
++            <input type="text" .value=${displayWorkspace}
++              placeholder="${workspace}"
++              ?disabled=${editAgentSaving}
++              @input=${(e: Event) => onEditWorkspaceChange((e.target as HTMLInputElement).value)} />
++          </label>
++          ${editAgentError ? html`<div class="callout danger" style="margin-top:0;">${editAgentError}</div>` : nothing}
++          <div style="font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap;">
++            <span>Default: ${isDefault ? "yes" : "no"}</span>
++            <span>·</span>
++            <span>Skills: ${skillFilter ? `${skillCount} selected` : "all"}</span>
++            ${identityStatus ? html`<span>·</span><span>${identityStatus}</span>` : nothing}
++          </div>
+         </div>
+-      </div>
++      `
++      }
  
        <div class="agent-model-select" style="margin-top: 20px;">
          <div class="label">Model Selection</div>
--        <div class="row" style="gap: 12px; flex-wrap: wrap;">
--          <label class="field" style="min-width: 260px; flex: 1;">
--            <span>Primary model${isDefault ? " (default)" : ""}</span>
--            <select
--              .value=${effectivePrimary ?? ""}
--              ?disabled=${!configForm || configLoading || configSaving}
--              @change=${(e: Event) =>
--                onModelChange(agent.id, (e.target as HTMLSelectElement).value || null)}
--            >
--              ${
--                isDefault
--                  ? nothing
--                  : html`
--                      <option value="">
--                        ${defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"}
--                      </option>
--                    `
--              }
--              ${buildModelOptions(configForm, effectivePrimary ?? undefined, availableModels)}
--            </select>
--          </label>
--          <label class="field" style="min-width: 260px; flex: 1;">
--            <span>Fallbacks (comma-separated)</span>
--            <input
--              .value=${fallbackText}
--              ?disabled=${!configForm || configLoading || configSaving}
--              placeholder="provider/model, provider/model"
--              @input=${(e: Event) =>
--                onModelFallbacksChange(
--                  agent.id,
--                  parseFallbackList((e.target as HTMLInputElement).value),
--                )}
--            />
--          </label>
--        </div>
-+        <label class="field" style="margin-top: 10px;">
-+          <span>Primary model${isDefault ? " (default)" : ""}</span>
-+          <select
-+            .value=${effectivePrimary ?? ""}
-+            ?disabled=${!configForm || configLoading || configSaving}
-+            @change=${(e: Event) =>
-+              onModelChange(agent.id, (e.target as HTMLSelectElement).value || null)}
-+          >
-+            ${
-+              isDefault
-+                ? nothing
-+                : html`
-+                    <option value="">
-+                      ${defaultPrimary ? `Inherit default (${defaultPrimary})` : "Inherit default"}
-+                    </option>
-+                  `
-+            }
-+            ${buildModelOptions(configForm, effectivePrimary ?? undefined, availableModels)}
-+          </select>
-+        </label>
-+        <label class="field" style="margin-top: 14px;">
-+          <span>Fallback models <span style="font-weight:400; color:var(--muted); font-size:11px;">(hold Ctrl/\u{2318} to select multiple)</span></span>
-+          <select
-+            multiple
-+            size="4"
-+            ?disabled=${!configForm || configLoading || configSaving}
-+            @change=${(e: Event) => {
-+              const sel = e.target as HTMLSelectElement;
-+              const chosen = Array.from(sel.selectedOptions).map((o) => o.value).filter(Boolean);
-+              onModelFallbacksChange(agent.id, chosen);
-+            }}
-+          >
-+            ${buildModelOptionsMulti(configForm, modelFallbacks ?? [], availableModels)}
-+          </select>
-+        </label>
-+        <div class="row" style="justify-content: flex-end; gap: 8px; margin-top: 10px;">
-         <div class="row" style="justify-content: flex-end; gap: 8px;">
-           <button class="btn btn--sm" ?disabled=${configLoading} @click=${onConfigReload}>
-             Reload Config
-@@ -491,7 +668,7 @@ function renderAgentOverview(params: {
-             ?disabled=${configSaving || !configDirty}
+@@ -681,10 +853,10 @@ function renderAgentOverview(params: {
+           </button>
+           <button
+             class="btn btn--sm primary"
+-            ?disabled=${configSaving || !configDirty}
++            ?disabled=${configSaving || editAgentSaving || (!configDirty && !editAgentDirty)}
              @click=${onConfigSave}
            >
--            ${configSaving ? "Saving?" : "Save"}
-+            ${configSaving ? "Saving\u{2026}" : "Save"}
+-            ${configSaving ? "Saving\u{2026}" : "Save"}
++            ${configSaving || editAgentSaving ? "Saving\u{2026}" : "Save"}
            </button>
          </div>
        </div>
