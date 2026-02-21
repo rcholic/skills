@@ -1,7 +1,7 @@
 ---
 name: horizon-trader
-version: 0.4.13
-description: Trade prediction markets (Polymarket, Kalshi) - positions, orders, risk management, Kelly sizing, wallet analytics, Monte Carlo, arbitrage, quantitative analytics (entropy, Hurst, VaR, Greeks, stress testing), and market discovery.
+version: 0.4.16
+description: "v0.4.16 - Trade prediction markets (Polymarket, Kalshi) - positions, orders, risk management, Kelly sizing, wallet analytics, Monte Carlo, arbitrage, quantitative analytics, AFML (bars, labeling, fractional differentiation, HRP, denoising), multi-strategy orchestration, alpha research, tier-gated features, and market discovery."
 emoji: "\U0001F4C8"
 metadata:
   openclaw:
@@ -236,6 +236,52 @@ python3 {baseDir}/scripts/horizon.py market-efficiency 0.50,0.52,0.48,0.55,0.53,
 python3 {baseDir}/scripts/horizon.py stress-test 10000
 ```
 
+### Portfolio Management
+```bash
+# Get portfolio metrics (value, PnL, exposure, diversification)
+python3 {baseDir}/scripts/horizon.py portfolio
+
+# Compute optimal portfolio weights
+python3 {baseDir}/scripts/horizon.py portfolio-weights equal
+python3 {baseDir}/scripts/horizon.py portfolio-weights kelly
+python3 {baseDir}/scripts/horizon.py portfolio-weights risk_parity
+python3 {baseDir}/scripts/horizon.py portfolio-weights min_variance
+```
+
+### Hot-Reload Parameters
+```bash
+# Update runtime parameters (hot-reload, takes effect next cycle)
+python3 {baseDir}/scripts/horizon.py update-params '{"spread": 0.05, "gamma": 0.3}'
+
+# Get all current runtime parameters
+python3 {baseDir}/scripts/horizon.py get-params
+```
+
+### Tearsheet Analytics
+```bash
+# Generate comprehensive tearsheet from equity curve CSV
+python3 {baseDir}/scripts/horizon.py tearsheet path/to/equity.csv
+```
+
+### Bayesian Optimization
+```bash
+# Run GP-based Bayesian optimization for strategy parameters
+# param_space: {name: [min, max]}
+python3 {baseDir}/scripts/horizon.py bayesian-opt '{"spread": [0.01, 0.10], "gamma": [0.1, 1.0]}' 20 5
+```
+
+### Hawkes Process
+```bash
+# Compute Hawkes self-exciting intensity from event timestamps
+python3 {baseDir}/scripts/horizon.py hawkes 1000.0,1000.5,1001.2 0.1 0.5 1.0
+```
+
+### Ledoit-Wolf Correlation
+```bash
+# Compute shrinkage covariance matrix from returns (rows=observations, cols=assets)
+python3 {baseDir}/scripts/horizon.py correlation '[[0.01,0.02],[-0.01,0.03],[0.02,-0.01]]'
+```
+
 ## Maker/Taker Fees (v0.4.6)
 
 Split fees by liquidity role for more realistic paper trading and backtesting:
@@ -375,6 +421,46 @@ The Horizon SDK also includes advanced pipeline components for automated strateg
 - **Walk-Forward Optimization** - rolling/expanding window parameter optimization with purge gap
 
 These are Python pipeline functions used with `hz.run()` and `hz.backtest()`. See the SDK documentation for usage.
+
+## New Features (v0.4.16)
+
+### AFML (Advances in Financial Machine Learning)
+Rust-native implementations of Lopez de Prado's research:
+- **Information-Driven Bars** (`hz.dollar_bars`, `hz.volume_bars`, `hz.tick_bars`, `hz.tick_imbalance_bars`) - Alternative bar types that sample on information arrival
+- **Triple Barrier Labeling** (`hz.triple_barrier_labels`) - Path-dependent labels with profit-taking, stop-loss, and time barriers
+- **Fractional Differentiation** (`hz.frac_diff_weights`, `hz.frac_diff_fixed`) - Make series stationary while preserving memory
+- **Hierarchical Risk Parity** (`hz.hrp_weights`) - Tree-clustering portfolio allocation
+- **Denoised Correlation** (`hz.marchenko_pastur_bounds`, `hz.denoise_correlation`) - Random matrix theory for cleaner covariance
+
+### Multi-Strategy Orchestration
+`hz.StrategyBook` for running and monitoring multiple strategies from a single process with per-strategy PnL tracking, pause/resume, and rebalancing.
+
+### Alpha Research Tools
+- `hz.feature_importance` - MDI/MDA feature importance via random forests
+- `hz.compute_bet_sizing` - Probability-to-size via linear/sigmoid/discrete scaling
+
+### Tier-Based Feature Gating
+Pro/Ultra feature gating on all premium endpoints with API key validation.
+
+## New Features (v0.4.14)
+
+### Tearsheet Analytics
+Generate comprehensive performance reports with monthly returns, rolling Sharpe/Sortino, drawdown analysis, trade statistics, and tail ratio.
+
+### Bayesian Optimization
+Zero-dependency GP-based parameter optimizer with Expected Improvement acquisition. Finds optimal strategy parameters efficiently.
+
+### Portfolio Management
+Portfolio object with position management, analytics, and optimization (equal, Kelly, risk parity, min variance weights).
+
+### Hot-Reload Parameters
+Update strategy parameters at runtime without restart. Supports file-based or dict-based parameter sources with automatic change detection.
+
+### Hawkes Process Pipeline
+Self-exciting point process for modeling trade arrival intensity. Triggers on fills and large price jumps. Per-market isolation.
+
+### Ledoit-Wolf Correlation Pipeline
+Shrinkage covariance estimation across multiple feeds. Optimal shrinkage intensity computed via Ledoit-Wolf formula.
 
 ## Output format
 

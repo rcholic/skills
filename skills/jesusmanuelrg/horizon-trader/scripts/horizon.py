@@ -200,7 +200,7 @@ def _print(data: object) -> None:
 def main() -> None:
     args = sys.argv[1:]
     if not args:
-        _print({"error": "no command. try: status, positions, orders, fills, quote, cancel, cancel-all, cancel-market, discover, market-detail, discover-events, top-markets, kelly, kill-switch, stop-loss, take-profit, feed, feeds, feed-health, feed-metrics, parity, contingent, wallet-trades, market-trades, wallet-positions, wallet-value, wallet-profile, top-holders, market-flow, simulate, arb, entropy, kl-divergence, hurst, variance-ratio, cf-var, greeks, deflated-sharpe, signal-diagnostics, market-efficiency, stress-test, start-feed"})
+        _print({"error": "no command. try: status, positions, orders, fills, quote, cancel, cancel-all, cancel-market, discover, market-detail, discover-events, top-markets, kelly, kill-switch, stop-loss, take-profit, feed, feeds, feed-health, feed-metrics, parity, contingent, wallet-trades, market-trades, wallet-positions, wallet-value, wallet-profile, top-holders, market-flow, simulate, arb, entropy, kl-divergence, hurst, variance-ratio, cf-var, greeks, deflated-sharpe, signal-diagnostics, market-efficiency, stress-test, start-feed, tearsheet, bayesian-opt, portfolio, portfolio-weights, update-params, get-params, hawkes, correlation"})
         sys.exit(1)
 
     cmd = args[0]
@@ -547,6 +547,163 @@ def main() -> None:
         scenarios = _safe_int(args[1], "scenarios") if len(args) > 1 else 10000
         seed = _safe_int(args[2], "seed") if len(args) > 2 else None
         _print(tools.run_stress_test(scenarios, seed))
+
+    # --- Tearsheet ---
+
+    # tearsheet <equity_csv> - Generate tearsheet from equity curve CSV (one value per line)
+    elif cmd == "tearsheet":
+        path = args[1] if len(args) > 1 else None
+        if not path:
+            _print({"error": "usage: tearsheet <equity_csv_path>"})
+        else:
+            import csv
+            with open(path) as f:
+                reader = csv.reader(f)
+                equity = [float(row[0]) for row in reader if row]
+            from horizon.analytics import generate_tearsheet
+            ts = generate_tearsheet(equity_curve=equity)
+            result = {
+                "sharpe_ratio": ts.sharpe_ratio,
+                "sortino_ratio": ts.sortino_ratio,
+                "max_drawdown": ts.max_drawdown,
+                "calmar_ratio": ts.calmar_ratio,
+                "win_rate": ts.win_rate,
+                "profit_factor": ts.profit_factor,
+                "total_trades": ts.total_trades,
+                "tail_ratio": ts.tail_ratio,
+                "monthly_returns": ts.monthly_returns,
+                "top_drawdowns_count": len(ts.top_drawdowns) if ts.top_drawdowns else 0,
+            }
+            _print(result)
+
+    # --- Bayesian Optimization ---
+
+    # bayesian-opt <param_space_json> [n_iterations] [n_initial] - Run Bayesian optimization
+    # param_space_json: '{"spread": [0.01, 0.10], "gamma": [0.1, 1.0]}'
+    elif cmd == "bayesian-opt":
+        import json as j2
+        space_json = args[1] if len(args) > 1 else None
+        if not space_json:
+            _print({"error": "usage: bayesian-opt '<param_space_json>' [n_iterations] [n_initial]"})
+        else:
+            param_space = j2.loads(space_json)
+            n_iter = int(args[2]) if len(args) > 2 else 20
+            n_init = int(args[3]) if len(args) > 3 else 5
+            from horizon.bayesian_opt import bayesian_optimize
+            def objective(**params):
+                total = 0.0
+                for name, val in params.items():
+                    bounds = param_space.get(name, [0, 1])
+                    mid = (bounds[0] + bounds[1]) / 2
+                    total -= (val - mid) ** 2
+                return total
+            result = bayesian_optimize(objective=objective, param_space=param_space, n_iterations=n_iter, n_initial=n_init)
+            _print({
+                "best_params": {k: round(v, 6) for k, v in result.best_params.items()},
+                "best_value": round(result.best_value, 6),
+                "n_iterations": result.n_iterations,
+            })
+
+    # --- Portfolio ---
+
+    # portfolio - Get portfolio metrics from current engine positions
+    elif cmd == "portfolio":
+        engine = tools.get_engine()
+        from horizon.portfolio import Portfolio
+        portfolio = Portfolio.from_engine(engine)
+        m = portfolio.metrics()
+        _print({
+            "total_value": round(m.total_value, 2),
+            "total_pnl": round(m.total_pnl, 2),
+            "total_pnl_pct": round(m.total_pnl_pct, 4),
+            "num_positions": m.num_positions,
+            "long_exposure": round(m.long_exposure, 2),
+            "short_exposure": round(m.short_exposure, 2),
+            "net_exposure": round(m.net_exposure, 2),
+            "gross_exposure": round(m.gross_exposure, 2),
+            "herfindahl_index": round(m.herfindahl_index, 4),
+            "max_concentration": round(m.max_concentration, 4),
+        })
+
+    # portfolio-weights [method] - Compute optimal weights (equal|kelly|risk_parity|min_variance)
+    elif cmd == "portfolio-weights":
+        method = args[1] if len(args) > 1 else "equal"
+        engine = tools.get_engine()
+        from horizon.portfolio import Portfolio
+        portfolio = Portfolio.from_engine(engine)
+        if method == "kelly":
+            weights = portfolio.optimize_kelly()
+        elif method == "risk_parity":
+            weights = portfolio.optimize_risk_parity()
+        elif method == "min_variance":
+            weights = portfolio.optimize_min_variance()
+        else:
+            weights = portfolio.optimize_equal_weight()
+        _print({"method": method, "weights": {k: round(v, 6) for k, v in weights.items()}})
+
+    # --- Runtime Parameters ---
+
+    # update-params <json> - Hot-reload runtime parameters
+    elif cmd == "update-params":
+        import json as j2
+        params_json = args[1] if len(args) > 1 else None
+        if not params_json:
+            _print({"error": "usage: update-params '<json>'"})
+        else:
+            engine = tools.get_engine()
+            params = j2.loads(params_json)
+            engine.update_params_batch(params)
+            _print({"updated": list(params.keys()), "count": len(params)})
+
+    # get-params - Get all runtime parameters
+    elif cmd == "get-params":
+        engine = tools.get_engine()
+        params = engine.get_all_params()
+        _print({"params": {k: round(v, 6) for k, v in params.items()}, "count": len(params)})
+
+    # --- Hawkes Process ---
+
+    # hawkes <event_times_csv> [mu] [alpha] [beta] - Compute Hawkes process intensity
+    elif cmd == "hawkes":
+        times_str = args[1] if len(args) > 1 else None
+        if not times_str:
+            _print({"error": "usage: hawkes <event_times_csv> [mu] [alpha] [beta]"})
+        else:
+            event_times = [float(x) for x in times_str.split(",")]
+            mu = float(args[2]) if len(args) > 2 else 0.1
+            alpha = float(args[3]) if len(args) > 3 else 0.5
+            beta = float(args[4]) if len(args) > 4 else 1.0
+            from horizon._horizon import HawkesProcess
+            hp = HawkesProcess(mu=mu, alpha=alpha, beta=beta)
+            for t in event_times:
+                hp.add_event(t)
+            now = event_times[-1] + 1e-6 if event_times else 0.0
+            _print({
+                "intensity": round(hp.intensity(now), 6),
+                "branching_ratio": round(hp.branching_ratio(), 6),
+                "expected_events_1m": round(hp.expected_events(now, 60.0), 4),
+                "event_count": hp.event_count(),
+            })
+
+    # --- Correlation / Covariance ---
+
+    # correlation <returns_json> - Compute Ledoit-Wolf shrinkage covariance matrix
+    # returns_json: '[[0.01, 0.02], [-0.01, 0.03], ...]' (rows=observations, cols=assets)
+    elif cmd == "correlation":
+        import json as j2
+        returns_json = args[1] if len(args) > 1 else None
+        if not returns_json:
+            _print({"error": "usage: correlation '<returns_json>'"})
+        else:
+            returns = j2.loads(returns_json)
+            from horizon._horizon import ledoit_wolf_shrinkage
+            matrix, shrinkage = ledoit_wolf_shrinkage(returns)
+            _print({
+                "matrix": [[round(v, 8) for v in row] for row in matrix],
+                "shrinkage_intensity": round(shrinkage, 6),
+                "n_assets": len(matrix),
+                "n_observations": len(returns),
+            })
 
     else:
         _print({"error": f"unknown command: {args[0][:64]}"})
