@@ -3,9 +3,15 @@
   "slug": "effortlist-ai",
   "displayName": "EffortList AI",
   "latest": {
-    "version": "1.6.2",
-    "publishedAt": 1771570306390,
-    "commit": "https://github.com/openclaw/skills/commit/9723800876430e8cd2e5a7e07a047cd1cf42a5e4"
+    "version": "1.7.2",
+    "publishedAt": 1771660189736,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.6.2",
+      "publishedAt": 1771570306390,
+      "commit": "https://github.com/openclaw/skills/commit/9723800876430e8cd2e5a7e07a047cd1cf42a5e4"
+    }
+  ]
 }
