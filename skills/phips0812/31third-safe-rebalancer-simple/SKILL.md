@@ -16,6 +16,18 @@ If you are unsure, use the help command first:
 
 - `npm run cli -- help`
 
+## Prerequisites
+
+- Node.js 22+
+- npm
+
+## Local Setup
+
+```bash
+npm install
+npm run build
+```
+
 ## Setup
 
 1. Deploy your Safe + policies using the 31Third policy wizard:
@@ -36,7 +48,7 @@ RPC_URL=https://mainnet.base.org
 CHAIN_ID=8453
 ```
 
-`TOT_API_KEY` can be requested via <https://31third.com> or by emailing `dev@31third.com`.
+`TOT_API_KEY` can be requested via <https://31third.com/contact> or by emailing `dev@31third.com`.
 
 ## What rebalance_now does
 
