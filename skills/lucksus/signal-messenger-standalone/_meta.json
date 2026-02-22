@@ -1,0 +1,11 @@
+{
+  "owner": "lucksus",
+  "slug": "signal-messenger-standalone",
+  "displayName": "Signal messaging for standalone bots/accounts",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771691289554,
+    "commit": null
+  },
+  "history": []
+}
