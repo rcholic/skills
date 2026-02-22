@@ -52,11 +52,56 @@ try {
   process.exit(3);
 }
 
-cfg.skills = Array.isArray(cfg.skills) ? cfg.skills : [];
-const exists = cfg.skills.some((s) => s && (s.name === "trail-nav-telegram" || s.path === skillPath));
-if (!exists) {
-  cfg.skills.push({ name: "trail-nav-telegram", path: skillPath });
+// OpenClaw config schema (current): skills is an object.
+// We patch by adding the outsideclaw skill directory to skills.load.extraDirs
+// and enabling the skill under skills.entries.
+const extraDir = path.join(OUTSIDECLAW_APP_DIR, "skills");
+
+// Detect whether this patch was already applied.
+let hadExtraDir = false;
+let hadEnabled = false;
+
+if (Array.isArray(cfg.skills)) {
+  // Legacy schema: skills was an array of {name,path}.
+  hadEnabled = cfg.skills.some((s) => s && (s.name === "trail-nav-telegram" || s.path === skillPath));
+} else if (cfg.skills && typeof cfg.skills === "object") {
+  const ed = cfg.skills?.load?.extraDirs;
+  hadExtraDir = Array.isArray(ed) && ed.includes(extraDir);
+  const e = cfg.skills?.entries?.["trail-nav-telegram"];
+  hadEnabled = !!(e && typeof e === "object" && e.enabled);
 }
+
+// Migrate legacy schema where skills was an array of {name,path}.
+if (Array.isArray(cfg.skills)) {
+  const legacy = cfg.skills;
+  cfg.skills = { load: { extraDirs: [], watch: true, watchDebounceMs: 250 }, entries: {} };
+  for (const s of legacy) {
+    if (!s || (!s.name && !s.path)) continue;
+    const name = s.name || "unknown";
+    cfg.skills.entries[name] = { enabled: true };
+    if (s.path) {
+      // Best-effort: also add the parent dir of the skill path as an extraDir.
+      cfg.skills.load.extraDirs.push(path.dirname(s.path));
+    }
+  }
+}
+
+cfg.skills = cfg.skills && typeof cfg.skills === "object" ? cfg.skills : {};
+cfg.skills.load = cfg.skills.load && typeof cfg.skills.load === "object" ? cfg.skills.load : {};
+cfg.skills.load.extraDirs = Array.isArray(cfg.skills.load.extraDirs) ? cfg.skills.load.extraDirs : [];
+
+if (!cfg.skills.load.extraDirs.includes(extraDir)) {
+  cfg.skills.load.extraDirs.push(extraDir);
+}
+
+cfg.skills.entries = cfg.skills.entries && typeof cfg.skills.entries === "object" ? cfg.skills.entries : {};
+const prev = cfg.skills.entries["trail-nav-telegram"];
+cfg.skills.entries["trail-nav-telegram"] = {
+  ...(prev && typeof prev === "object" ? prev : {}),
+  enabled: true,
+};
+
+const added = !(hadExtraDir && hadEnabled);
 
 const bak = configPath + ".bak";
 fs.copyFileSync(configPath, bak);
@@ -68,7 +113,7 @@ process.stdout.write(
       ok: true,
       configPath,
       backupPath: bak,
-      added: !exists,
+      added,
       skill: { name: "trail-nav-telegram", path: skillPath },
     },
     null,
