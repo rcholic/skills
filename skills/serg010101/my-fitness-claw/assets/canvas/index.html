@@ -53,7 +53,7 @@
 
             <div class="insight-box">
                 <h2 style="border-bottom: none; color: #36A2EB; margin-bottom: 10px; font-size: 0.9rem;">Insights & Tips</h2>
-                <div id="recommendations">Calculating...</div>
+                <div id="recommendations">Log your first meal to see AI insights!</div>
             </div>
         </div>
         
@@ -68,6 +68,12 @@
     <div id="loader" class="error-state">Loading your nutritional data...</div>
 
     <script>
+        // --- EMBEDDED DATA START ---
+        const fallbackData = [{ "date": "2026-01-01", "calories": 0, "protein": 0, "carbs": 0, "fats": 0, "notes": "Example data" }];
+        const fallbackGoals = { "daily_goals": { "calories": 2000, "protein": 150, "carbs": 200, "fats": 70 } };
+        const fallbackInsights = { "date": "2026-01-01", "tips": ["Log your first meal to get personalized tips!"] };
+        // --- EMBEDDED DATA END ---
+
         function renderUI(data, goalsJson, insights) {
             if (!data || data.length === 0) return;
             
@@ -163,16 +169,16 @@
                     fetch('../nutrition/insights.json?v=' + Date.now())
                 ]);
                 
-                if (!dRes.ok || !gRes.ok) throw new Error('Data files missing');
-                
-                const data = await dRes.json();
-                const goals = await gRes.json();
-                const insights = iRes.ok ? await iRes.json() : null;
-                
-                renderUI(data, goals, insights);
+                if (dRes.ok && gRes.ok) {
+                    const data = await dRes.json();
+                    const goals = await gRes.json();
+                    const insights = iRes.ok ? await iRes.json() : null;
+                    renderUI(data, goals, insights);
+                } else {
+                    renderUI(fallbackData, fallbackGoals, fallbackInsights);
+                }
             } catch (e) { 
-                document.getElementById('loader').innerHTML = '<b>Error:</b> Data not found.<br><small>Make sure nutrition/daily_macros.json exists.</small>';
-                console.error(e); 
+                renderUI(fallbackData, fallbackGoals, fallbackInsights);
             }
         }
         init();
