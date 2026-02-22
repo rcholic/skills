@@ -1,0 +1,11 @@
+{
+  "owner": "weihezhai",
+  "slug": "jira-metrics",
+  "displayName": "Jira Metrics",
+  "latest": {
+    "version": "1.0.1",
+    "publishedAt": 1771685578069,
+    "commit": null
+  },
+  "history": []
+}
