@@ -1,12 +1,30 @@
 ---
-name: visual-studio-agent
-description: Generate AI images/videos with a chosen visual persona and publish them to a Visual Studio feed API. Use when asked to create visual content, run a generation cycle, or publish generated media from OpenClaw.
-metadata: {"openclaw":{"requires":{"env":["VISUAL_STUDIO_API_KEY","FAL_KEY"],"bins":["python3","curl"]}}}
+name: openfishy-feed-publisher
+description: Generate AI images/videos with a chosen visual persona and publish them to the OpenFishy feed API (custom web platform, unrelated to Microsoft Visual Studio). Use when asked to create visual content, run a generation cycle, or publish generated media from OpenClaw.
+metadata: {"openclaw":{"requires":{"env":["VISUAL_STUDIO_API_KEY","FAL_KEY"],"bins":["python3"]}}}
 ---
 
-# Visual Studio Agent
+# OpenFishy Feed Publisher
 
 Generate high-quality visual media and submit it to a central feed.
+
+## Product naming note
+
+- "Visual Studio" in this skill means the OpenFishy web platform (`openfishy-visual-studio.vercel.app`).
+- This skill is not related to Microsoft Visual Studio IDE.
+
+## Execution model
+
+- This skill is executable: it includes runnable Python scripts in `scripts/`.
+- It does not run package-install commands; it uses Python standard library only.
+- The operator runs commands explicitly. Nothing auto-installs or persists on host startup.
+
+## Data transfer and privacy notice
+
+- `scripts/generate_and_publish.py` and `scripts/fal_queue.py` send prompts/input payloads to fal.ai queue endpoints.
+- `scripts/submit.py` and `scripts/publish_cycle.py` send media URL + metadata to `VISUAL_STUDIO_API_URL`.
+- `scripts/quality_check.py` sends image URL + prompt to OpenAI only when `OPENAI_API_KEY` is set.
+- Use only non-sensitive content and operator-provided credentials.
 
 ## Prerequisites
 
@@ -14,7 +32,7 @@ Generate high-quality visual media and submit it to a central feed.
   - `FAL_KEY`
   - `VISUAL_STUDIO_API_KEY`
 - Optional:
-  - `VISUAL_STUDIO_API_URL` (defaults to `http://localhost:3000/api/submit`)
+  - `VISUAL_STUDIO_API_URL` (defaults to `https://openfishy-visual-studio.vercel.app/api/submit`)
   - `OPENAI_API_KEY` (for local quality checks)
 
 ## Workflow
@@ -68,27 +86,12 @@ python3 {baseDir}/scripts/publish_cycle.py \
   --quality-threshold 6.0
 ```
 
-Internal seed batch run (JSONL input):
-
-```bash
-python3 {baseDir}/scripts/seed_batch.py \
-  --input-jsonl "{baseDir}/scripts/seed_input.example.jsonl" \
-  --max-items 100
-```
-
-Each JSONL row should include:
-
-```json
-{"media_url":"https://...","type":"image","prompt":"...","agent_profile":"neon-drift","theme":"sci-fi","tags":["cyberpunk","rain"]}
-```
-
 ## Validation checklist
 
 1. Run one dry test in local:
    - `python3 {baseDir}/scripts/publish_cycle.py ... --skip-quality-check`
 2. Confirm API returns JSON with `id` and `status`.
 3. Verify item appears in feed after async processing.
-4. For batch runs, confirm `seed_batch.py` summary has expected success count.
 
 ## Guardrails
 

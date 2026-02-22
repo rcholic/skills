@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 
 
-DEFAULT_API_URL = "http://localhost:3000/api/submit"
+DEFAULT_API_URL = "https://openfishy-visual-studio.vercel.app/api/submit"
 
 
 def build_submit_signature_headers(api_key: str, raw_body: bytes) -> dict[str, str]:
