@@ -1,0 +1,27 @@
+{
+  "name": "voice-log",
+  "version": "0.1.1",
+  "description": "Background voice journaling with Soniox realtime STT and 1-hour rolling minute logs",
+  "author": "local",
+  "license": "MIT",
+  "keywords": [
+    "voice",
+    "journal",
+    "soniox",
+    "openclaw",
+    "speech-to-text"
+  ],
+  "files": [
+    "SKILL.md",
+    "scripts/"
+  ],
+  "scripts": {
+    "start-journal": "node scripts/voice_journal_ctl.js start",
+    "end-journal": "node scripts/voice_journal_ctl.js end",
+    "status-journal": "node scripts/voice_journal_ctl.js status",
+    "last-journal": "node scripts/voice_journal_ctl.js last"
+  },
+  "dependencies": {
+    "node": ">=18"
+  }
+}

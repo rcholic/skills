@@ -1,0 +1,4 @@
+interface:
+  display_name: "Voice Log"
+  short_description: "OpenClaw live conversation journal powered by Soniox."
+  default_prompt: "Start or stop a background Soniox voice log and summarize or extract the most recent minutes from its rolling 1-hour transcript."
