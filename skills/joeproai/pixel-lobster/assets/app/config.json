@@ -1,0 +1,14 @@
+{
+  "audioMode": "tts",
+  "ttsUrl": "http://127.0.0.1:8787",
+  "ttsEnvelopePath": "/audio/envelope",
+  "ttsPollIdleMs": 500,
+  "ttsPollActiveMs": 45,
+  "ttsPlayStartOffsetMs": 1100,
+  "monitor": "primary",
+  "lobsterScale": 4,
+  "alwaysOnTop": true,
+  "clickThrough": false,
+  "swimEnabled": true,
+  "swimSpeed": 1.0
+}
