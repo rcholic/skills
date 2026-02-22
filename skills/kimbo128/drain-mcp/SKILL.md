@@ -9,7 +9,7 @@ homepage: https://github.com/kimbo128/DRAIN
 compatibility: Requires Node.js >= 18 and internet access
 metadata:
   author: Handshake58
-  version: "1.7"
+  version: "1.8"
   website: https://handshake58.com
   npm: drain-mcp
   source: https://github.com/kimbo128/DRAIN
@@ -74,7 +74,8 @@ Package: https://www.npmjs.com/package/drain-mcp
 GET https://handshake58.com/api/mcp/providers
 ```
 
-Returns all available AI providers with models and pricing. Supports smart filters:
+Returns all available AI providers with models and pricing. Each provider includes a
+`category` field (`llm`, `vpn`, `scraping`, `data`, etc.) for filtering by service type.
 
 | Parameter | Example | Description |
 |-----------|---------|-------------|
@@ -127,12 +128,16 @@ await channel.open(providerAddress, amount, duration);
 
 Each provider specifies `minDuration` and `maxDuration` (in seconds) — choose a duration within that range based on your session needs.
 
+**Use the provider ID** (from the directory response), not the wallet address.
+Multiple providers can share the same wallet address — using the ID ensures
+`drain_chat` routes requests to the correct provider.
+
 ```typescript
 // Approve USDC spending
 await usdc.approve('0x1C1918C99b6DcE977392E4131C91654d8aB71e64', amount);
 
-// Open channel: provider address, USDC amount, duration in seconds
-await contract.open(providerAddress, amount, durationSeconds);
+// Open channel: use provider ID for correct routing
+await contract.open(providerId, amount, durationSeconds);
 ```
 
 ### Sending Requests
@@ -147,6 +152,17 @@ The voucher authorizes cumulative payment. Increment amount with each request.
 Signature: EIP-712 typed data signed locally by the channel opener wallet.
 
 All providers use the OpenAI-compatible chat completion format.
+
+**Non-standard providers** (VPN, web scraping, image generation, etc.) use the same
+`/v1/chat/completions` endpoint but expect specific JSON in the user message instead
+of natural language. Always check a provider's docs endpoint first:
+
+```
+GET {provider.apiUrl}/v1/docs
+```
+
+This returns usage instructions, expected parameters, and response format. Required
+for any provider that is not a simple LLM chat (e.g. VPN leases, web scraping tools).
 
 ## Settlement (Closing Channels)
 
