@@ -1,6 +1,6 @@
 ---
 name: github-release-workflow
-description: "Professional GitHub release workflow. Use when: (1) releasing a new version, (2) managing versions and tags, (3) following conventional commits, (4) setting up CI/CD for releases."
+description: "Professional GitHub release workflow. Use when: (1) releasing a new version, (2) managing versions and tags, (3) following conventional commits, (4) updating README and docs, (5) setting up CI/CD for releases."
 metadata:
   {
     openclaw: { emoji: "🚀" },
@@ -10,6 +10,8 @@ metadata:
 # GitHub Release Workflow Skill
 
 A standardized workflow for professional GitHub releases.
+
+**IMPORTANT: Always update README.md and documentation before releasing!**
 
 ## Prerequisites
 
@@ -36,17 +38,42 @@ black lib/ tests/
 # 4. Update CHANGELOG.md
 # Add new section with today's date
 
-# 5. Stage and commit
+# 5. Update README.md (IMPORTANT!)
+# - Update version badge
+# - Update features list
+# - Update project structure if changed
+# - Update roadmap table
+
+# 6. Update other docs as needed
+# - docs/*.md
+# - API documentation
+# - Examples
+
+# 7. Stage and commit
 git add .
 git commit -m "release: v2.1.0 - Description"
 
-# 6. Create tag
+# 8. Create tag
 git tag -a v2.1.0 -m "Version 2.1.0"
 
-# 7. Push
+# 9. Push
 git push
 git push origin v2.1.0
 ```
+
+### README Update Checklist
+
+When releasing a new version, always update README.md:
+
+| Item | Description |
+|------|-------------|
+| Version badge | Update `version-x.x.x-blue` |
+| Features list | Add new features, remove deprecated |
+| Project structure | Reflect new files/directories |
+| Installation | Update if deps changed |
+| Usage | Add new examples if needed |
+| Roadmap | Move current version to done, add next |
+| API docs | Update if API changed |
 
 ### Conventional Commits Format
 
