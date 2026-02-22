@@ -3,11 +3,16 @@
   "slug": "rsoft-agentic-bank",
   "displayName": "RSoft Agentic Bank",
   "latest": {
-    "version": "1.2.0",
-    "publishedAt": 1771656239739,
-    "commit": "https://github.com/openclaw/skills/commit/8a7887179d0d93d5611d74adbe1888e95ff1d316"
+    "version": "1.4.0",
+    "publishedAt": 1771732509174,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.2.0",
+      "publishedAt": 1771656239739,
+      "commit": "https://github.com/openclaw/skills/commit/8a7887179d0d93d5611d74adbe1888e95ff1d316"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770911540614,

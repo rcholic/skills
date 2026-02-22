@@ -1,10 +1,10 @@
 ---
 name: rsoft-agentic-bank
 description: Provides real-time RSoft Agentic Bank services — credit checks, loan requests, and interest rate queries for autonomous agents.
-version: 1.2.0
+version: 1.4.0
 requires:
   bins:
-    - mcporter
+    - curl
 metadata:
   openclaw:
     homepage: https://rsoft-agentic-bank.com/
@@ -14,20 +14,12 @@ metadata:
 
 Official skill for **RSoft Agentic Bank** — an AI-native lending service for autonomous agents in Latin America and beyond.
 
-This skill connects to the RSoft MCP Server via `mcporter` to check interest rates, verify creditworthiness, and request loans.
+This skill connects to the RSoft Agentic Bank REST API using `curl` via the exec tool.
 
-## Setup
+## Base URL
 
-Before using this skill, register the RSoft MCP Server with mcporter:
-
-```bash
-mcporter config add rsoft-bank --url "https://7mavs5vu7ggbhtxvbavdgs26qa0cbawg.lambda-url.us-east-1.on.aws/mcp" --transport streamable-http
 ```
-
-Verify the connection:
-
-```bash
-mcporter list rsoft-bank --schema
+https://7mavs5vu7ggbhtxvbavdgs26qa0cbawg.lambda-url.us-east-1.on.aws
 ```
 
 ## Available Commands
@@ -37,7 +29,7 @@ mcporter list rsoft-bank --schema
 Query current lending rates for all risk tiers:
 
 ```bash
-mcporter call rsoft-bank read_resource --arg uri="bank://interest_rates"
+curl -s https://7mavs5vu7ggbhtxvbavdgs26qa0cbawg.lambda-url.us-east-1.on.aws/api/interest-rates
 ```
 
 Returns: current rates by loan type, currency (USDC), network, and last update date.
@@ -47,8 +39,10 @@ Returns: current rates by loan type, currency (USDC), network, and last update d
 Verify an agent's creditworthiness and repayment history:
 
 ```bash
-mcporter call rsoft-bank get_creditworthiness --arg agent_id="your-agent-id"
+curl -s https://7mavs5vu7ggbhtxvbavdgs26qa0cbawg.lambda-url.us-east-1.on.aws/api/creditworthiness/{agent_id}
 ```
+
+Replace `{agent_id}` with the agent's unique identifier.
 
 Returns: credit score (0-850), outstanding debt, repayment history, and status.
 
@@ -57,24 +51,26 @@ Returns: credit score (0-850), outstanding debt, repayment history, and status.
 Submit a loan request with AI-powered risk assessment:
 
 ```bash
-mcporter call rsoft-bank request_loan --arg amount=5000 --arg agent_id="your-agent-id"
+curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": "your-agent-id", "amount": 5000}' \
+  https://7mavs5vu7ggbhtxvbavdgs26qa0cbawg.lambda-url.us-east-1.on.aws/api/loans
 ```
 
 Returns: approval status, transaction hash if approved, interest rate, and terms.
 
 ## Quick Start
 
-1. Install mcporter if not already available.
-2. Run the `mcporter config add` command above to register the server.
-3. Call `get_creditworthiness` with your agent ID to check eligibility.
-4. Call `request_loan` with the desired amount to request financing.
-5. Visit [rsoft-agentic-bank.com](https://rsoft-agentic-bank.com/) for full documentation.
+1. Run the interest rates curl command to see current lending rates.
+2. Run the creditworthiness curl command with your agent ID to check eligibility.
+3. Run the loans curl command with the desired amount to request financing.
+4. Visit [rsoft-agentic-bank.com](https://rsoft-agentic-bank.com/) for full documentation.
 
 ## Verification
 
 - **Official Website:** [rsoft-agentic-bank.com](https://rsoft-agentic-bank.com/)
 - **Publisher:** RSoft Latam
-- **Protocol:** MCP via mcporter bridge
+- **Protocol:** REST API via curl
 - **Network:** Base (Coinbase L2)
 
 ---
