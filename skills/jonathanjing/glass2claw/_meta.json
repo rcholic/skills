@@ -1,11 +1,17 @@
 {
   "owner": "jonathanjing",
   "slug": "glass2claw",
-  "displayName": "glass2claw",
+  "displayName": "Vision Router Skill",
   "latest": {
-    "version": "1.4.3",
-    "publishedAt": 1771561353125,
-    "commit": "https://github.com/openclaw/skills/commit/58f79ab74af06d850e4a26e548d385df5fc54e10"
+    "version": "1.5.0",
+    "publishedAt": 1771723762536,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.4.3",
+      "publishedAt": 1771561353125,
+      "commit": "https://github.com/openclaw/skills/commit/58f79ab74af06d850e4a26e548d385df5fc54e10"
+    }
+  ]
 }
