@@ -3,11 +3,16 @@
   "slug": "todoist-natural-language",
   "displayName": "Todoist Natural Language",
   "latest": {
-    "version": "1.0.6",
-    "publishedAt": 1771550832109,
-    "commit": "https://github.com/openclaw/skills/commit/bf6049a1a5876f32ee1a0d130692157926dd61c9"
+    "version": "1.0.8",
+    "publishedAt": 1771647028479,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.6",
+      "publishedAt": 1771550832109,
+      "commit": "https://github.com/openclaw/skills/commit/bf6049a1a5876f32ee1a0d130692157926dd61c9"
+    },
     {
       "version": "1.0.5",
       "publishedAt": 1771476846370,
