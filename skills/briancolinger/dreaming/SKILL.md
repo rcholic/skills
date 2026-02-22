@@ -1,17 +1,37 @@
 ---
 name: dreaming
+version: 1.0.1
 description: Creative exploration during quiet hours. Turns idle heartbeat time into freeform thinking — hypotheticals, future scenarios, reflections, unexpected connections. Use when you want your agent to do something meaningful during low-activity periods instead of just returning HEARTBEAT_OK. Outputs written to files for human review later (like remembering dreams in the morning).
+metadata:
+  openclaw:
+    requires:
+      bins: ["jq"]
+      anyBins: ["python3"]
 ---
 
 # Dreaming
 
 Creative, exploratory thinking during quiet hours. Not task-oriented work — freeform associative exploration that gets captured for later review.
 
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `WORKSPACE` | No | Skill's parent directory (`scripts/..`) | Root directory where `data/` and `memory/` live. Optional — defaults to the skill's parent directory, which is correct for standard workspace layouts. |
+
+## Directories Written
+
+The skill writes to these directories (relative to `WORKSPACE`):
+
+- **`data/dream-state.json`** — Tracks nightly dream count and last dream date
+- **`data/dream-config.json`** — Optional custom topic configuration (user-created)
+- **`memory/dreams/YYYY-MM-DD.md`** — Dream output files (written by the agent, not the script)
+
 ## Setup
 
 ### 1. Configure quiet hours and topics
 
-Edit `scripts/should-dream.sh` to customize:
+Edit `skills/dreaming/scripts/should-dream.sh` to customize:
 
 - **QUIET_START / QUIET_END** — when dreaming can happen (default: 11 PM - 7 AM)
 - **TOPICS array** — categories of exploration (see defaults for examples)
@@ -32,7 +52,7 @@ Add this section to your heartbeat routine (during quiet hours):
 Check if it's time to dream:
 
 \`\`\`bash
-DREAM_TOPIC=$(./scripts/should-dream.sh 2>/dev/null) && echo "DREAM:$DREAM_TOPIC" || echo "NO_DREAM"
+DREAM_TOPIC=$(./skills/dreaming/scripts/should-dream.sh 2>/dev/null) && echo "DREAM:$DREAM_TOPIC" || echo "NO_DREAM"
 \`\`\`
 
 **If DREAM_TOPIC is set:**
@@ -45,7 +65,7 @@ DREAM_TOPIC=$(./scripts/should-dream.sh 2>/dev/null) && echo "DREAM:$DREAM_TOPIC
 
 ## How It Works
 
-The `should-dream.sh` script acts as a gate:
+The `skills/dreaming/scripts/should-dream.sh` script acts as a gate:
 
 1. Checks if current time is within quiet hours
 2. Checks if we've already hit the nightly dream limit
@@ -88,6 +108,7 @@ This isn't a report — it's thinking out loud, captured.]
 ## Customizing Topics
 
 **Option A: Config file (recommended)** — Create `data/dream-config.json`:
+
 ```json
 {
   "topics": [
@@ -97,6 +118,9 @@ This isn't a report — it's thinking out loud, captured.]
   ]
 }
 ```
+
+```
+
 This keeps your customizations outside the skill directory (safe for skill updates).
 
 **Option B: Edit script directly** — Modify the `DEFAULT_TOPICS` array in `should-dream.sh`. Format: `category:prompt`
@@ -127,3 +151,4 @@ In `data/dream-state.json`:
 - **dreamChance** — probability per check (default: 1.0 = guaranteed if under limit)
 
 Lower `dreamChance` for more sporadic dreaming. Raise `maxDreamsPerNight` for more prolific nights.
+```
