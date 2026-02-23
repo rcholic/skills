@@ -74,14 +74,17 @@ function getSimilarity(s1, s2) {
   return union.size === 0 ? 0 : intersection.size / union.size;
 }
 
-// Run bird command
-function runBird(args) {
+// Run bird command securely using execFileSync (avoids shell injection)
+const { execFileSync } = require('child_process');
+
+function runBird(argsArray) {
   try {
-    // Suppress stderr to keep logs clean, or capture it if debugging needed
-    const output = execSync(`bird ${args}`, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
+    // argsArray should be an array of strings, e.g. ['home', '-n', '100', '--json']
+    // We assume 'bird' is in the PATH. If not, provide absolute path.
+    const output = execFileSync('bird', argsArray, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 });
     return JSON.parse(output);
   } catch (e) {
-    console.error(`Error running bird ${args}:`, e.message);
+    console.error(`Error running bird with args ${JSON.stringify(argsArray)}:`, e.message);
     return [];
   }
 }
@@ -94,10 +97,10 @@ async function main() {
   
   // 1. Fetch Tweets
   console.error('Fetching For You timeline...');
-  const forYouRaw = runBird(`home -n ${CONFIG.fetchLimitForYou} --json`);
+  const forYouRaw = runBird(['home', '-n', String(CONFIG.fetchLimitForYou), '--json']);
   
   console.error('Fetching Following timeline...');
-  const followingRaw = runBird(`home --following -n ${CONFIG.fetchLimitFollowing} --json`);
+  const followingRaw = runBird(['home', '--following', '-n', String(CONFIG.fetchLimitFollowing), '--json']);
 
   const counts = {
     forYouFetched: forYouRaw.length,
