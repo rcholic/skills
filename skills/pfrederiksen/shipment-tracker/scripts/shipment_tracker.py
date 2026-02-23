@@ -207,9 +207,9 @@ def check_usps_status(tracking: str) -> dict | None:
 def check_status(shipment: Shipment) -> dict:
     """Check tracking status for a shipment.
 
-    Attempts carrier-specific status checks via urllib first.
-    Returns a status dict with tracking info and recommendation
-    for whether browser-use should be used for full details.
+    Strategy:
+    1. Try basic HTTP request first (fast, VirusTotal-compliant)
+    2. If HTTP fails, provide structured guidance for browser-use fallback
     """
     result = {
         "order": shipment.order,
@@ -219,17 +219,41 @@ def check_status(shipment: Shipment) -> dict:
         "tracking_url": shipment.link or get_tracking_url(shipment.carrier, shipment.tracking),
         "added": shipment.added,
         "status": None,
-        "needs_browser": True,  # Default to recommending browser-use
+        "method": None,
+        "needs_browser_use": False,
     }
 
-    # Try carrier-specific status check (match carrier prefix for variants like "USPS Media Mail")
+    # Try basic HTTP check first (carrier-specific)
     carrier_base = shipment.carrier.split()[0].upper() if shipment.carrier else ""
+    
     if carrier_base == "USPS":
         usps_status = check_usps_status(shipment.tracking)
         if usps_status:
             result["status"] = usps_status["status"]
-            result["needs_browser"] = False
-
+            result["method"] = "http"
+            return result
+    
+    # TODO: Add basic HTTP checks for other carriers (UPS, FedEx, etc.)
+    
+    # HTTP method failed or not implemented for this carrier
+    result["status"] = "Needs browser-use check"
+    result["method"] = "manual"
+    result["needs_browser_use"] = True
+    result["browser_use_command"] = f"""python3 -c "
+import asyncio
+from browser_use import Agent, Browser, ChatBrowserUse
+async def main():
+    browser = Browser(use_cloud=True)
+    llm = ChatBrowserUse()
+    agent = Agent(
+        task='Go to {result["tracking_url"]} and extract the current tracking status, delivery date, and location',
+        llm=llm, browser=browser
+    )
+    result = await agent.run(max_steps=10)
+    print('TRACKING:', result)
+asyncio.run(main())
+\""""
+    
     return result
 
 
@@ -291,27 +315,33 @@ def main() -> None:
         status = check_status(s)
         results.append(status)
 
+    browser_use_count = sum(1 for r in results if r.get("needs_browser_use", False))
+    
     output = {
         "shipments": results,
         "count": len(results),
-        "needs_browser_count": sum(1 for r in results if r["needs_browser"]),
+        "needs_browser_use_count": browser_use_count,
     }
 
     if output_format == "json":
         print(json.dumps(output, indent=2))
     else:
-        print(f"📦 {len(results)} active shipment(s)\n")
+        print(f"📦 {len(results)} active shipment(s)")
+        if browser_use_count > 0:
+            print(f"🌐 {browser_use_count} need(s) browser-use for detailed tracking")
+        print()
+        
         for r in results:
             print(f"  {r['item'] or r['order'] or 'Package'}")
             print(f"    Carrier:  {r['carrier']}")
             print(f"    Tracking: {r['tracking']}")
-            if r["status"]:
-                print(f"    Status:   {r['status']}")
-            else:
-                print(f"    Status:   Check via tracking URL (JS-heavy page)")
+            print(f"    Status:   {r['status']}")
+            print(f"    Method:   {r.get('method', 'unknown')}")
             print(f"    URL:      {r['tracking_url']}")
-            if r["needs_browser"]:
-                print(f"    ℹ️  Use browser-use for full tracking history")
+            
+            if r.get("needs_browser_use"):
+                print(f"    🌐 Browser-use command:")
+                print(f"        {r.get('browser_use_command', '').strip()}")
             print()
 
 

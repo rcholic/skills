@@ -52,14 +52,35 @@ Automatically identifies carrier from tracking number patterns:
 
 ## Status Checking (Hybrid)
 
-1. **Direct HTTP** — Attempts to extract status from carrier tracking pages via urllib. Works for basic status on some carriers.
-2. **Browser-use** (recommended) — For full tracking history and JS-heavy carrier sites, use browser-use with the tracking URL from the script output.
+1. **Direct HTTP** — Attempts to extract status from carrier tracking pages via urllib. Works for basic status on USPS and some other carriers.
+2. **Browser-use fallback** — When HTTP fails or carriers use JS-heavy pages, the script provides the exact browser-use command to run.
 
-When the script output includes `needs_browser: true`, use browser-use to get detailed status:
+When the script output includes `needs_browser_use: true`, it will provide a complete browser-use command:
 
+```python
+python3 -c "
+import asyncio
+from browser_use import Agent, Browser, ChatBrowserUse
+async def main():
+    browser = Browser(use_cloud=True)
+    llm = ChatBrowserUse()
+    agent = Agent(
+        task='Go to <tracking_url> and extract the current tracking status, delivery date, and location',
+        llm=llm, browser=browser
+    )
+    result = await agent.run(max_steps=10)
+    print('TRACKING:', result)
+asyncio.run(main())
+"
 ```
-Use browser-use to visit the tracking_url and extract the full tracking status and history.
-```
+
+This ensures reliable tracking across all carriers, even those with aggressive bot detection.
+
+**When browser-use is needed:**
+- UPS, FedEx, Amazon (heavily JS-based tracking pages)
+- USPS when basic parsing fails (complex status updates)
+- Any carrier with CAPTCHA or bot detection
+- Sites that require user interaction or form submission
 
 ## Workflow
 
