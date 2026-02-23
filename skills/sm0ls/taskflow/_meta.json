@@ -3,11 +3,16 @@
   "slug": "taskflow",
   "displayName": "TaskFlow",
   "latest": {
-    "version": "1.1.0",
-    "publishedAt": 1771785922361,
-    "commit": "https://github.com/openclaw/skills/commit/042ef528095b4261da9e2763a4f4624b28480aa8"
+    "version": "1.1.1",
+    "publishedAt": 1771801350988,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.1.0",
+      "publishedAt": 1771785922361,
+      "commit": "https://github.com/openclaw/skills/commit/042ef528095b4261da9e2763a4f4624b28480aa8"
+    },
     {
       "version": "1.0.2",
       "publishedAt": 1771652246155,
