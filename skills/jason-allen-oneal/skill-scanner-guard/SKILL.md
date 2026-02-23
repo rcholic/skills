@@ -1,7 +1,14 @@
 ---
-name: skill-scanner-guard
-license: MIT
-description: Add a security gate around OpenClaw AgentSkills using cisco-ai-defense/skill-scanner. Use when setting up or operating skill scanning for ~/.openclaw/skills, wiring auto-scan/quarantine on new skill folders, wrapping ClawHub installs with scan-before-install, generating scan reports (markdown/json/sarif), or tuning block thresholds (block High/Critical; allow Medium with warnings).
+name: openclaw-skill-scanner
+description: Security gate for OpenClaw AgentSkills. Scans folder/ClawHub skills with cisco-ai-defense/skill-scanner before installation. Supports manual scans, staged installs, and auto-quarantine of high-risk skills via systemd.
+binaries:
+  - uv
+  - npx
+  - git
+  - systemctl
+env:
+  - OPENCLAW_STATE_DIR
+  - OPENCLAW_WORKSPACE_DIR
 ---
 
 # Skill Scanner Guard

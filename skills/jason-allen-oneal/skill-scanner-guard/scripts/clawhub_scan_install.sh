@@ -34,6 +34,12 @@ if [[ -z "$SLUG" ]]; then
   exit 2
 fi
 
+# Sanitize SLUG: allow only alphanumeric, hyphen, underscore, forward slash
+if [[ ! "$SLUG" =~ ^[a-zA-Z0-9_\/-]+$ ]]; then
+  echo "ERROR: Invalid slug characters" >&2
+  exit 2
+fi
+
 VERSION=""
 FORCE=0
 

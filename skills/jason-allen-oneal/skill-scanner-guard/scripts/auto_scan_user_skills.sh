@@ -89,7 +89,7 @@ if [[ "$CRITICAL" -gt 0 || "$HIGH" -gt 0 ]]; then
       name="$(basename "$d")"
       qdest="$QUARANTINE_BASE/${name}-$TS"
       echo "Quarantining: $d -> $qdest" >&2
-      mv "$d" "$qdest"
+      mv -- "$d" "$qdest"
     fi
   done
 

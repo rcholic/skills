@@ -50,6 +50,11 @@ while [[ $# -gt 0 ]]; do
         echo "ERROR: --name requires a value" >&2
         exit 2
       fi
+      # Sanitize DEST_NAME: alphanumeric, hyphen, underscore
+      if [[ ! "$DEST_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "ERROR: Invalid name characters (alphanumeric, hyphen, underscore only)" >&2
+        exit 2
+      fi
       shift 2
       ;;
     *)
@@ -76,10 +81,20 @@ fi
 
 cd "$SCANNER_DIR"
 
+# Run scan
+if command -v uv >/dev/null 2>&1; then
+  UV_BIN="$(command -v uv)"
+elif [[ -x "/home/linuxbrew/.linuxbrew/bin/uv" ]]; then
+  UV_BIN="/home/linuxbrew/.linuxbrew/bin/uv"
+else
+  echo "ERROR: uv not found in PATH. Install uv: https://astral.sh/uv" >&2
+  exit 2
+fi
+
 # Run scan; capture output for decisioning.
 SCAN_OUT="$OUT_DIR/${DEST_NAME}_$TS.txt"
 set +e
-uv run skill-scanner scan "$SRC_DIR" --format markdown --detailed --output "$REPORT" >"$SCAN_OUT" 2>&1
+"$UV_BIN" run skill-scanner scan "$SRC_DIR" --format markdown --detailed --output "$REPORT" >"$SCAN_OUT" 2>&1
 SCAN_CODE=$?
 set -e
 
@@ -130,7 +145,7 @@ if [[ $BLOCKED -eq 0 ]]; then
   fi
 
   # Copy the directory in a simple, predictable way.
-  cp -a "$SRC_DIR" "$DEST_DIR"
+  cp -a -- "$SRC_DIR" "$DEST_DIR"
   echo "Installed skill to: $DEST_DIR"
   echo "Report: $REPORT"
   exit 0
