@@ -5,7 +5,6 @@ allowed-tools:
   - Read
   - Write
   - StrReplace
-  - Shell
   - Glob
 ---
 
