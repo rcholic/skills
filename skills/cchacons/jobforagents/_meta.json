@@ -3,11 +3,16 @@
   "slug": "jobforagents",
   "displayName": "Job For Agents",
   "latest": {
-    "version": "3.2.1",
-    "publishedAt": 1771374779356,
-    "commit": "https://github.com/openclaw/skills/commit/d3cd7afc3c2e6eb1ae12b8f3bbca578b384b3e66"
+    "version": "3.2.2",
+    "publishedAt": 1771734459567,
+    "commit": null
   },
   "history": [
+    {
+      "version": "3.2.1",
+      "publishedAt": 1771374779356,
+      "commit": "https://github.com/openclaw/skills/commit/d3cd7afc3c2e6eb1ae12b8f3bbca578b384b3e66"
+    },
     {
       "version": "3.2.0",
       "publishedAt": 1771038654339,
