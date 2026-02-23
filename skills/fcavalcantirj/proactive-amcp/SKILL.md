@@ -1,7 +1,7 @@
 ---
 name: proactive-amcp
-version: 0.7.7
-description: "Your agent's safety net. Watchdog resurrection, free IPFS pinning via Solvr, learning commands (/remember, /stuck, /learned), and a plugin that checkpoints automatically on lifecycle events. Never lose your agent again."
+version: 0.8.0
+description: Your agent's safety net. Watchdog resurrection, free IPFS pinning via Solvr, learning commands (/remember, /stuck, /learned), and a plugin that checkpoints automatically on lifecycle events.
 triggers:
   - amcp
   - checkpoint
@@ -20,8 +20,6 @@ triggers:
   - /remember
   - /stuck
   - /learned
-argument-hint: [checkpoint | status | resurrect | init]
-metadata: {"openclaw": {"requires": {"bins": ["curl", "jq", "python3"], "env": []}, "optionalEnv": ["PINATA_JWT", "SOLVR_API_KEY", "GROQ_API_KEY"], "externalServices": ["api.pinata.cloud", "api.solvr.dev", "api.agentmail.to"], "fileAccess": ["~/.amcp/*", "~/.openclaw/workspace/*", "~/.openclaw/openclaw.json"], "securityNotes": "Reads/writes agent config and session files for backup/restore. Review scripts before enabling."}}
 ---
 
 # Proactive-AMCP
@@ -41,10 +39,9 @@ Complete end-to-end setup in four steps. Replace `SKILL_DIR` with the path where
 ```bash
 # Via OpenClaw skill hub
 clawhub install proactive-amcp
-
-# Or manually
-git clone https://github.com/fcavalcantirj/proactive-amcp ~/.openclaw/skills/proactive-amcp
 ```
+
+Scripts are bundled in this skill package at `scripts/`. No external fetch required.
 
 For fleet deployments (no prompts), use the non-interactive installer:
 
