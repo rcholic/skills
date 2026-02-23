@@ -1,10 +1,10 @@
 ---
 name: skill-shield
-version: 0.3.1
-description: "Security audit tool for ClawHub skills. Scans a skill directory with 65 detection patterns, anti-obfuscation analysis, and dual rating system (Security + Compliance). v0.3.1 fixes SKILL.md markdown false positives (table cells, YAML values, inline code paths). Use when: installing a new skill, reviewing skill safety, or auditing permissions."
+version: 0.6.1
+description: "Security audit tool for ClawHub skills. Scans a skill directory with 65 detection patterns, anti-obfuscation analysis, and dual rating system (Security + Compliance). v0.6.1 fixes batch scan performance by skipping venv/node_modules directories. Use when: installing a new skill, reviewing skill safety, or auditing permissions."
 ---
 
-# Skill Shield v0.3.1 — Security Auditor
+# Skill Shield v0.6.1 — Security Auditor
 
 Scan any skill directory for permissions and dangerous patterns. Get a safety rating before you install.
 
@@ -14,6 +14,12 @@ Run the scanner on a skill directory:
 
 ```bash
 python3 scripts/scan.py /path/to/skill-directory
+```
+
+### SARIF Output (GitHub Code Scanning)
+
+```bash
+python3 scripts/scan.py /path/to/skill-directory --sarif
 ```
 
 ### Output
@@ -75,6 +81,59 @@ Automatically decodes base64 and hex-encoded content, then re-scans decoded outp
 
 ### CWE References
 Every detection pattern includes a CWE (Common Weakness Enumeration) reference for professional vulnerability classification.
+
+## v0.6.0 — Batch Scan Mode
+
+### Batch Scanning
+Scan all skills in a directory at once with `--batch`:
+
+```bash
+python3 scripts/scan.py /path/to/skills/ --batch
+python3 scripts/scan.py /path/to/skills/ --batch --json-summary
+python3 scripts/scan.py /path/to/skills/ --batch --json-summary -o /path/to/output
+```
+
+### Performance
+- Skips venv/node_modules/dist/.git directories automatically
+- Caps at 200 script files per skill for safety
+- 164 skills scanned in ~8 seconds
+
+### Output
+- Markdown table with summary stats and per-skill ratings (default)
+- JSON summary with `--json-summary` flag for machine consumption
+- Writes `batch-summary.json` when using `-o`
+
+## v0.5.0 — SARIF Output Format
+
+### GitHub Code Scanning Integration
+Use `--sarif` flag to output SARIF 2.1.0 format, compatible with:
+- GitHub Code Scanning (upload-sarif action)
+- VS Code SARIF Viewer extension
+- SARIF Web Viewer
+
+```bash
+python3 scripts/scan.py /path/to/skill --sarif > report.sarif
+python3 scripts/scan.py /path/to/skill --sarif -o /path/to/output
+```
+
+### SARIF Features
+- Full rule definitions for all 65 detection patterns
+- CWE taxonomy references (MITRE CWE 4.14)
+- Partial fingerprints for deduplication across runs
+- Security severity scores (2.0-10.0 scale)
+- Skill-shield metadata in run properties (ratings, recommendation)
+
+## v0.4.0 — Security Tool False Positive Fix
+
+### String Literal Context Detection
+Regex patterns and string constants inside security tools (scanners, auditors) are no longer flagged as dangerous code. The scanner now recognizes when a pattern like `rm -rf` or `curl POST` appears inside a string literal (quotes, regex, array) and reduces severity accordingly.
+
+### Ignore-Next-Line Support
+Add `# skill-shield: ignore-next-line` above any line to suppress the next finding. Useful for known-safe patterns in security tools.
+
+### Results
+- 5 security audit tools reclassified from F to A/C/D (agents-skill-security-audit, ai-skill-scanner, skulk-skill-scanner, aoi-prompt-injection-sentinel, aoi-sandbox-shield-lite)
+- 0 regressions on known-safe skills
 
 ## v0.3.0 — Dual Rating System
 

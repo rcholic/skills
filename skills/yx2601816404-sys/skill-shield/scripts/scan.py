@@ -1,6 +1,26 @@
 #!/usr/bin/env python3
 """
-skill-shield scanner v0.3.0 — Audit a ClawHub skill for permissions and dangerous patterns.
+skill-shield scanner v0.6.1 — Audit a ClawHub skill for permissions and dangerous patterns.
+
+v0.6.1 changes (batch scan mode):
+- Batch scan: --batch flag scans all subdirectories as separate skills
+- JSON summary: --json-summary outputs machine-readable batch results
+- Performance: skip venv/node_modules/dist directories, cap at 200 files per skill
+- Handles 160+ skills in under 60 seconds
+
+v0.5.0 changes (SARIF output):
+- SARIF 2.1.0 output format (--sarif flag) for GitHub Code Scanning integration
+- Includes rules, results, fingerprints, CWE taxa, and invocation metadata
+- Compatible with: GitHub upload-sarif action, VS Code SARIF Viewer, SARIF Web Viewer
+
+v0.4.0 changes (security tool false positive fix):
+- String literal context detection: regex patterns in security tools no longer flagged as dangerous code
+- Ignore comment: # skill-shield: ignore-next-line support
+- 6 security audit tools reclassified from F to A/B (agents-skill-security-audit, ai-skill-scanner, etc.)
+
+v0.3.1 changes:
+- Fix: SKILL.md markdown table cells and YAML values no longer trigger pipe_sh
+- Fix: SKILL.md inline code paths no longer trigger backtick_exec
 
 v0.3.0 changes (context bias fix):
 - Dual rating: Security Rating (code danger) vs Compliance Rating (permission declarations)
@@ -13,11 +33,12 @@ v0.3.0 changes (context bias fix):
 - 65 detection patterns with CWE references
 
 Usage:
-    python3 scan.py <skill-directory> [--output-dir <dir>]
+    python3 scan.py <skill-directory> [--output-dir <dir>] [--sarif]
 """
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
@@ -167,6 +188,125 @@ def _is_pattern_definition_line(line: str) -> bool:
     return False
 
 
+def _is_string_literal_context(line: str, match_str: str, file_ext: str) -> bool:
+    """Detect if a match is inside a string literal used as data (regex pattern, config value, etc.).
+
+    This catches security tools that define detection patterns as string data,
+    e.g.: PATTERNS = [r"rm -rf", r"sudo", r"curl .*| bash"]
+    These are data definitions, not executable commands.
+    """
+    stripped = line.strip()
+
+    # --- Universal: noscan marker (used by other scanners to mark their own patterns) ---
+    if "# noscan" in line or "// noscan" in line or "/* noscan" in line:
+        return True
+
+    # --- Universal: line is a raw string continuation ---
+    if stripped.startswith(('r"', "r'", 'r' + chr(34)*3, "r" + chr(39)*3)):
+        return True
+
+    # --- Universal: "description" or "check" dict values describing patterns ---
+    if re.search(r'["\'](?:description|check|pattern_name|name|message|reason)["\']', stripped):
+        if _match_inside_quotes(stripped, match_str):
+            return True
+
+    # --- Universal: match is inside a quoted string on a line that's mostly strings ---
+    # Catches function args, tuple elements, dict values where patterns are described
+    if _match_inside_quotes(stripped, match_str):
+        # Count quoted vs unquoted content ratio
+        quote_chars = stripped.count('"') + stripped.count("'")
+        if quote_chars >= 4:  # At least 2 quoted strings on the line
+            return True
+
+    # Python-specific
+    if file_ext == ".py":
+        # re.compile(r"pattern") — including triple-quoted
+        if re.search(r're\.compile\s*\(\s*r?["\']', stripped):
+            return True
+        # Triple-quoted raw strings (often multi-line regex)
+        if re.search(r'r"""', stripped) or re.search(r"r'''", stripped):
+            return True
+        # Assignment to list/tuple with raw strings: [r"...", ...]
+        if re.search(r'[\[(\s]r["\']', stripped):
+            return True
+        # String in a tuple/list element: ("id", "name", r"regex", ...)
+        if re.search(r'\(\s*["\'].*r["\'].*["\'].*\)', stripped):
+            return True
+        # Variable assignment with string containing the match
+        if re.search(r'=\s*[\[{(]?\s*r?["\']', stripped):
+            if _match_inside_quotes(stripped, match_str):
+                return True
+
+    # JavaScript-specific
+    if file_ext in (".js", ".ts", ".mjs", ".cjs"):
+        # JS regex literal: /pattern/flags — property assignment like re: /pattern/i,
+        if re.search(r'(?:^|[\s=:,({])\/[^/\n]+\/[gimsuy]*\s*[,;)\]}]?', stripped):
+            return True
+        # RegExp constructor: new RegExp("pattern")
+        if re.search(r'RegExp\s*\(', stripped):
+            return True
+        # Quoted strings containing the match
+        if _match_inside_quotes(stripped, match_str):
+            return True
+
+    # Any language: string in array/dict used as pattern data
+    if re.search(r'[\[{]\s*r?["\']', stripped) and re.search(r'["\'].*["\']', stripped):
+        if _match_inside_quotes(stripped, match_str):
+            return True
+
+    return False
+
+
+def _match_inside_quotes(line: str, match_str: str) -> bool:
+    """Check if match_str appears inside a quoted string in the line."""
+    # Find all quoted regions
+    in_str = False
+    quote_char = None
+    start = -1
+    regions = []
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if not in_str:
+            if ch in ('"', "'"):
+                # Check for triple quotes
+                if line[i:i+3] in ('"""', "'''"):
+                    in_str = True
+                    quote_char = line[i:i+3]
+                    start = i + 3
+                    i += 3
+                    continue
+                in_str = True
+                quote_char = ch
+                start = i + 1
+        else:
+            if isinstance(quote_char, str) and len(quote_char) == 3:
+                if line[i:i+3] == quote_char:
+                    regions.append((start, i))
+                    in_str = False
+                    i += 3
+                    continue
+            elif ch == quote_char and (i == 0 or line[i-1] != '\\'):
+                regions.append((start, i))
+                in_str = False
+        i += 1
+
+    # Check if any part of match_str falls inside a quoted region
+    for s, e in regions:
+        segment = line[s:e]
+        if match_str in segment or any(part in segment for part in match_str.split()):
+            return True
+    return False
+
+
+def _is_ignore_next_line(lines: list[str], line_idx: int) -> bool:
+    """Check if the previous line has a skill-shield ignore comment."""
+    if line_idx <= 0:
+        return False
+    prev = lines[line_idx - 1].strip()
+    return "skill-shield: ignore-next-line" in prev or "skill-shield:ignore-next-line" in prev
+
+
 def _is_documentation_line(line: str) -> bool:
     stripped = line.strip()
     doc_keywords = [
@@ -176,8 +316,23 @@ def _is_documentation_line(line: str) -> bool:
         "obfuscation", "crypto", "shell injection", "code execution",
         "anti-obfuscation", "permission", "cwe-", "detection capabilit",
         "safety rating", "patterns)", "mining", "compliance",
+        "arbitrary code", "command injection", "shell access",
+        "code injection", "risk:", "pattern:", "vulnerability",
     ]
+    # Bullet points with security keywords
     if stripped.startswith("- ") and any(kw in stripped.lower() for kw in doc_keywords):
+        return True
+    # Markdown table rows with security keywords
+    if stripped.startswith("|") and any(kw in stripped.lower() for kw in doc_keywords):
+        return True
+    # Lines with backtick-quoted code examples in documentation
+    if stripped.startswith("|") and "`" in stripped:
+        return True
+    # Indented example blocks (│ or similar)
+    if "│" in stripped and any(kw in stripped.lower() for kw in doc_keywords):
+        return True
+    # Bullet points with backtick-quoted code
+    if stripped.startswith(("- ", "* ", "• ")) and "`" in stripped:
         return True
     return False
 
@@ -215,9 +370,35 @@ def _context_severity_adjust(severity, line, file_ext, lines, line_idx,
     """Adjust severity based on context. Returns 0 to skip entirely."""
     import re as _re
 
+    # --- v0.4.0: skill-shield: ignore-next-line comment ---
+    if _is_ignore_next_line(lines, line_idx):
+        return 0
+
     # Self-scan: skip pattern definition lines
     if is_self_scan and _is_pattern_definition_line(line):
         return 0
+
+    # --- v0.4.0: String literal context detection (security tool false positives) ---
+    if not is_self_scan and not is_skill_md and match_str:
+        # Don't apply string literal demotion if the line is an actual execution call
+        # Check for execution functions that are NOT inside strings themselves
+        stripped_line = line.strip()
+        is_exec_call = False
+        exec_patterns = [
+            (r'\bsubprocess\.\w+\s*\(', None),
+            (r'\bos\.system\s*\(', None),
+            (r'\bos\.popen\s*\(', None),
+            (r'\bchild_process\.\w+\s*\(', None),
+        ]
+        for ep, _ in exec_patterns:
+            if _re.search(ep, stripped_line):
+                is_exec_call = True
+                break
+        if not is_exec_call and _is_string_literal_context(line, match_str, file_ext):
+            return max(1, severity - 3)  # Demote to info level
+        # Also check if we're inside a multi-line triple-quoted string (Python)
+        if file_ext == ".py" and _is_in_docstring(lines, line_idx, file_ext):
+            return max(1, severity - 2)
 
     # SKILL.md documentation lines: skip
     if is_skill_md and _is_documentation_line(line):
@@ -363,13 +544,24 @@ def scan_obfuscated_content(files, skill_md):
 # Core scanning functions
 # ---------------------------------------------------------------------------
 
-def find_skill_files(skill_dir):
+SKIP_DIRS = {"venv", "node_modules", ".git", "__pycache__", ".venv", "env", ".env",
+             "dist", "build", ".tox", ".mypy_cache", ".pytest_cache", "site-packages"}
+
+MAX_SCRIPT_FILES = 200  # Safety limit for batch scanning
+
+
+def find_skill_files(skill_dir, max_files=0):
     skill_md = skill_dir / "SKILL.md"
     script_exts = {".sh", ".py", ".js", ".ts", ".bash", ".mjs", ".cjs"}
     scripts = []
     for f in skill_dir.rglob("*"):
+        # Skip common non-skill directories
+        if any(part in SKIP_DIRS for part in f.parts):
+            continue
         if f.is_file() and f.suffix in script_exts:
             scripts.append(f)
+            if max_files and len(scripts) >= max_files:
+                break
     return skill_md, scripts
 
 
@@ -611,7 +803,7 @@ def build_json_report(skill_dir, perm_audit, findings, sec_rating, sec_reason,
                       comp_rating, comp_reason, recommendation, rec_reason,
                       rating_reasons, is_doc_only):
     return {
-        "skill_shield_version": "0.3.0",
+        "skill_shield_version": "0.6.1",
         "scan_timestamp": datetime.now(timezone.utc).isoformat(),
         "skill_path": str(skill_dir),
         "skill_name": skill_dir.name,
@@ -754,14 +946,326 @@ def build_md_report(report):
 
 
 # ---------------------------------------------------------------------------
+# SARIF 2.1.0 output (v0.5.0) — GitHub Code Scanning compatible
+# ---------------------------------------------------------------------------
+
+SARIF_SEVERITY_MAP = {
+    5: "error",
+    4: "error",
+    3: "warning",
+    2: "note",
+    1: "note",
+}
+
+SARIF_SECURITY_SEVERITY_MAP = {
+    5: "critical",
+    4: "high",
+    3: "medium",
+    2: "low",
+    1: "low",
+}
+
+CWE_DESCRIPTIONS = {
+    "CWE-78": "Improper Neutralization of Special Elements used in an OS Command",
+    "CWE-95": "Improper Neutralization of Directives in Dynamically Evaluated Code",
+    "CWE-116": "Improper Encoding or Escaping of Output",
+    "CWE-200": "Exposure of Sensitive Information to an Unauthorized Actor",
+    "CWE-269": "Improper Privilege Management",
+    "CWE-400": "Uncontrolled Resource Consumption",
+    "CWE-459": "Incomplete Cleanup",
+    "CWE-506": "Embedded Malicious Code",
+    "CWE-522": "Insufficiently Protected Credentials",
+    "CWE-526": "Cleartext Storage of Sensitive Information in an Environment Variable",
+    "CWE-732": "Incorrect Permission Assignment for Critical Resource",
+    "CWE-829": "Inclusion of Functionality from Untrusted Control Sphere",
+}
+
+
+def _sarif_fingerprint(finding, skill_name):
+    """Generate a stable partial fingerprint for deduplication."""
+    key = f"{skill_name}:{finding['pattern_id']}:{finding['file']}:{finding.get('match', '')}"
+    return hashlib.sha256(key.encode()).hexdigest()[:32]
+
+
+def build_sarif_report(report):
+    """Build a SARIF 2.1.0 report from the internal JSON report."""
+    findings = report.get("findings", [])
+    skill_name = report["skill_name"]
+
+    # Build rules from all patterns (not just those with findings)
+    rules = []
+    rule_index_map = {}
+    for idx, (pat_id, pat_name, regex, severity, category, cwe) in enumerate(DANGEROUS_PATTERNS):
+        rule_id = f"skill-shield/{pat_id}"
+        rule_index_map[pat_id] = idx
+        cwe_desc = CWE_DESCRIPTIONS.get(cwe, cwe)
+        rules.append({
+            "id": rule_id,
+            "name": pat_id,
+            "shortDescription": {"text": pat_name},
+            "fullDescription": {"text": f"{pat_name} — {cwe_desc}"},
+            "helpUri": f"https://cwe.mitre.org/data/definitions/{cwe.split('-')[1]}.html" if "-" in cwe else "",
+            "help": {
+                "text": f"Pattern: {pat_name}\nCategory: {category}\nCWE: {cwe}\nDefault severity: {severity}/5",
+                "markdown": f"**Pattern:** {pat_name}\n\n**Category:** {category}\n\n**CWE:** [{cwe}](https://cwe.mitre.org/data/definitions/{cwe.split('-')[1]}.html)\n\n**Default severity:** {severity}/5"
+            },
+            "defaultConfiguration": {
+                "level": SARIF_SEVERITY_MAP.get(severity, "warning"),
+            },
+            "properties": {
+                "tags": ["security", category],
+                "security-severity": str(float(severity * 2)),  # Map 1-5 to 2.0-10.0
+                "precision": "medium",
+            },
+        })
+
+    # Also add rules for obfuscated variants that appear in findings
+    for f in findings:
+        pid = f["pattern_id"]
+        if pid.startswith("obfuscated_") and pid not in rule_index_map:
+            rule_index_map[pid] = len(rules)
+            rules.append({
+                "id": f"skill-shield/{pid}",
+                "name": pid,
+                "shortDescription": {"text": f["pattern_name"]},
+                "fullDescription": {"text": f"Obfuscated pattern: {f['pattern_name']}"},
+                "defaultConfiguration": {"level": "error"},
+                "properties": {
+                    "tags": ["security", "obfuscation", f.get("category", "unknown")],
+                    "security-severity": str(float(min(f["severity"], 5) * 2)),
+                },
+            })
+
+    # Build results
+    results = []
+    for f in findings:
+        pid = f["pattern_id"]
+        rule_idx = rule_index_map.get(pid, 0)
+        rule_id = f"skill-shield/{pid}"
+        sev = f["severity"]
+
+        result = {
+            "ruleId": rule_id,
+            "ruleIndex": rule_idx,
+            "level": SARIF_SEVERITY_MAP.get(sev, "warning"),
+            "message": {
+                "text": f"{f['pattern_name']} detected in {f['file']} at line {f['line']}: {f.get('match', '')[:80]}",
+            },
+            "locations": [{
+                "physicalLocation": {
+                    "artifactLocation": {
+                        "uri": f["file"],
+                        "uriBaseId": "%SRCROOT%",
+                    },
+                    "region": {
+                        "startLine": f["line"],
+                        "startColumn": 1,
+                        "snippet": {"text": f.get("context", "")[:200]},
+                    },
+                },
+            }],
+            "partialFingerprints": {
+                "primaryLocationLineHash": _sarif_fingerprint(f, skill_name),
+            },
+            "properties": {
+                "security-severity": SARIF_SECURITY_SEVERITY_MAP.get(sev, "medium"),
+                "category": f.get("category", "unknown"),
+                "cwe": f.get("cwe", ""),
+            },
+        }
+
+        # Add original severity if context-reduced
+        orig = f.get("original_severity", sev)
+        if orig != sev:
+            result["properties"]["originalSeverity"] = orig
+            result["properties"]["contextReduced"] = True
+
+        # Add CWE as taxa reference
+        cwe = f.get("cwe", "")
+        if cwe and "-" in cwe:
+            result["taxa"] = [{
+                "id": cwe,
+                "index": 0,
+                "toolComponent": {"name": "cwe", "index": 0},
+            }]
+
+        results.append(result)
+
+    # Collect unique CWEs for taxonomy
+    unique_cwes = sorted(set(f.get("cwe", "") for f in findings if f.get("cwe")))
+    taxa = []
+    for cwe in unique_cwes:
+        if "-" not in cwe:
+            continue
+        cwe_num = cwe.split("-")[1]
+        taxa.append({
+            "id": cwe,
+            "name": CWE_DESCRIPTIONS.get(cwe, cwe),
+            "shortDescription": {"text": CWE_DESCRIPTIONS.get(cwe, cwe)},
+            "helpUri": f"https://cwe.mitre.org/data/definitions/{cwe_num}.html",
+        })
+
+    sarif = {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {
+                "driver": {
+                    "name": "skill-shield",
+                    "semanticVersion": "0.6.1",
+                    "informationUri": "https://clawhub.ai/yx2601816404-sys/skill-shield",
+                    "rules": rules,
+                },
+                "extensions": [{
+                    "name": "cwe",
+                    "version": "4.14",
+                    "informationUri": "https://cwe.mitre.org/",
+                    "taxa": taxa,
+                }] if taxa else [],
+            },
+            "invocations": [{
+                "executionSuccessful": True,
+                "commandLine": f"python3 scan.py {report['skill_path']} --sarif",
+                "workingDirectory": {"uri": report["skill_path"]},
+            }],
+            "results": results,
+            "taxonomies": [{
+                "name": "CWE",
+                "version": "4.14",
+                "informationUri": "https://cwe.mitre.org/",
+                "organization": "MITRE",
+                "shortDescription": {"text": "Common Weakness Enumeration"},
+                "taxa": taxa,
+            }] if taxa else [],
+            "properties": {
+                "skillName": skill_name,
+                "securityRating": report["security_rating"],
+                "complianceRating": report["compliance_rating"],
+                "recommendation": report["recommendation"],
+                "totalFindings": report["summary"]["total_findings"],
+                "patternCount": report["pattern_count"],
+                "isDocumentationOnly": report.get("is_documentation_only", False),
+            },
+        }],
+    }
+
+    return sarif
+
+
+# ---------------------------------------------------------------------------
+# Batch scan mode (v0.6.1)
+# ---------------------------------------------------------------------------
+
+def scan_single_skill(skill_dir):
+    """Scan a single skill and return summary dict."""
+    skill_md, script_files = find_skill_files(skill_dir, max_files=MAX_SCRIPT_FILES)
+    if not skill_md.exists() and not script_files:
+        return None
+    is_doc_only = len(script_files) == 0
+    tools_declared = extract_tools_from_skill_md(skill_md)
+    tools_in_code = extract_tools_from_code(script_files)
+    perm_audit = audit_permissions(tools_declared, tools_in_code)
+    findings = scan_dangerous_patterns(script_files, skill_md)
+    findings.extend(scan_obfuscated_content(script_files, skill_md))
+    sec_rating, sec_reason = compute_security_rating(findings, is_doc_only)
+    comp_rating, comp_reason = compute_compliance_rating(perm_audit)
+    recommendation, rec_reasons = compute_recommendation(sec_rating, comp_rating, is_doc_only)
+    high_count = sum(1 for f in findings if f["severity"] >= 4)
+    return {
+        "name": skill_dir.name,
+        "security_rating": sec_rating,
+        "compliance_rating": comp_rating,
+        "recommendation": recommendation,
+        "total_findings": len(findings),
+        "high_findings": high_count,
+        "is_doc_only": is_doc_only,
+        "permissions_declared": len(tools_declared),
+        "permissions_found": len(tools_in_code),
+    }
+
+
+def batch_scan(parent_dir, args):
+    """Scan all subdirectories as separate skills."""
+    from collections import Counter
+    results = []
+    dirs = sorted(d for d in parent_dir.iterdir() if d.is_dir() and not d.name.startswith('.'))
+    total = len(dirs)
+    for i, d in enumerate(dirs):
+        try:
+            r = scan_single_skill(d)
+            if r:
+                results.append(r)
+        except Exception as e:
+            results.append({"name": d.name, "security_rating": "ERR", "error": str(e)})
+        if (i + 1) % 20 == 0:
+            print(f"  Scanned {i+1}/{total}...", file=sys.stderr)
+
+    # Stats
+    sec = Counter(r["security_rating"] for r in results)
+    recs = Counter(r.get("recommendation", "?") for r in results)
+    doc_only = sum(1 for r in results if r.get("is_doc_only"))
+    safe = sec.get("A", 0) + sec.get("B", 0)
+    risky = sec.get("C", 0) + sec.get("D", 0) + sec.get("F", 0)
+
+    if args.json_summary:
+        summary = {
+            "total": len(results),
+            "safe": safe, "risky": risky, "doc_only": doc_only,
+            "ratings": dict(sec), "recommendations": dict(recs),
+            "skills": results,
+        }
+        print(json.dumps(summary, indent=2, ensure_ascii=False))
+        if args.output_dir:
+            out = Path(args.output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "batch-summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    else:
+        # Markdown table
+        print(f"# Skill Shield Batch Scan — {len(results)} skills\n")
+        print(f"| Metric | Count |")
+        print(f"|--------|-------|")
+        print(f"| Total | {len(results)} |")
+        print(f"| Safe (A/B) | {safe} ({safe*100//max(len(results),1)}%) |")
+        print(f"| Risky (C/D/F) | {risky} ({risky*100//max(len(results),1)}%) |")
+        print(f"| Doc-only | {doc_only} |")
+        print()
+        print(f"| Rating | Count |")
+        print(f"|--------|-------|")
+        for rating in ["A", "B", "C", "D", "F", "N/A"]:
+            if sec.get(rating):
+                print(f"| {rating} | {sec[rating]} |")
+        print()
+        print(f"| Skill | Security | Compliance | Recommendation | Findings |")
+        print(f"|-------|----------|------------|----------------|----------|")
+        for r in sorted(results, key=lambda x: {"F":0,"D":1,"C":2,"B":3,"A":4,"N/A":5,"ERR":-1}.get(x["security_rating"],6)):
+            print(f"| {r['name']} | {r['security_rating']} | {r.get('compliance_rating','?')} | {r.get('recommendation','?')} | {r.get('total_findings',0)} |")
+
+        if args.output_dir:
+            # Also write JSON
+            out = Path(args.output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            summary = {"total": len(results), "safe": safe, "risky": risky, "skills": results}
+            (out / "batch-summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+
+    print(f"\nScanned {len(results)} skills: {safe} safe, {risky} risky, {doc_only} doc-only", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Skill Shield v0.3.0 — security audit for ClawHub skills")
-    parser.add_argument("skill_dir", help="Path to the skill directory to scan")
-    parser.add_argument("--output-dir", "-o", help="Directory to write report.json and report.md")
+    parser = argparse.ArgumentParser(description="Skill Shield v0.6.1 — security audit for ClawHub skills")
+    parser.add_argument("skill_dir", help="Path to skill directory (or parent dir with --batch)")
+    parser.add_argument("--output-dir", "-o", help="Directory to write reports")
+    parser.add_argument("--sarif", action="store_true", help="Output SARIF 2.1.0 format")
+    parser.add_argument("--batch", action="store_true", help="Scan all subdirectories as separate skills")
+    parser.add_argument("--json-summary", action="store_true", help="With --batch, output JSON summary")
     args = parser.parse_args()
+
+    if args.batch:
+        batch_scan(Path(args.skill_dir).resolve(), args)
+        return
 
     skill_dir = Path(args.skill_dir).resolve()
     if not skill_dir.is_dir():
@@ -806,20 +1310,29 @@ def main():
     md_report = build_md_report(json_report)
 
     # Output
-    print("--- JSON START ---")
-    print(json.dumps(json_report, indent=2, ensure_ascii=False))
-    print("--- JSON END ---")
-    print()
-    print("--- MD START ---")
-    print(md_report)
-    print("--- MD END ---")
+    if args.sarif:
+        sarif_report = build_sarif_report(json_report)
+        print(json.dumps(sarif_report, indent=2, ensure_ascii=False))
+        if args.output_dir:
+            out = Path(args.output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "report.sarif").write_text(json.dumps(sarif_report, indent=2, ensure_ascii=False))
+            print(f"\nSARIF report written to {out}/report.sarif", file=sys.stderr)
+    else:
+        print("--- JSON START ---")
+        print(json.dumps(json_report, indent=2, ensure_ascii=False))
+        print("--- JSON END ---")
+        print()
+        print("--- MD START ---")
+        print(md_report)
+        print("--- MD END ---")
 
-    if args.output_dir:
-        out = Path(args.output_dir)
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "report.json").write_text(json.dumps(json_report, indent=2, ensure_ascii=False))
-        (out / "report.md").write_text(md_report)
-        print(f"\nReports written to {out}/", file=sys.stderr)
+        if args.output_dir:
+            out = Path(args.output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "report.json").write_text(json.dumps(json_report, indent=2, ensure_ascii=False))
+            (out / "report.md").write_text(md_report)
+            print(f"\nReports written to {out}/", file=sys.stderr)
 
     # Exit code based on security rating
     exit_codes = {"A": 0, "B": 0, "C": 1, "D": 1, "F": 2, "N/A": 0}

@@ -3,11 +3,16 @@
   "slug": "skill-shield",
   "displayName": "Skill",
   "latest": {
-    "version": "0.3.1",
-    "publishedAt": 1771785551397,
-    "commit": "https://github.com/openclaw/skills/commit/dab5ef47ce725a0ee6724518371d3acdfdc5d243"
+    "version": "0.6.1",
+    "publishedAt": 1771837422821,
+    "commit": null
   },
   "history": [
+    {
+      "version": "0.3.1",
+      "publishedAt": 1771785551397,
+      "commit": "https://github.com/openclaw/skills/commit/dab5ef47ce725a0ee6724518371d3acdfdc5d243"
+    },
     {
       "version": "0.3.0",
       "publishedAt": 1771677371840,
