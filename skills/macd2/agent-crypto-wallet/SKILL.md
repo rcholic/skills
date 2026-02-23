@@ -5,7 +5,7 @@ license: Proprietary
 compatibility: Requires network access to https://openclawcash.com
 metadata:
   author: agentwalletapi
-  version: "1.9.0"
+  version: "1.9.1"
   required_env_vars:
     - AGENTWALLETAPI_KEY
   optional_env_vars:
@@ -34,7 +34,6 @@ Interact with OpenclawCash-managed wallets to send native assets and tokens, che
 - High-risk actions are gated:
   - API key permissions in dashboard (`allowWalletCreation`, `allowWalletImport`)
   - Explicit CLI confirmation (`--yes`) for write actions
-- Wallet import sends a private key to OpenclawCash for encrypted storage and managed execution. Only use this if you understand and accept that trust model.
 
 ## Setup
 
@@ -64,11 +63,23 @@ bash scripts/agentwalletapi.sh tokens mainnet
 # Write actions (require explicit --yes)
 bash scripts/agentwalletapi.sh create "Ops Wallet" sepolia --yes
 bash scripts/agentwalletapi.sh import "Treasury Imported" mainnet --yes
+# Automation-safe import: read private key from stdin instead of command args
+printf '%s' '<private_key>' | bash scripts/agentwalletapi.sh import "Treasury Imported" mainnet - --yes
 bash scripts/agentwalletapi.sh transfer 2 0xRecipient 0.01 --yes
 bash scripts/agentwalletapi.sh transfer 2 0xRecipient 100 USDC --yes
 bash scripts/agentwalletapi.sh quote mainnet WETH USDC 10000000000000000
 bash scripts/agentwalletapi.sh swap 2 WETH USDC 10000000000000000 0.5 --yes
 ```
+
+### Import Input Safety
+
+- Wallet import is optional and not required for normal wallet operations (list, balance, transfer, swap).
+- Import works only when the user explicitly enables API key permission `allowWalletImport` in dashboard settings.
+- Import execution requires explicit confirmation in the CLI (`--yes` for automation, or interactive `YES` prompt).
+- Avoid passing sensitive inputs as CLI arguments when possible (shell history/process logs risk).
+- Preferred options:
+  - Interactive hidden prompt: omit the private key argument.
+  - Automation: pass `-` and pipe input via stdin.
 
 ## Base URL
 
@@ -107,7 +118,9 @@ Content-Type: application/json
   - Used for autonomous agent execution (wallets list/create/import, transactions, balance, transfer, swap, quote, approve)
 - **Dashboard/User API (session auth):** `/api/wallets/*`
   - Authenticate with bearer token or `aw_session` cookie
-  - Used for user-managed dashboard operations (including wallet import)
+  - Used for user-managed dashboard operations (including wallet import and wallet creation).
+  - Dashboard wallet creation now requires `exportPassphrase` (minimum 12 characters).
+  - Private-key export requires `exportPassphrase` and is protected by rate limits and temporary lockouts.
 
 ## Workflow
 
@@ -154,6 +167,12 @@ Behavior notes:
   - `allowWalletImport` for import
 - Both are rate-limited per API key. Exceeding the limit returns `429` with `Retry-After`.
 - Agent import supports `mainnet` and `solana-mainnet`.
+- Agent wallet create requires:
+  - `exportPassphrase` (minimum 12 characters)
+  - `confirmExportPassphraseSaved: true`
+- Agent-safe create sequence:
+  - Save export passphrase in secure storage first.
+  - Then call `POST /api/agent/wallets/create` with that passphrase and confirmation.
 
 ## Transfer Examples
 
@@ -174,11 +193,19 @@ Send arbitrary ERC-20 by contract address:
 
 Send SOL by symbol:
 ```json
-{ "walletId": 7, "to": "9xQeWvG816bUx9EPfHmaT23yvVMY6sX3uA9wX6kM3cVG", "token": "SOL", "amount": "0.01" }
+{ "walletId": "Q7X2K9P", "to": "SolanaRecipientWalletAddress...", "token": "SOL", "amount": "0.01" }
+```
+
+Send SOL with memo (Solana only):
+```json
+{ "walletId": "Q7X2K9P", "to": "SolanaRecipientWalletAddress...", "token": "SOL", "amount": "0.01", "memo": "payment verification note" }
 ```
 
 Use `amount` for human-readable values (e.g., "100" = 100 USDC). Use `value` for base units (smallest denomination on each chain).
 Use optional `chain: "evm" | "solana"` in agent payloads for explicit chain routing and validation.
+`memo` is supported only for Solana transfers and must pass safety validation (max 5 words, max 256 UTF-8 bytes, no control/invisible characters).
+For native SOL transfers, the API may auto-adjust requested value to fit platform fee + network fee.
+Transfer responses include `requestedValue`, `adjustedValue`, `requestedAmount`, and `adjustedAmount`.
 
 ## Token Support Model
 
@@ -192,6 +219,7 @@ Use optional `chain: "evm" | "solana"` in agent payloads for explicit chain rout
 - 200: Success
 - 400: Invalid input, insufficient funds, unknown token, or policy violation
 - 400 `chain_mismatch`: requested `chain` does not match the selected wallet
+- 400 `insufficient_balance`: requested transfer + fees exceed available balance
 - 401: Missing/invalid API key
 - 404: Wallet not found
 - 500: Internal error (retry with corrected payload or reduced amount)
@@ -209,6 +237,9 @@ Violations return HTTP 401 with an explanation message.
 - All POST requests require `Content-Type: application/json`
 - EVM token transfers require ETH in the wallet for gas fees
 - Solana token transfers require SOL in the wallet for fees
+- Solana transfer memos are optional and Solana-only: max 5 words, max 256 UTF-8 bytes, no control/invisible characters
+- Solana native transfers account for network fee and can auto-adjust requested transfer amount
+- If requested native SOL + platform fee + network fee cannot fit wallet balance, API returns `400 insufficient_balance`
 - Swap supports EVM (Uniswap) and Solana (Jupiter); Quote/Approve are EVM-only
 - A platform fee (default 1%) is deducted from the token amount
 - Use `amount` for simplicity, use `value` for precise base-unit control

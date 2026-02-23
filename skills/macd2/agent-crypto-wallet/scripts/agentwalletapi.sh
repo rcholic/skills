@@ -9,7 +9,7 @@
 #   wallets                     List all wallets
 #   wallet <walletId|walletLabel> [chain]   Get one wallet detail with balances
 #   create <label> [network] [--yes]    Create a wallet (default network: sepolia)
-#   import <label> <network> [privateKey] [--yes]   Import wallet (network: mainnet|solana-mainnet)
+#   import <label> <network> [privateKey|-] [--yes]   Import wallet (network: mainnet|solana-mainnet)
 #   transactions <walletId> [chain]     List merged transaction history for a wallet
 #   balance <walletId> [token] [chain]  Check balances for a wallet
 #   transfer <walletId> <to> <amount> [token] [chain] [--yes]   Send native/token transfer
@@ -53,8 +53,46 @@ done
 set -- "${FILTERED_ARGS[@]}"
 COMMAND="$1"
 
-json_escape() {
-    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+json_escape_var() {
+    DEST_VAR="$1"
+    VALUE="${2-}"
+    VALUE="${VALUE//\\/\\\\}"
+    VALUE="${VALUE//\"/\\\"}"
+    VALUE="${VALUE//$'\n'/\\n}"
+    VALUE="${VALUE//$'\r'/\\r}"
+    VALUE="${VALUE//$'\t'/\\t}"
+    printf -v "$DEST_VAR" '%s' "$VALUE"
+}
+
+url_encode_var() {
+    DEST_VAR="$1"
+    VALUE="${2-}"
+    ENCODED=""
+    for (( i=0; i<${#VALUE}; i++ )); do
+        CHAR="${VALUE:i:1}"
+        case "$CHAR" in
+            [a-zA-Z0-9.~_-]) ENCODED+="$CHAR" ;;
+            *)
+                printf -v HEX '%%%02X' "'$CHAR"
+                ENCODED+="$HEX"
+                ;;
+        esac
+    done
+    printf -v "$DEST_VAR" '%s' "$ENCODED"
+}
+
+append_query_param() {
+    DEST_VAR="$1"
+    KEY="$2"
+    RAW_VALUE="$3"
+    URL="${!DEST_VAR}"
+    url_encode_var ENCODED_VALUE "$RAW_VALUE"
+    if [[ "$URL" == *\?* ]]; then
+        URL="${URL}&${KEY}=${ENCODED_VALUE}"
+    else
+        URL="${URL}?${KEY}=${ENCODED_VALUE}"
+    fi
+    printf -v "$DEST_VAR" '%s' "$URL"
 }
 
 require_uint() {
@@ -120,10 +158,11 @@ case "$COMMAND" in
         if echo "$SELECTOR" | grep -Eq '^[0-9]+$'; then
             URL="$BASE_URL/api/agent/wallet?walletId=$SELECTOR"
         else
-            URL="$BASE_URL/api/agent/wallet?walletLabel=$(printf '%s' "$SELECTOR" | sed 's/ /%20/g')"
+            URL="$BASE_URL/api/agent/wallet"
+            append_query_param URL "walletLabel" "$SELECTOR"
         fi
         if [ -n "$CHAIN" ]; then
-            URL="$URL&chain=$CHAIN"
+            append_query_param URL "chain" "$CHAIN"
         fi
         curl -s -H "X-Agent-Key: $AGENTWALLETAPI_KEY" \
             "$URL" | pretty_print_json
@@ -138,7 +177,9 @@ case "$COMMAND" in
             echo "  network options: sepolia | mainnet | solana-devnet | solana-testnet | solana-mainnet"
             exit 1
         fi
-        BODY="{\"label\":\"$(json_escape "$LABEL")\",\"network\":\"$NETWORK\"}"
+        json_escape_var LABEL_ESC "$LABEL"
+        json_escape_var NETWORK_ESC "$NETWORK"
+        BODY="{\"label\":\"$LABEL_ESC\",\"network\":\"$NETWORK_ESC\"}"
         curl -s -X POST \
             -H "X-Agent-Key: $AGENTWALLETAPI_KEY" \
             -H "Content-Type: application/json" \
@@ -148,13 +189,28 @@ case "$COMMAND" in
 
     import)
         confirm_risky_action "Wallet import"
+        if [ "$FORCE_RISKY" -eq 1 ]; then
+            echo "Import confirmation accepted via --yes."
+        fi
         LABEL="$2"
         NETWORK="$3"
         PRIVATE_KEY="$4"
         if [ -z "$LABEL" ] || [ -z "$NETWORK" ]; then
-            echo "Usage: agentwalletapi.sh import <label> <network> [privateKey] [--yes]"
+            echo "Usage: agentwalletapi.sh import <label> <network> [privateKey|-] [--yes]"
             echo "  network options: mainnet | solana-mainnet"
+            echo "  pass '-' to read private key from stdin (recommended for automation)"
             exit 1
+        fi
+        if [ "$PRIVATE_KEY" = "-" ]; then
+            if [ -t 0 ]; then
+                echo "Error: private key input set to '-' but stdin is empty."
+                echo "Example: printf '%s' '<private_key>' | agentwalletapi.sh import <label> <network> - --yes"
+                exit 1
+            fi
+            IFS= read -r PRIVATE_KEY
+        elif [ -n "$PRIVATE_KEY" ]; then
+            echo "WARNING: passing private key as a CLI argument can leak in shell history/process logs."
+            echo "Safer options: omit [privateKey] for hidden prompt, or pass '-' and pipe via stdin."
         fi
         if [ -z "$PRIVATE_KEY" ]; then
             if [ ! -t 0 ]; then
@@ -167,12 +223,17 @@ case "$COMMAND" in
             stty echo
             echo ""
         fi
-        BODY="{\"label\":\"$(json_escape "$LABEL")\",\"network\":\"$NETWORK\",\"privateKey\":\"$(json_escape "$PRIVATE_KEY")\"}"
+        json_escape_var LABEL_ESC "$LABEL"
+        json_escape_var NETWORK_ESC "$NETWORK"
+        json_escape_var PRIVATE_KEY_ESC "$PRIVATE_KEY"
+        BODY="{\"label\":\"$LABEL_ESC\",\"network\":\"$NETWORK_ESC\",\"privateKey\":\"$PRIVATE_KEY_ESC\"}"
         curl -s -X POST \
             -H "X-Agent-Key: $AGENTWALLETAPI_KEY" \
             -H "Content-Type: application/json" \
             -d "$BODY" \
             "$BASE_URL/api/agent/wallets/import" | pretty_print_json
+        unset PRIVATE_KEY
+        unset BODY
         ;;
 
     transactions)
@@ -185,7 +246,7 @@ case "$COMMAND" in
         require_uint "walletId" "$WALLET_ID"
         URL="$BASE_URL/api/agent/transactions?walletId=$WALLET_ID"
         if [ -n "$CHAIN" ]; then
-            URL="$URL&chain=$CHAIN"
+            append_query_param URL "chain" "$CHAIN"
         fi
         curl -s -H "X-Agent-Key: $AGENTWALLETAPI_KEY" \
             "$URL" | pretty_print_json
@@ -202,10 +263,12 @@ case "$COMMAND" in
         require_uint "walletId" "$WALLET_ID"
         BODY="{\"walletId\": $WALLET_ID"
         if [ -n "$TOKEN_FILTER" ]; then
-            BODY="$BODY, \"token\": \"$(json_escape "$TOKEN_FILTER")\""
+            json_escape_var TOKEN_FILTER_ESC "$TOKEN_FILTER"
+            BODY="$BODY, \"token\": \"$TOKEN_FILTER_ESC\""
         fi
         if [ -n "$CHAIN" ]; then
-            BODY="$BODY, \"chain\": \"$(json_escape "$CHAIN")\""
+            json_escape_var CHAIN_ESC "$CHAIN"
+            BODY="$BODY, \"chain\": \"$CHAIN_ESC\""
         fi
         BODY="$BODY}"
         curl -s -X POST \
@@ -228,12 +291,16 @@ case "$COMMAND" in
             exit 1
         fi
         require_uint "walletId" "$WALLET_ID"
-        BODY="{\"walletId\": $WALLET_ID, \"to\": \"$(json_escape "$TO")\", \"amount\": \"$(json_escape "$AMOUNT")\""
+        json_escape_var TO_ESC "$TO"
+        json_escape_var AMOUNT_ESC "$AMOUNT"
+        BODY="{\"walletId\": $WALLET_ID, \"to\": \"$TO_ESC\", \"amount\": \"$AMOUNT_ESC\""
         if [ "$TOKEN" != "ETH" ]; then
-            BODY="$BODY, \"token\": \"$(json_escape "$TOKEN")\""
+            json_escape_var TOKEN_ESC "$TOKEN"
+            BODY="$BODY, \"token\": \"$TOKEN_ESC\""
         fi
         if [ -n "$CHAIN" ]; then
-            BODY="$BODY, \"chain\": \"$(json_escape "$CHAIN")\""
+            json_escape_var CHAIN_ESC "$CHAIN"
+            BODY="$BODY, \"chain\": \"$CHAIN_ESC\""
         fi
         BODY="$BODY}"
         curl -s -X POST \
@@ -246,9 +313,10 @@ case "$COMMAND" in
     tokens)
         NETWORK="${2:-mainnet}"
         CHAIN="$3"
-        URL="$BASE_URL/api/agent/supported-tokens?network=$NETWORK"
+        URL="$BASE_URL/api/agent/supported-tokens"
+        append_query_param URL "network" "$NETWORK"
         if [ -n "$CHAIN" ]; then
-            URL="$URL&chain=$CHAIN"
+            append_query_param URL "chain" "$CHAIN"
         fi
         curl -s "$URL" | pretty_print_json
         ;;
@@ -263,15 +331,21 @@ case "$COMMAND" in
             echo "Usage: agentwalletapi.sh quote <network> <tokenIn> <tokenOut> <amountInBaseUnits> [chain]"
             exit 1
         fi
-        BODY="{\"tokenIn\":\"$(json_escape "$TOKEN_IN")\",\"tokenOut\":\"$(json_escape "$TOKEN_OUT")\",\"amountIn\":\"$(json_escape "$AMOUNT_IN")\""
+        json_escape_var TOKEN_IN_ESC "$TOKEN_IN"
+        json_escape_var TOKEN_OUT_ESC "$TOKEN_OUT"
+        json_escape_var AMOUNT_IN_ESC "$AMOUNT_IN"
+        BODY="{\"tokenIn\":\"$TOKEN_IN_ESC\",\"tokenOut\":\"$TOKEN_OUT_ESC\",\"amountIn\":\"$AMOUNT_IN_ESC\""
         if [ -n "$CHAIN" ]; then
-            BODY="$BODY, \"chain\": \"$(json_escape "$CHAIN")\""
+            json_escape_var CHAIN_ESC "$CHAIN"
+            BODY="$BODY, \"chain\": \"$CHAIN_ESC\""
         fi
         BODY="$BODY}"
+        URL="$BASE_URL/api/agent/quote"
+        append_query_param URL "network" "$NETWORK"
         curl -s -X POST \
             -H "Content-Type: application/json" \
             -d "$BODY" \
-            "$BASE_URL/api/agent/quote?network=$NETWORK" | pretty_print_json
+            "$URL" | pretty_print_json
         ;;
 
     swap)
@@ -288,9 +362,13 @@ case "$COMMAND" in
         fi
         require_uint "walletId" "$WALLET_ID"
         require_decimal "slippage" "$SLIPPAGE"
-        BODY="{\"walletId\":$WALLET_ID,\"tokenIn\":\"$(json_escape "$TOKEN_IN")\",\"tokenOut\":\"$(json_escape "$TOKEN_OUT")\",\"amountIn\":\"$(json_escape "$AMOUNT_IN")\",\"slippage\":$SLIPPAGE"
+        json_escape_var TOKEN_IN_ESC "$TOKEN_IN"
+        json_escape_var TOKEN_OUT_ESC "$TOKEN_OUT"
+        json_escape_var AMOUNT_IN_ESC "$AMOUNT_IN"
+        BODY="{\"walletId\":$WALLET_ID,\"tokenIn\":\"$TOKEN_IN_ESC\",\"tokenOut\":\"$TOKEN_OUT_ESC\",\"amountIn\":\"$AMOUNT_IN_ESC\",\"slippage\":$SLIPPAGE"
         if [ -n "$CHAIN" ]; then
-            BODY="$BODY, \"chain\": \"$(json_escape "$CHAIN")\""
+            json_escape_var CHAIN_ESC "$CHAIN"
+            BODY="$BODY, \"chain\": \"$CHAIN_ESC\""
         fi
         BODY="$BODY}"
         curl -s -X POST \
@@ -312,9 +390,13 @@ case "$COMMAND" in
             exit 1
         fi
         require_uint "walletId" "$WALLET_ID"
-        BODY="{\"walletId\":$WALLET_ID,\"tokenAddress\":\"$(json_escape "$TOKEN_ADDRESS")\",\"spender\":\"$(json_escape "$SPENDER")\",\"amount\":\"$(json_escape "$AMOUNT")\""
+        json_escape_var TOKEN_ADDRESS_ESC "$TOKEN_ADDRESS"
+        json_escape_var SPENDER_ESC "$SPENDER"
+        json_escape_var AMOUNT_ESC "$AMOUNT"
+        BODY="{\"walletId\":$WALLET_ID,\"tokenAddress\":\"$TOKEN_ADDRESS_ESC\",\"spender\":\"$SPENDER_ESC\",\"amount\":\"$AMOUNT_ESC\""
         if [ -n "$CHAIN" ]; then
-            BODY="$BODY, \"chain\": \"$(json_escape "$CHAIN")\""
+            json_escape_var CHAIN_ESC "$CHAIN"
+            BODY="$BODY, \"chain\": \"$CHAIN_ESC\""
         fi
         BODY="$BODY}"
         curl -s -X POST \

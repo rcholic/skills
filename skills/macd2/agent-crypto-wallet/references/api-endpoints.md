@@ -19,6 +19,8 @@
 
 - **Agent API (`/api/agent/*`)**: authenticate with `X-Agent-Key`.
 - **Dashboard/User API (`/api/wallets/*`)**: authenticate with bearer token or session cookie.
+  - `POST /api/wallets` requires `exportPassphrase` (minimum 12 characters).
+  - Private-key export requires `exportPassphrase` and is protected by rate limits and temporary lockouts.
 
 Use Agent API for autonomous execution. Use Dashboard API for user-account management actions.
 
@@ -87,7 +89,9 @@ Request:
 ```json
 {
   "label": "Agent Ops Wallet",
-  "network": "sepolia"
+  "network": "sepolia",
+  "exportPassphrase": "your-strong-passphrase",
+  "confirmExportPassphraseSaved": true
 }
 ```
 
@@ -105,6 +109,8 @@ Response:
 Notes:
 - API key must have wallet creation enabled (`allowWalletCreation`).
 - Endpoint is rate-limited per API key; on limit exceeded returns `429` + `Retry-After`.
+- Create requires `exportPassphrase` (minimum 12 characters).
+- Agent must persist passphrase first, then send `confirmExportPassphraseSaved: true`.
 
 ## Import Wallet (Agent API)
 
@@ -186,13 +192,14 @@ X-Agent-Key: ag_your_key
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| walletId | number | One of walletId/walletLabel | Wallet ID from list wallets |
+| walletId | number \| string | One of walletId/walletLabel | Wallet numeric ID or public wallet ID from list wallets |
 | walletLabel | string | One of walletId/walletLabel | Wallet name from dashboard |
 | chain | string | No | Optional guard: `"evm"` or `"solana"` |
 | to | string | Yes | Recipient address (0x... for EVM, base58 for Solana) |
 | token | string | No | Token symbol or token address/mint. Defaults to chain native token (ETH/SOL) |
 | amount | string | One of amount/value | Human-readable amount (e.g., "100" for 100 USDC) |
 | value | string | One of amount/value | Amount in base units (e.g., "100000000" for 100 USDC with 6 decimals) |
+| memo | string | No | Solana-only transfer memo. Max 5 words, max 256 UTF-8 bytes, no control/invisible characters |
 
 ### Examples
 
@@ -218,11 +225,15 @@ Send arbitrary ERC-20 by address + human amount:
 
 Send 0.01 SOL:
 ```json
-{ "walletId": 7, "to": "9xQeWvG816bUx9EPfHmaT23yvVMY6sX3uA9wX6kM3cVG", "token": "SOL", "amount": "0.01" }
+{ "walletId": "Q7X2K9P", "to": "SolanaRecipientWalletAddress...", "token": "SOL", "amount": "0.01" }
+```
+Send 0.01 SOL with memo:
+```json
+{ "walletId": "Q7X2K9P", "to": "SolanaRecipientWalletAddress...", "token": "SOL", "amount": "0.01", "memo": "payment verification note" }
 ```
 Optional chain guard example:
 ```json
-{ "chain": "solana", "walletId": 7, "to": "9xQeWvG816...", "amount": "0.01" }
+{ "chain": "solana", "walletId": "Q7X2K9P", "to": "SolanaRecipientWalletAddress...", "amount": "0.01" }
 ```
 
 ### Response
@@ -233,15 +244,27 @@ Optional chain guard example:
   "status": "confirmed",
   "token": "USDC",
   "tokenAddress": "0xA0b86991...",
+  "requestedValue": "100000000",
+  "adjustedValue": "100000000",
+  "requestedAmount": "100",
+  "adjustedAmount": "100",
   "fee": "1000000",
   "feePercent": "1%",
   "feeAmount": "1.0",
   "netValue": "99000000",
   "netAmount": "99.0",
   "feeWalletAddress": "0x...",
-  "feeTxHash": "0xdef456..."
+  "feeTxHash": "0xdef456...",
+  "memo": "payment verification note"
 }
 ```
+
+Behavior notes:
+- For native SOL transfers, server estimates network fee and may reduce requested gross amount so transfer + platform fee + network fee fits wallet balance.
+- For native SOL with configured Solana fee wallet, recipient transfer and platform fee transfer are sent in one transaction.
+- Memo is accepted only for Solana wallets; providing memo on EVM returns `400 invalid_transfer_input`.
+- Memo validation: max 5 words, max 256 UTF-8 bytes, rejects control/invisible characters.
+- If requested transfer cannot fit after required fees, API returns `400` with code `insufficient_balance`.
 
 ## Check Balances
 
@@ -446,6 +469,7 @@ Network is fixed at wallet creation and cannot be changed.
 
 - EVM token transfers require ETH in the wallet for gas fees
 - Solana token transfers require SOL in the wallet for transaction fees
+- Native SOL transfers account for network fee and may return adjusted transfer values in response
 - Swap supports EVM (Uniswap) and Solana (Jupiter); Quote/Approve are EVM-only
 - Platform fee is deducted from the token amount (not ETH), consistent with ETH transfers
 - Use `amount` for simplicity (human-readable), use `value` when you need precise base-unit control
