@@ -3,7 +3,40 @@ name: 1claw
 description: HSM-backed secret management for AI agents — store, retrieve, rotate, and share secrets via the 1Claw vault without exposing them in context.
 homepage: https://1claw.xyz
 repository: https://github.com/1clawAI/1claw
-metadata: {"openclaw":{"requires":{"env":["ONECLAW_AGENT_TOKEN","ONECLAW_VAULT_ID"],"bins":[]},"primaryEnv":"ONECLAW_AGENT_TOKEN","install":[{"id":"npm","kind":"node","package":"@1claw/mcp","bins":["1claw-mcp"],"label":"1Claw MCP Server"}],"credentials":["ONECLAW_AGENT_TOKEN"],"permissions":["vault:read","vault:write","vault:delete","secret:read","secret:write","secret:delete","policy:create","share:create"]}}
+metadata:
+    {
+        "openclaw":
+            {
+                "requires":
+                    {
+                        "env": ["ONECLAW_AGENT_TOKEN", "ONECLAW_VAULT_ID"],
+                        "bins": [],
+                    },
+                "primaryEnv": "ONECLAW_AGENT_TOKEN",
+                "install":
+                    [
+                        {
+                            "id": "npm",
+                            "kind": "node",
+                            "package": "@1claw/mcp",
+                            "bins": ["1claw-mcp"],
+                            "label": "1Claw MCP Server",
+                        },
+                    ],
+                "credentials": ["ONECLAW_AGENT_TOKEN"],
+                "permissions":
+                    [
+                        "vault:read",
+                        "vault:write",
+                        "vault:delete",
+                        "secret:read",
+                        "secret:write",
+                        "secret:delete",
+                        "policy:create",
+                        "share:create",
+                    ],
+            },
+    }
 ---
 
 # 1Claw — HSM-Backed Secret Management
@@ -21,12 +54,13 @@ Use this skill to securely store, retrieve, and share secrets using the 1Claw va
 ## Access control model
 
 Agents do NOT get blanket access to all secrets in a vault. Access is controlled by policies that specify:
+
 - **Which paths** the agent can access (glob patterns like `api-keys/*` or `**`)
 - **Which permissions** (read, write, delete)
 - **Under what conditions** (IP allowlist, time windows)
 - **For how long** (policy expiry date)
 
-A human must explicitly create a policy to grant an agent access. If no policy matches, access is denied with 403.
+A human must explicitly create a policy to grant an agent access. If no policy matches, access is denied with 403. In the dashboard (Vaults → [vault] → Policies), humans can create policies (with a vault selector and agent dropdown), edit permissions/conditions/expiry, and delete policies. When an agent gets a JWT via `POST /v1/auth/agent-token`, the JWT’s `scopes` are derived from these policies (path patterns) when the agent record has no scopes set, so the token always reflects current policy access.
 
 ### Crypto transaction proxy
 
@@ -45,11 +79,33 @@ Transaction endpoint: `POST /v1/agents/{id}/transactions` with `{ to, value, cha
 2. An agent registered under your account
 3. An access policy granting the agent permission to the vault
 
+**CLI for humans:** For CI/CD and servers, humans can use the official CLI: `npm install -g @1claw/cli`, then `1claw login` (browser-based) or set `ONECLAW_TOKEN` / `ONECLAW_API_KEY`. See [docs — CLI](https://docs.1claw.xyz/docs/guides/cli).
+
+**API key authentication:** `1ck_` keys (personal or agent API keys) can be used as Bearer tokens for all API endpoints. No separate JWT exchange required.
+
 ### MCP server (recommended)
 
-Add the 1Claw MCP server to your client configuration:
+Add the 1Claw MCP server to your client configuration.
 
-**Claude Desktop / Cursor** (stdio mode):
+**Recommended: auto-refreshing agent credentials** — Use `ONECLAW_AGENT_ID` + `ONECLAW_AGENT_API_KEY` instead of a static JWT. The MCP server automatically refreshes tokens and stays authenticated:
+
+```json
+{
+    "mcpServers": {
+        "1claw": {
+            "command": "npx",
+            "args": ["-y", "@1claw/mcp"],
+            "env": {
+                "ONECLAW_AGENT_ID": "<your-agent-uuid>",
+                "ONECLAW_AGENT_API_KEY": "<agent-api-key>",
+                "ONECLAW_VAULT_ID": "<your-vault-uuid>"
+            }
+        }
+    }
+}
+```
+
+**Alternative: static JWT** — `ONECLAW_AGENT_TOKEN` + `ONECLAW_VAULT_ID` (tokens expire; manual refresh required):
 
 ```json
 {
@@ -186,7 +242,7 @@ share_secret(secret_id: "...", recipient_type: "user", recipient_id: "...", expi
 share_secret(secret_id: "...", recipient_type: "anyone_with_link", expires_at: "2026-12-31T00:00:00Z")
 ```
 
-Recipients of targeted shares (creator/user/agent) must explicitly accept the share before they can access the secret. Agents cannot create email-based shares.
+`max_access_count: 0` is treated as unlimited (not zero reads). Recipients of targeted shares (creator/user/agent) must explicitly accept the share before they can access the secret. Agents cannot create email-based shares.
 
 ## Security model
 
@@ -196,6 +252,7 @@ Recipients of targeted shares (creator/user/agent) must explicitly accept the sh
 - **Secret values are fetched just-in-time** and should never be stored, echoed, or included in conversation summaries.
 - **Agents cannot create email-based shares.** This prevents phishing via share links.
 - **Crypto proxy is opt-in and enforced.** Agents only gain transaction signing capabilities if a human explicitly enables `crypto_proxy_enabled`. When enabled, direct reads of `private_key` and `ssh_key` secrets are blocked — the agent must use the proxy. It is off by default.
+- **Two-factor authentication.** Human users can enable TOTP-based 2FA from the dashboard (Settings → Security). When enabled, login requires a 6-digit authenticator app code in addition to credentials. 2FA does not affect agent authentication.
 
 ## Best practices
 
@@ -209,14 +266,14 @@ Recipients of targeted shares (creator/user/agent) must explicitly accept the sh
 
 ## Error handling
 
-| Error | Meaning                             | Action                                                   |
-| ----- | ----------------------------------- | -------------------------------------------------------- |
-| 404   | Secret not found                    | Check the path with `list_secrets`                       |
-| 410   | Expired or max access count reached | Ask the user to store a new version                      |
-| 402   | Free tier quota exhausted           | Inform the user to upgrade at 1claw.xyz/settings/billing |
-| 401   | Not authenticated                   | Token expired; re-authenticate                           |
-| 403   | No permission                       | Ask the user to grant access via a policy                |
-| 429   | Rate limited                        | Wait and retry; share creation is limited to 10/min/org  |
+| Error | Meaning                               | Action                                                                                                                                                                                                                            |
+| ----- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 404   | Secret not found                      | Check the path with `list_secrets`                                                                                                                                                                                                |
+| 410   | Expired or max access count reached   | Ask the user to store a new version                                                                                                                                                                                               |
+| 402   | Quota exhausted, insufficient credits | Inform the user to top up credits or upgrade at 1claw.xyz/settings/billing. Response includes `code` field: `insufficient_credits`, `no_credits`, or x402 payment envelope. Platform admin orgs and their agents are quota-exempt |
+| 401   | Not authenticated                     | Token expired; re-authenticate                                                                                                                                                                                                    |
+| 403   | No permission                         | Ask the user to grant access via a policy                                                                                                                                                                                         |
+| 429   | Rate limited                          | Wait and retry; share creation is limited to 10/min/org                                                                                                                                                                           |
 
 ## Links
 
