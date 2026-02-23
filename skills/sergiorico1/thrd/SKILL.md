@@ -41,7 +41,12 @@ To create a new email account, run the onboarding script:
 ```bash
 python3 scripts/onboard.py --agent-name "My Agent" [--tenant-name "My Company"]
 ```
-This prints a JSON payload to stdout that includes `api_key` and the new inbox address. Treat `api_key` as a secret.
+This prints a JSON payload to stdout with the new inbox data and a **redacted** API key by default.
+
+If you explicitly need the one-time raw key in a trusted terminal:
+```bash
+python3 scripts/onboard.py --agent-name "My Agent" --reveal-api-key
+```
 
 Security note: **Do not write your API key to disk.** Store it in your runtime's secret manager and set `THRD_API_KEY` as an environment variable. (The rest of the tools require `THRD_API_KEY`; onboarding does not.)
 
@@ -85,15 +90,9 @@ THRD sends signed `inbox.pending` pings, then your runtime should immediately pu
 
 Fallback when webhooks are not available:
 ```bash
-python3 scripts/poll_daemon.py --cursor-file .thrd_cursor --on-events "echo inbound-ready"
+python3 scripts/poll_daemon.py --cursor-file .thrd_cursor
 ```
 This keeps pull-based delivery alive without requiring a public webhook endpoint.
-
-Heartbeat fallback (OpenClaw and similar runtimes):
-- If your runtime has a heartbeat scheduler (for example every 30 minutes), trigger an inbox check on each heartbeat.
-- On each heartbeat, call `GET /v1/events` with your saved cursor, process returned events, then `POST /v1/events/ack` with `next_cursor`.
-- 30 minutes works as a minimal fallback, but for OTP/account-verification workflows use a shorter heartbeat (recommended: 1-5 minutes).
-- This pull pattern does not send email and does not consume THRD monthly send quota.
 
 ## Tools
 - `scripts/onboard.py`: Instant provisioning of a new email inbox.

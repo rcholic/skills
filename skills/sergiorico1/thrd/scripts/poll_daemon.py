@@ -2,7 +2,6 @@
 import argparse
 import json
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -33,10 +32,6 @@ def main() -> int:
     parser.add_argument("--cursor-file", default=".thrd_cursor")
     parser.add_argument("--timeout-ms", type=int, default=25000)
     parser.add_argument("--limit", type=int, default=50)
-    parser.add_argument(
-        "--on-events",
-        help="Optional shell command to run whenever one or more events are received.",
-    )
     args = parser.parse_args()
 
     api_key = os.environ.get("THRD_API_KEY")
@@ -75,9 +70,6 @@ def main() -> int:
                     "types": [ev.get("type") for ev in events],
                 }
                 print(json.dumps(summary))
-
-                if args.on_events:
-                    subprocess.run(args.on_events, shell=True, check=False)
 
                 ack = requests.post(
                     f"{base_url}/v1/events/ack",

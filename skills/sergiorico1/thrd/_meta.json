@@ -3,11 +3,16 @@
   "slug": "thrd",
   "displayName": "Thrd Skill",
   "latest": {
-    "version": "1.4.2",
-    "publishedAt": 1771257286915,
-    "commit": "https://github.com/openclaw/skills/commit/131b686aaffb926947818e219e67dccd570a4667"
+    "version": "1.4.3",
+    "publishedAt": 1771784665161,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.4.2",
+      "publishedAt": 1771257286915,
+      "commit": "https://github.com/openclaw/skills/commit/131b686aaffb926947818e219e67dccd570a4667"
+    },
     {
       "version": "1.4.1",
       "publishedAt": 1771256408371,

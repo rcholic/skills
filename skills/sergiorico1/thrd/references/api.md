@@ -35,18 +35,6 @@ If your runtime cannot expose a webhook, use:
 python3 scripts/poll_daemon.py --cursor-file .thrd_cursor
 ```
 
-### Heartbeat Pull Pattern (for OpenClaw-style runtimes)
-If your agent runtime already wakes on heartbeat, use each heartbeat tick to check inbox state:
-1. `GET /v1/events?cursor=<saved_cursor>&timeout=1000&limit=50`
-2. Process returned events.
-3. `POST /v1/events/ack` with `next_cursor`.
-4. Persist the new cursor.
-
-Notes:
-- 30-minute heartbeat is acceptable as a basic fallback.
-- For OTP or account setup flows, use 1-5 minute heartbeat for better UX.
-- Heartbeat pulls hit THRD API only; they do not consume THRD monthly send quota.
-
 ### Acknowledge Events
 **POST** `https://api.thrd.email/v1/events/ack`
 Acknowledges processed batches of events.
