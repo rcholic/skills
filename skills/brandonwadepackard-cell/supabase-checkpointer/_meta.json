@@ -1,0 +1,11 @@
+{
+  "owner": "brandonwadepackard-cell",
+  "slug": "supabase-checkpointer",
+  "displayName": "Supabase LangGraph Checkpointer",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771899341786,
+    "commit": null
+  },
+  "history": []
+}
