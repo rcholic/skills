@@ -136,6 +136,7 @@ def get_client(live=True):
 
 # Source tag for tracking
 TRADE_SOURCE = "sdk:weather"
+_automaton_reported = False
 
 # Polymarket constraints
 MIN_SHARES_PER_ORDER = 5.0  # Polymarket requires minimum 5 shares
@@ -145,6 +146,9 @@ MIN_TICK_SIZE = 0.01        # Minimum tradeable price
 ENTRY_THRESHOLD = _config["entry_threshold"]
 EXIT_THRESHOLD = _config["exit_threshold"]
 MAX_POSITION_USD = _config["max_position_usd"]
+_automaton_max = os.environ.get("AUTOMATON_MAX_BET")
+if _automaton_max:
+    MAX_POSITION_USD = min(MAX_POSITION_USD, float(_automaton_max))
 
 # Smart sizing parameters
 SMART_SIZING_PCT = _config["sizing_pct"]
@@ -326,7 +330,7 @@ def parse_temperature_bucket(outcome_name: str) -> tuple:
     if above_match:
         return (int(above_match.group(1)), 999)
 
-    range_match = re.search(r'(\d+)\s*[-–to]+\s*(\d+)', outcome_name)
+    range_match = re.search(r'(\d+)\s*(?:°?\s*[fF])?\s*(?:-|–|to)\s*(\d+)', outcome_name)
     if range_match:
         low, high = int(range_match.group(1)), int(range_match.group(2))
         return (min(low, high), max(low, high))
@@ -475,6 +479,14 @@ def detect_price_trend(history: list) -> dict:
 
 # =============================================================================
 # Market Discovery - Auto-import from Polymarket
+# =============================================================================
+# NOTE: Unlike fastloop (which queries Gamma API directly with tag=crypto),
+# weather uses Simmer's list_importable_markets (Dome-backed keyword search).
+# Gamma API has no weather/temperature tag and no public text search endpoint
+# (/search requires auth). Tested Feb 2026: 600+ events paginated, zero weather.
+# This path is slower but is the only way to discover weather markets by keyword.
+# Trading does NOT depend on discovery — v1.10.1+ trades from already-imported
+# markets via GET /api/sdk/markets?tags=weather.
 # =============================================================================
 
 # Search terms per location (matching Polymarket event naming)
@@ -802,7 +814,10 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
 
     forecast_cache = {}
     trades_executed = 0
+    total_usd_spent = 0.0
     opportunities_found = 0
+    skip_reasons = []
+    execution_errors = []
 
     for event_id, event_markets in events.items():
         # Use event_name from API if available, otherwise parse from question
@@ -856,9 +871,11 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
 
         if price < MIN_TICK_SIZE:
             log(f"  ⏸️  Price ${price:.4f} below min tick ${MIN_TICK_SIZE} - skip (market at extreme)")
+            skip_reasons.append("price at extreme")
             continue
         if price > (1 - MIN_TICK_SIZE):
             log(f"  ⏸️  Price ${price:.4f} above max tradeable - skip (market at extreme)")
+            skip_reasons.append("price at extreme")
             continue
 
         # Check safeguards with edge analysis
@@ -869,6 +886,7 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
             should_trade, reasons = check_context_safeguards(context)
             if not should_trade:
                 log(f"  ⏭️  Safeguard blocked: {'; '.join(reasons)}")
+                skip_reasons.append(f"safeguard: {reasons[0]}")
                 continue
             if reasons:
                 log(f"  ⚠️  Warnings: {'; '.join(reasons)}")
@@ -889,6 +907,7 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
             min_cost_for_shares = MIN_SHARES_PER_ORDER * price
             if min_cost_for_shares > position_size:
                 log(f"  ⚠️  Position size ${position_size:.2f} too small for {MIN_SHARES_PER_ORDER} shares at ${price:.2f}")
+                skip_reasons.append("position too small")
                 continue
 
             opportunities_found += 1
@@ -897,6 +916,7 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
             # Check rate limit
             if trades_executed >= MAX_TRADES_PER_RUN:
                 log(f"  ⏸️  Max trades per run ({MAX_TRADES_PER_RUN}) reached - skipping")
+                skip_reasons.append("max trades reached")
                 continue
 
             tag = "SIMULATED" if dry_run else "LIVE"
@@ -905,6 +925,7 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
 
             if result.get("success"):
                 trades_executed += 1
+                total_usd_spent += position_size
                 shares = result.get("shares_bought") or result.get("shares") or 0
                 trade_id = result.get("trade_id")
                 log(f"  ✅ {'[PAPER] ' if result.get('simulated') else ''}Bought {shares:.1f} shares @ ${price:.2f}", force=True)
@@ -931,6 +952,7 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
             else:
                 error = result.get("error", "Unknown error")
                 log(f"  ❌ Trade failed: {error}", force=True)
+                execution_errors.append(error[:120])
         else:
             log(f"  ⏸️  Price ${price:.2f} above threshold ${ENTRY_THRESHOLD:.2f} - skip")
 
@@ -945,6 +967,17 @@ def run_weather_strategy(dry_run: bool = True, positions_only: bool = False,
         print(f"  Entry opportunities: {opportunities_found}")
         print(f"  Exit opportunities:  {exits_found}")
         print(f"  Trades executed:     {total_trades}")
+
+    # Structured report for automaton
+    if os.environ.get("AUTOMATON_MANAGED"):
+        global _automaton_reported
+        report = {"signals": opportunities_found + exits_found, "trades_attempted": opportunities_found + exits_found, "trades_executed": total_trades, "amount_usd": round(total_usd_spent, 2)}
+        if (opportunities_found + exits_found) > 0 and total_trades == 0 and skip_reasons:
+            report["skip_reason"] = ", ".join(dict.fromkeys(skip_reasons))
+        if execution_errors:
+            report["execution_errors"] = execution_errors
+        print(json.dumps({"automaton": report}))
+        _automaton_reported = True
 
     if dry_run and show_summary:
         print("\n  [PAPER MODE - trades simulated with real prices]")
@@ -1009,3 +1042,7 @@ if __name__ == "__main__":
         use_trends=not args.no_trends,
         quiet=args.quiet,
     )
+
+    # Fallback report for automaton if the strategy returned early (no signal)
+    if os.environ.get("AUTOMATON_MANAGED") and not _automaton_reported:
+        print(json.dumps({"automaton": {"signals": 0, "trades_attempted": 0, "trades_executed": 0, "skip_reason": "no_signal"}}))
