@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "organization": "CopilotKit",
+  "date": "February 2026",
+  "abstract": "Server-side runtime configuration patterns for CopilotKit. Contains 15 rules covering Express/Hono endpoint setup, agent runner selection (InMemory vs SQLite), middleware hooks, security configuration, and performance optimization.",
+  "references": [
+    "https://docs.copilotkit.ai",
+    "https://github.com/CopilotKit/CopilotKit",
+    "https://docs.copilotkit.ai/reference/runtime"
+  ]
+}
