@@ -1,0 +1,11 @@
+{
+  "owner": "homeofe",
+  "slug": "openclaw-gpu-bridge",
+  "displayName": "GPU Bridge",
+  "latest": {
+    "version": "0.2.0",
+    "publishedAt": 1771856036840,
+    "commit": null
+  },
+  "history": []
+}
