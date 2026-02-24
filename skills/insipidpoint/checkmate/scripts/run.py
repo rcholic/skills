@@ -152,17 +152,19 @@ def request_user_input(
     session_uuid: str = "",       # agent session UUID for direct injection (preferred)
 ) -> str:
     """
-    Pause the run, send a checkpoint to the user, then poll for their reply.
+    Pause the run, deliver a checkpoint to the user, then poll for their reply.
 
     Notification strategy (two-layer):
-      PRIMARY — agent-turn injection via session UUID: injects the checkpoint
-        message into the agent's live session. The agent has full routing context
-        and naturally presents the checkpoint + routes the reply to user-input.md.
-        Requires --session-uuid (the UUID from `openclaw gateway call sessions.list`).
+      PRIMARY — agent-turn injection via session UUID: injects an ACTION COMMAND
+        into the agent's live session instructing it to (1) relay the checkpoint
+        to the user via the message tool, and (2) bridge the user's next reply
+        to user-input.md. The agent's tool calls execute even in --json one-shot
+        mode, so the message send happens as a side-effect of the injection.
+        Requires --session-uuid (UUID from `openclaw gateway call sessions.list`).
 
       FALLBACK — openclaw message send: sends directly to the channel if injection
-        fails or no session_uuid provided. The message embeds a routing instruction
-        so it appears in conversation history for the agent to act on.
+        is unavailable or fails. Message includes bridge instruction for the agent
+        to write the user's reply to user-input.md on next contact.
 
     The orchestrator polls user-input.md every 5s.
     pending-input.json is written as a safety net for heartbeat-based routing.
@@ -187,25 +189,40 @@ def request_user_input(
         log("No recipient or session UUID — cannot send checkpoint; proceeding with default")
         return default_response
 
-    routing_instruction = (
-        f"⚙️ **Routing instruction:** When the user replies, immediately write their "
-        f"exact reply to `{workspace}/user-input.md` before anything else. "
-        f"The checkmate orchestrator polls that file every 5 seconds."
+    bridge_instruction = (
+        f"When the user replies to this checkpoint in any upcoming message, "
+        f"immediately write their verbatim reply to `{workspace}/user-input.md` "
+        f"before doing anything else. The checkmate orchestrator polls that file every 5 seconds."
     )
 
-    # ── Primary: agent-turn injection (routing context lives in agent's session) ──
+    # ── Primary: agent-turn injection — action command to relay + bridge ──
+    # The injection tells the agent to actively SEND the checkpoint to the user
+    # (via the message tool) and to bridge the next user reply to user-input.md.
+    # The agent's tool calls (message send) execute even in --json one-shot mode.
     injected = False
     if session_uuid:
-        agent_msg = f"[checkmate {kind}]\n\n{message}\n\n---\n{routing_instruction}"
+        recipient_clause = f"Send it to: channel={channel}, target={recipient}." if recipient else \
+                           "Send it via whatever channel you have configured."
+        agent_msg = (
+            f"[checkmate {kind}]\n\n"
+            f"The checkmate orchestrator is paused and needs user input. "
+            f"Do the following immediately:\n\n"
+            f"1. **Relay this checkpoint to the user** using the message tool (or `openclaw message send`). "
+            f"{recipient_clause}\n\n"
+            f"2. **Bridge their reply**: {bridge_instruction}\n\n"
+            f"--- CHECKPOINT TO RELAY ---\n\n"
+            f"{message}\n\n"
+            f"--- END CHECKPOINT ---"
+        )
         injected = inject_agent_turn(session_uuid, agent_msg)
 
-    # ── Fallback: direct message send (routing instruction embedded in message body) ──
+    # ── Fallback: direct message send (injection unavailable) ──
     if not injected and recipient:
         fallback_msg = (
             f"{message}\n\n"
             f"---\n"
             f"_(checkmate — {'agent injection failed, ' if session_uuid else ''}direct notification)_\n\n"
-            f"{routing_instruction}"
+            f"⚙️ **{bridge_instruction}**"
         )
         log(f"⏸  checkpoint ({kind}) — sending direct message to {recipient} via {channel}")
         notify(recipient, fallback_msg, channel)
@@ -259,9 +276,15 @@ def run_criteria_judge(task: str, criteria: str, iteration: int) -> tuple[str, b
 
 
 def extract_criteria_feedback(verdict: str) -> str:
-    """Extract suggested fixes from a criteria judge verdict."""
-    m = re.search(r"## Suggested Fixes\n(.*?)(?=\n## |\Z)", verdict, re.DOTALL)
-    return m.group(1).strip() if m else ""
+    """Extract issues + suggested fixes from a goal-clarity judge verdict."""
+    issues_m = re.search(r"## Issues\n(.*?)(?=\n## |\Z)", verdict, re.DOTALL)
+    fixes_m = re.search(r"## Suggested Fixes\n(.*?)(?=\n## |\Z)", verdict, re.DOTALL)
+    parts = []
+    if issues_m:
+        parts.append(issues_m.group(1).strip())
+    if fixes_m:
+        parts.append(fixes_m.group(1).strip())
+    return "\n\n".join(parts) if parts else verdict.strip()
 
 
 def run_intake(workspace: Path, task: str, max_intake_iter: int = 5,
@@ -280,57 +303,57 @@ def run_intake(workspace: Path, task: str, max_intake_iter: int = 5,
         # Re-read task each iteration (may have been updated with user clarification)
         task = read_file(workspace / "task.md") or task
 
-        log(f"intake: iteration {i}/{max_intake_iter} — drafting criteria...")
+        log(f"intake: iteration {i}/{max_intake_iter} — drafting goal...")
         criteria = run_intake_draft(task, feedback, i)
 
         intake_dir = workspace / f"intake-{i:02d}"
         intake_dir.mkdir(parents=True, exist_ok=True)
-        write_file(intake_dir / "criteria-draft.md", criteria)
+        write_file(intake_dir / "goal-draft.md", criteria)
 
         # Pause for user review after each draft (interactive mode)
         if interactive and recipient:
             user_msg = (
-                f"📋 *checkmate: criteria draft (intake {i}/{max_intake_iter})*\n\n"
+                f"🎯 *checkmate: goal draft (intake {i}/{max_intake_iter})*\n\n"
                 f"{criteria}\n\n"
                 f"---\n"
                 f"Reply with:\n"
-                f"• **ok / approve** — lock these criteria and proceed\n"
+                f"• **ok / approve** — lock this goal and proceed\n"
                 f"• **feedback or edits** — I'll revise before moving on\n\n"
                 f"Workspace: `{workspace}`"
             )
             response = request_user_input(
                 workspace, recipient, channel,
                 message=user_msg,
-                kind="confirm-criteria",
+                kind="confirm-goal",
                 timeout_min=60,
                 default_response="proceed",
                 session_uuid=session_uuid,
             )
 
             if is_approval(response):
-                log(f"intake: user approved criteria on iteration {i}")
+                log(f"intake: user approved goal on iteration {i}")
                 _criteria_approved = True
                 break
             else:
                 # User gave feedback — append it and continue refining
-                log(f"intake: user requested changes — refining")
+                log(f"intake: user requested changes — refining goal")
                 feedback = f"User review feedback:\n{response}"
                 write_file(intake_dir / "user-feedback.md", response)
                 continue
 
-        # Non-interactive: use criteria-judge as gatekeeper
+        # Non-interactive: use goal-clarity judge as gatekeeper
         # (Interactive mode skips judge since user approval is the real gate)
-        log(f"intake: judging criteria quality (iter {i})...")
+        log(f"intake: judging goal clarity (iter {i})...")
         verdict, approved = run_criteria_judge(task, criteria, i)
-        write_file(intake_dir / "criteria-verdict.md", verdict)
+        write_file(intake_dir / "goal-verdict.md", verdict)
 
         if approved:
-            log(f"intake: criteria APPROVED on iteration {i}")
+            log(f"intake: goal APPROVED on iteration {i}")
             _criteria_approved = True
             break
 
         feedback = extract_criteria_feedback(verdict)
-        log(f"intake: criteria NEEDS_WORK — refining (iter {i})")
+        log(f"intake: goal needs refinement — iterating (iter {i})")
 
     if not _criteria_approved:
         log(
@@ -341,15 +364,15 @@ def run_intake(workspace: Path, task: str, max_intake_iter: int = 5,
             notify(
                 recipient,
                 (
-                    f"⚠️ checkmate: criteria intake hit max iterations ({max_intake_iter}) without approval.\n"
-                    f"Proceeding with best-effort criteria — results may be less reliable.\n"
+                    f"⚠️ checkmate: goal intake hit max iterations ({max_intake_iter}) without approval.\n"
+                    f"Proceeding with best-effort goal statement — results may be less reliable.\n"
                     f"Workspace: {workspace}"
                 ),
                 channel,
             )
 
     write_file(criteria_path, criteria)
-    log(f"intake: locked criteria.md ({len(criteria)} chars)")
+    log(f"intake: locked goal statement ({len(criteria)} chars)")
     return criteria
 
 
@@ -365,11 +388,11 @@ def confirm_prestart(workspace: Path, task: str, criteria: str,
         return True
 
     task_preview = task.strip().splitlines()[0][:200]
-    criteria_count = criteria.count("- [ ]") + criteria.count("- [x]")
+    goal_preview = criteria.strip().splitlines()[0][:150]  # first line of goal statement
     msg = (
         f"✅ *checkmate: ready to start*\n\n"
         f"**Task:** {task_preview}{'…' if len(task.strip()) > 200 else ''}\n"
-        f"**Criteria:** {criteria_count} items locked\n"
+        f"**Goal:** {goal_preview}{'…' if len(criteria.strip()) > 150 else ''}\n"
         f"**Workspace:** `{workspace}`\n\n"
         f"Reply: **go** to start · **cancel** to abort · **edit task: ...** to revise"
     )
@@ -518,9 +541,7 @@ def run_judge(workspace: Path, criteria: str, output: str,
     is_fail = bool(re.search(r"\*\*Result:\*\*\s*FAIL", reply, re.IGNORECASE))
     if not is_pass and not is_fail:
         log(f"WARNING: iter {iteration}: malformed judge output — neither PASS nor FAIL detected; treating as FAIL")
-    score_m = re.search(r"\*\*Score:\*\*\s*(\d+)/(\d+)", reply)
-    score = f"{score_m.group(1)}/{score_m.group(2)}" if score_m else "?/?"
-    log(f"iter {iteration}: judge → {'PASS ✅' if is_pass else f'FAIL ❌ ({score} criteria passing)'}")
+    log(f"iter {iteration}: judge → {'PASS ✅' if is_pass else 'FAIL ❌'}")
     return reply, is_pass
 
 
