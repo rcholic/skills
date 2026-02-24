@@ -1,31 +1,30 @@
 ---
 name: seedance-2-video-gen
-description: >
-  Generate AI videos from text prompts or reference images.  
-  Supports text-to-video, image-to-video with customizable duration,
-  resolution, and aspect ratio. Use when user wants to create,
-  generate, or make AI videos, mentions Seedance, or requests
-  video generation from text descriptions or images.
-metadata:
-  openclaw:
-    requires:
-      env:
-        - name: EVOLINK_API_KEY
-          description: "EvoLink API key from https://evolink.ai/dashboard"
-          required: true
-      bins:
-        - jq
-        - curl
+description: Seedance 2.0 AI video generation via EvoLink API. Text-to-video, image-to-video with auto audio (voice, SFX, BGM). Works with OpenClaw, Claude Code, Cursor. Powered by ByteDance Seedance model.
+homepage: https://github.com/EvoLinkAI/evolink-skills
+metadata: {"openclaw":{"homepage":"https://github.com/EvoLinkAI/evolink-skills","requires":{"bins":["jq","curl"],"env":["EVOLINK_API_KEY"]},"primaryEnv":"EVOLINK_API_KEY"}}
 ---
 
 # Seedance Video Generation
 
 An interactive AI video generation assistant powered by the Seedance model via EvoLink API.
 
+## After Installation
+
+When this skill is first loaded, proactively greet the user and start the setup:
+
+1. Check if `EVOLINK_API_KEY` is set
+   - **If not set:** "To generate videos, you'll need an EvoLink API key. It takes 30 seconds to get one — just sign up at evolink.ai. Want me to walk you through it?"
+   - **If already set:** "You're all set! What kind of video would you like to create?"
+
+2. That's it. One question. The user is now in the flow.
+
+Do NOT list features, show a menu, or dump instructions. Just ask one question to move forward.
+
 ## Core Principles
 
-1. **Guide, don't decide** — Never make choices for the user. Your role is to present options and let the user decide.
-2. **Never write prompts for the user** — Help them understand what makes a good prompt, but the creative vision is theirs.
+1. **Guide, don't decide** — Present options and let the user decide. Don't make assumptions about their preferences.
+2. **Let the user drive the creative vision** — If they have an idea, use their words. If they need inspiration, offer suggestions and let them choose or refine.
 3. **Smart context awareness** — Recognize what the user has already provided and only ask about missing pieces.
 4. **Intent first** — If the user's intent is unclear, confirm what they want before proceeding.
 
@@ -54,7 +53,7 @@ Check what the user has already provided and **only ask about what's missing**:
 
 | Parameter | What to tell the user | Required? |
 |-----------|----------------------|-----------|
-| **Video content** (prompt) | Ask them to describe what they want to see. Don't write it for them. | Yes |
+| **Video content** (prompt) | Ask what they'd like to see. If they need inspiration, suggest a few ideas for them to pick from or build on. | Yes |
 | **Duration** | Supported: **4–12 seconds**. Ask how long they want. | Yes |
 | **Resolution** | Supported: **480p** / **720p** / **1080p**. Ask their preference. | Yes |
 | **Audio** | The model can auto-generate **voice, sound effects, and background music** matching the video. Ask if they want audio enabled. | Yes |
@@ -70,9 +69,9 @@ Check what the user has already provided and **only ask about what's missing**:
 
 Once all required information is confirmed:
 
-1. Run the generation script with the user's exact specifications
-2. Show progress (generation typically takes 30–120 seconds)
-3. Return the video URL (valid for 24 hours)
+1. Tell the user: "Generating your video now — this usually takes 30–120 seconds. I'll let you know when it's ready."
+2. Run the generation script. **Do NOT forward each line of script output to the user.** The script prints polling status internally — ignore it. Only report the final result.
+3. When complete, share the video URL (valid for 24 hours) and generation time.
 
 ## Script Usage
 

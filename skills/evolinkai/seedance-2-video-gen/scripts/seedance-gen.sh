@@ -2,8 +2,17 @@
 
 # Seedance Video Generation Script
 # Usage: ./seedance-gen.sh "prompt" [--image urls] [--duration 5] [--quality 720p] [--aspect-ratio 16:9]
+# Requires: jq, curl
+# API endpoint: https://api.evolink.ai (hardcoded, not configurable)
 
 set -euo pipefail
+
+# Constants
+readonly API_BASE="https://api.evolink.ai"
+readonly MAX_POLL_SECONDS=180
+readonly POLL_FAST_INTERVAL=5
+readonly POLL_SLOW_INTERVAL=10
+readonly POLL_SLOW_AFTER=30
 
 # Default values
 DURATION=5
@@ -38,6 +47,18 @@ warn() {
     echo -e "${YELLOW}WARNING: $1${NC}"
 }
 
+# Check dependencies
+check_dependencies() {
+    if ! command -v jq &> /dev/null; then
+        error "jq is required but not installed. Install it with:
+  apt install jq   # Debian/Ubuntu
+  brew install jq   # macOS"
+    fi
+    if ! command -v curl &> /dev/null; then
+        error "curl is required but not installed."
+    fi
+}
+
 # Check API key
 check_api_key() {
     if [[ -z "${EVOLINK_API_KEY:-}" ]]; then
@@ -54,7 +75,7 @@ To get started:
 # Parse command line arguments
 parse_args() {
     if [[ $# -eq 0 ]]; then
-        error "Usage: $0 \"prompt\" [--image urls] [--duration 5] [--quality 720p] [--aspect-ratio 16:9]
+        error "Usage: $0 \"prompt\" [--image urls] [--duration 5] [--quality 720p] [--aspect-ratio 16:9] [--no-audio]
 
 Examples:
   $0 \"A serene sunset over ocean waves\"
@@ -103,18 +124,6 @@ Examples:
     done
 }
 
-# Check jq is available
-check_dependencies() {
-    if ! command -v jq &> /dev/null; then
-        error "jq is required but not installed. Install it with:
-  apt install jq   # Debian/Ubuntu
-  brew install jq   # macOS"
-    fi
-    if ! command -v curl &> /dev/null; then
-        error "curl is required but not installed."
-    fi
-}
-
 # Build JSON payload safely using jq (no shell injection)
 build_payload() {
     local json_payload
@@ -141,11 +150,11 @@ build_payload() {
     echo "$json_payload"
 }
 
-# Handle API errors
+# Handle API errors with user-friendly messages
 handle_error() {
     local status_code=$1
     local response_body=$2
-    
+
     case $status_code in
         401)
             error "Invalid API key.
@@ -162,13 +171,15 @@ handle_error() {
             error "Service temporarily unavailable. Please try again later."
             ;;
         400)
-            if echo "$response_body" | grep -qi "face\|人脸"; then
+            local error_msg
+            error_msg=$(echo "$response_body" | jq -r '.error // .message // empty' 2>/dev/null || echo "")
+            if echo "$error_msg" | grep -qi "face\|人脸"; then
                 error "Content blocked: Realistic faces not supported.
 → Please modify your prompt to avoid human faces."
-            elif echo "$response_body" | grep -qi "file.*large\|size.*exceed"; then
+            elif echo "$error_msg" | grep -qi "file.*large\|size.*exceed"; then
                 error "File size error: Images must be ≤30MB each."
             else
-                error "Request error (400): $response_body"
+                error "Request error (400): ${error_msg:-$response_body}"
             fi
             ;;
         *)
@@ -179,118 +190,105 @@ handle_error() {
 
 # Submit generation request
 submit_generation() {
-    local payload=$(build_payload)
-    
-    info "Submitting video generation request..."
-    info "Prompt: $PROMPT"
-    info "Duration: ${DURATION}s | Quality: $QUALITY | Aspect: $ASPECT_RATIO"
-    
-    if [[ -n "$IMAGE_URLS" ]]; then
-        local image_count=$(echo "$IMAGE_URLS" | tr ',' '\n' | wc -l)
-        info "Reference images: $image_count"
-    fi
+    local payload
+    payload=$(build_payload)
 
-    local response=$(curl -s -w "\n%{http_code}" \
-        -X POST "https://api.evolink.ai/v1/videos/generations" \
-        -H "Authorization: Bearer $EVOLINK_API_KEY" \
+    # Minimal output — only final result matters
+
+    local http_code response_body
+    response_body=$(curl --fail-with-body --show-error --silent \
+        -w "\n%{http_code}" \
+        -X POST "${API_BASE}/v1/videos/generations" \
+        -H "Authorization: Bearer ${EVOLINK_API_KEY}" \
         -H "Content-Type: application/json" \
-        -d "$payload")
+        -d "$payload" 2>&1) || true
 
-    local status_code=$(echo "$response" | tail -n1)
-    local response_body=$(echo "$response" | head -n -1)
+    http_code=$(echo "$response_body" | tail -n1)
+    response_body=$(echo "$response_body" | sed '$d')
 
-    if [[ "$status_code" != "200" ]]; then
-        handle_error "$status_code" "$response_body"
+    if [[ "$http_code" != "200" ]]; then
+        handle_error "$http_code" "$response_body"
     fi
 
-    # Try to extract task_id (could be "id" or "task_id" depending on API version)
-    local task_id=$(echo "$response_body" | grep -o '"id":"[^"]*' | cut -d'"' -f4)
-    if [[ -z "$task_id" ]]; then
-        task_id=$(echo "$response_body" | grep -o '"task_id":"[^"]*' | cut -d'"' -f4)
-    fi
+    # Extract task_id using jq
+    local task_id
+    task_id=$(echo "$response_body" | jq -r '.id // .task_id // empty' 2>/dev/null)
+
     if [[ -z "$task_id" ]]; then
         error "Failed to extract task_id from response: $response_body"
     fi
 
-    success "Generation started! Task ID: $task_id"
-    # Use a global variable to pass task_id to avoid stdout pollution
     GLOBAL_TASK_ID="$task_id"
 }
 
 # Poll task status
 poll_task() {
     local task_id=$1
-    local start_time=$(date +%s)
-    local max_wait=180  # 3 minutes max
-    local poll_interval=5
-    
-    info "Polling for completion... (this usually takes 30-120 seconds)"
-    
+    local start_time
+    start_time=$(date +%s)
+    local poll_interval=$POLL_FAST_INTERVAL
+
+    # Silent polling — no output until completion or failure
     while true; do
-        local current_time=$(date +%s)
-        local elapsed=$((current_time - start_time))
-        
-        if [[ $elapsed -gt $max_wait ]]; then
-            warn "Generation is taking longer than expected (>3 minutes).
-The video may still be processing. Check back later or contact support."
+        local current_time elapsed
+        current_time=$(date +%s)
+        elapsed=$((current_time - start_time))
+
+        if [[ $elapsed -gt $MAX_POLL_SECONDS ]]; then
+            warn "Generation is taking longer than expected (>${MAX_POLL_SECONDS}s). Task ${task_id} may still be processing."
             exit 1
         fi
-        
-        # Adjust polling interval: 5s for first 30s, then 10s
-        if [[ $elapsed -gt 30 ]]; then
-            poll_interval=10
+
+        if [[ $elapsed -gt $POLL_SLOW_AFTER ]]; then
+            poll_interval=$POLL_SLOW_INTERVAL
         fi
-        
-        local response=$(curl -s -w "\n%{http_code}" \
-            -X GET "https://api.evolink.ai/v1/tasks/$task_id" \
-            -H "Authorization: Bearer $EVOLINK_API_KEY")
-        
-        local status_code=$(echo "$response" | tail -n1)
-        local response_body=$(echo "$response" | head -n -1)
-        
-        if [[ "$status_code" != "200" ]]; then
-            handle_error "$status_code" "$response_body"
+
+        sleep "$poll_interval"
+
+        local http_code response_body
+        response_body=$(curl --fail-with-body --show-error --silent \
+            -w "\n%{http_code}" \
+            -X GET "${API_BASE}/v1/tasks/${task_id}" \
+            -H "Authorization: Bearer ${EVOLINK_API_KEY}" 2>&1) || true
+
+        http_code=$(echo "$response_body" | tail -n1)
+        response_body=$(echo "$response_body" | sed '$d')
+
+        if [[ "$http_code" != "200" ]]; then
+            handle_error "$http_code" "$response_body"
         fi
-        
-        if [[ "$status_code" != "200" ]]; then
-            handle_error "$status_code" "$response_body"
-        fi
-        
-        local task_status=$(echo "$response_body" | grep -o '"status":"[^"]*' | cut -d'"' -f4)
-        
+
+        local task_status
+        task_status=$(echo "$response_body" | jq -r '.status // empty' 2>/dev/null)
+
         case "$task_status" in
             "completed")
-                # Primary format: results array with URL(s)
-                local video_url=$(echo "$response_body" | grep -oP '"results"\s*:\s*\[\s*"[^"]*"' | grep -oP 'https?://[^"]+')
-                # Fallback: try other field names
-                if [[ -z "$video_url" ]]; then
-                    video_url=$(echo "$response_body" | grep -oP '"video_url"\s*:\s*"[^"]*"' | grep -oP 'https?://[^"]+')
-                fi
-                if [[ -z "$video_url" ]]; then
-                    video_url=$(echo "$response_body" | grep -oP '"url"\s*:\s*"[^"]*"' | grep -oP 'https?://[^"]+')
-                fi
-                if [[ -n "$video_url" ]]; then
-                    success "Video generation completed!"
-                    echo ""
-                    echo "🎬 Video URL: $video_url"
-                    echo "⏰ Valid for 24 hours"
-                    echo "⏱️  Total time: ${elapsed}s"
+                local video_url
+                video_url=$(echo "$response_body" | jq -r '
+                    (.results // [])[0] //
+                    .video_url //
+                    .url //
+                    empty
+                ' 2>/dev/null)
+
+                if [[ -n "$video_url" && "$video_url" != "null" ]]; then
+                    echo "VIDEO_URL=$video_url"
+                    echo "ELAPSED=${elapsed}s"
                     return 0
                 else
                     error "Task completed but no video URL found in response: $response_body"
                 fi
                 ;;
             "failed")
-                local error_msg=$(echo "$response_body" | grep -o '"error":"[^"]*' | cut -d'"' -f4)
-                error "Generation failed: ${error_msg:-Unknown error}"
+                local error_msg
+                error_msg=$(echo "$response_body" | jq -r '.error // "Unknown error"' 2>/dev/null)
+                error "Generation failed: $error_msg"
                 ;;
             "processing"|"pending")
-                info "Status: $task_status (${elapsed}s elapsed)"
-                sleep $poll_interval
+                # Silent — no output during polling
                 ;;
             *)
-                warn "Unknown status: $task_status"
-                sleep $poll_interval
+                # Silent — no output for unknown status
                 ;;
         esac
     done
@@ -301,10 +299,9 @@ main() {
     check_dependencies
     check_api_key
     parse_args "$@"
-    
+
     submit_generation
     poll_task "$GLOBAL_TASK_ID"
 }
 
-# Execute main function
 main "$@"
