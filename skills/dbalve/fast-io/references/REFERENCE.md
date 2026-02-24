@@ -1,6 +1,6 @@
 # Fast.io for AI Agents
 
-> **Version:** 1.23.0 | **Last updated:** 2026-02-16
+> **Version:** 1.25.0 | **Last updated:** 2026-02-21
 >
 > This guide is available at the `/current/agents/` endpoint on the connected API server.
 
@@ -17,14 +17,13 @@ needed.
 - **Streamable HTTP (recommended):** `https://mcp.fast.io/mcp`
 - **Legacy SSE:** `https://mcp.fast.io/sse`
 
-The MCP server exposes **14 consolidated tools** using action-based routing — each tool covers a domain (e.g., `auth`,
+The MCP server exposes **19 consolidated tools** using action-based routing — each tool covers a domain (e.g., `auth`,
 `storage`, `upload`) and uses an `action` parameter to select the operation. See the "MCP Tool Architecture" section
 below for the full tool list.
 
-MCP-connected agents also receive guided prompts (`prompts/list`, `prompts/get`) for common multi-step operations — see
-the "MCP Prompts" section below — and can read resources (`resources/read`) including `skill://guide` for full tool
-documentation, `session://status` for current authentication state, and `download://` resource templates for direct
-file content retrieval.
+MCP-connected agents receive comprehensive workflow guidance through SERVER_INSTRUCTIONS at connection time, and can
+read resources (`resources/read`) including `skill://guide` for full tool documentation, `session://status` for current
+authentication state, and `download://` resource templates for direct file content retrieval.
 
 This guide covers platform concepts and capabilities; the MCP server provides tool-level details through its standard
 protocol interface. The API endpoints referenced below are what the MCP server calls under the hood, and are available
@@ -492,7 +491,8 @@ entire workspace, omit `folders_scope` entirely — the default scope is already
 
 **File attachment parameter:**
 - `files_attach` — comma-separated `nodeId:versionId` pairs (max 20 files, 200MB total, both parts required and
-  non-empty). Files are read directly, not searched via RAG.
+  non-empty). **Only file nodes are accepted — passing a folder nodeId will be rejected.** Files are read directly,
+  not searched via RAG. To include folder contents, use `folders_scope` instead.
 
 #### Notes as Knowledge Grounding
 
@@ -1454,8 +1454,8 @@ the human upgrades when they're ready. The agent retains admin access to keep ma
 
 ## MCP Tool Architecture
 
-The MCP server exposes **14 consolidated tools**, each covering a domain. Every tool uses an `action` parameter to
-select the specific operation — agents don't need to discover hundreds of separate tools, just 14 tools with clearly
+The MCP server exposes **19 consolidated tools**, each covering a domain. Every tool uses an `action` parameter to
+select the specific operation — agents don't need to discover hundreds of separate tools, just 19 tools with clearly
 named actions.
 
 | Tool         | Domain                          | Example Actions                                                               |
@@ -1474,6 +1474,11 @@ named actions.
 | `comment`    | Comments                        | `list`, `create`, `details`, `delete`                                         |
 | `event`      | Events & audit                  | `search`, `details`, `summarize`, `activity-poll`                             |
 | `user`       | Account mgmt                    | `me`, `update`, `invitation-list`, `allowed`                                  |
+| `task`       | Task lists & tasks              | `list-lists`, `create-list`, `list-details`, `update-list`, `delete-list`, `list-tasks`, `create-task`, `task-details`, `update-task`, `delete-task`, `change-status`, `assign-task`, `bulk-status` |
+| `todo`       | Todo checklists                 | `list`, `create`, `details`, `update`, `delete`, `toggle`, `bulk-toggle`      |
+| `approval`   | Approval workflows              | `list`, `create`, `details`, `resolve`                                        |
+| `worklog`    | Activity logs & interjections   | `list`, `append`, `interject`, `details`, `acknowledge`, `unacknowledged`     |
+| `apps`       | Apps discovery                  | `list`                                                                        |
 
 ### `web_url` in Tool Responses — Use It Instead of Building URLs
 
@@ -1537,18 +1542,18 @@ needing to call separate list actions first.
 
 ### Tool Annotations — Safety & Side Effects
 
-All 14 tools include explicit MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
+All 19 tools include explicit MCP annotations (`title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint`) so agents and agent frameworks can make informed decisions about confirmation prompts, retries, and
 automated execution.
 
 **Read-only tools** (safe, no confirmation needed, `idempotentHint: true`):
-- `download`, `event` — these tools only read data, never modify state, and are safe to retry
+- `download`, `event`, `apps` — these tools only read data, never modify state, and are safe to retry
 
 **Non-destructive mutation tools** (create or update, no delete actions):
-- `upload`, `invitation` — these tools create or modify resources but cannot delete them
+- `upload`, `invitation`, `worklog` — these tools create or modify resources but cannot delete them
 
 **Destructive tools** (include delete, purge, or close actions — require user confirmation):
-- `auth`, `user`, `org`, `workspace`, `share`, `storage`, `ai`, `comment`, `member`, `asset` — these tools have at
+- `auth`, `user`, `org`, `workspace`, `share`, `storage`, `ai`, `comment`, `member`, `asset`, `task`, `todo`, `approval` — these tools have at
   least one action that permanently removes or closes a resource. Agent frameworks should prompt for confirmation before
   executing destructive actions.
 
@@ -1561,6 +1566,85 @@ automated execution.
 - File uploads: storage credits (100 credits/GB)
 - Downloads: bandwidth credits (212 credits/GB)
 - Document ingestion: 10 credits/page (when intelligence is enabled)
+
+### Code Mode — Streamlined Tools for Headless Agents
+
+The MCP server (v2026.02.102+) detects the connecting client and serves one of two tool sets:
+
+**Named Mode** (Claude Desktop, Cline, unknown clients): All 19 core tools listed above plus 12 app-specific widget
+tools — the full interactive experience with action-based routing across every domain.
+
+**Code Mode** (Claude Code, Cursor, Continue): 4 tools optimized for programmatic workflows:
+
+| Tool       | Purpose                                                                                     |
+|------------|---------------------------------------------------------------------------------------------|
+| `auth`     | Authentication — same as Named Mode (`signin`, `signup`, `set-api-key`, `pkce-login`, etc.) |
+| `upload`   | File uploads — same as Named Mode (`create-session`, `chunk`, `finalize`, `text-file`, etc.)|
+| `search`   | Keyword/tag search over 285 API endpoints                                                   |
+| `execute`  | Run agent-provided JavaScript against the Fast.io API in a sandboxed environment            |
+
+#### `search` Tool
+
+Discovers API endpoints by keyword and tag. Returns scored matches with method, path, summary, parameters, and relevant
+concept docs (pagination, error codes, etc.).
+
+**Parameters:**
+
+| Parameter          | Type    | Required | Description                                                    |
+|--------------------|---------|----------|----------------------------------------------------------------|
+| `query`            | string  | Yes      | Keyword search query (e.g., "list workspaces", "upload file")  |
+| `tag`              | string  | No       | Filter results by API tag (e.g., "workspace", "storage", "ai") |
+| `include_concepts` | boolean | No       | Include related concept docs (pagination, error codes, etc.)   |
+| `max_results`      | number  | No       | Maximum number of endpoint matches to return                   |
+
+#### `execute` Tool
+
+Runs agent-provided JavaScript in a sandboxed `AsyncFunction` with a `fastio` proxy object that handles auth
+injection, envelope parsing, and error extraction. The sandbox has whitelisted globals only (`JSON`, `Math`, `Date`,
+etc.), blocks prototype chain escapes, and enforces a 60-second timeout.
+
+**Parameters:**
+
+| Parameter    | Type   | Required | Description                                              |
+|--------------|--------|----------|----------------------------------------------------------|
+| `code`       | string | Yes      | JavaScript code to execute in the sandbox                |
+| `timeout_ms` | number | No       | Execution timeout in milliseconds (1,000–60,000)         |
+
+**`fastio` proxy methods:**
+
+| Method              | Description                           |
+|---------------------|---------------------------------------|
+| `fastio.get(path)`  | `GET` request to the Fast.io API      |
+| `fastio.post(path, body)` | `POST` with form-encoded body   |
+| `fastio.postJson(path, body)` | `POST` with JSON body        |
+| `fastio.put(path, body)` | `PUT` request                    |
+| `fastio.delete(path)` | `DELETE` request                   |
+
+The proxy automatically injects the authenticated session token, unwraps the API response envelope, and extracts errors
+— agents receive clean response data without boilerplate.
+
+#### Code Mode Workflow Pattern
+
+Code Mode agents follow a **search → review → execute → iterate** loop:
+
+1. **Search** — use the `search` tool to discover relevant API endpoints by keyword or tag
+2. **Review** — examine the returned endpoint details (method, path, parameters, summary)
+3. **Execute** — call the endpoint programmatically via the `execute` tool using the `fastio` proxy
+4. **Iterate** — refine based on results, search for additional endpoints as needed
+
+This pattern replaces the need for 19+ individually named tools. Agents discover endpoints dynamically via search and
+call them programmatically via execute, without needing pre-registered tool definitions for each operation.
+
+**Example — list workspaces in an org:**
+
+```javascript
+// Search: search tool with query "list workspaces"
+// → returns: GET /current/org/{id}/list/workspaces/
+
+// Execute:
+const result = await fastio.get('/current/org/{org_id}/list/workspaces/');
+return result;
+```
 
 ### Response Hints — Guided Agent Workflows
 
@@ -1589,6 +1673,8 @@ the following actions:
 - `download`: file-url (token expiry), zip-url
 - `upload`: stage-blob (5-minute expiry)
 - `org`: transfer-token-create
+- `task`: delete-list (cascade to child tasks), delete-task (soft-delete)
+- `approval`: resolve (irreversible approve/reject)
 
 **`_recovery` — Error recovery hints:**
 
@@ -1610,7 +1696,9 @@ correct resolution. All errors also include `(during: <tool> <action>)` so agent
 | 429    | Rate limited — wait 2–4 seconds, retry with exponential backoff |
 
 Error message pattern matching provides additional context-specific recovery steps (e.g., "email not verified" →
-use `auth` action `email-verify`; "workspace not found" → check workspace ID with `workspace` action `list`).
+use `auth` action `email-verify`; "workspace not found" → check workspace ID with `workspace` action `list`;
+"workflow not enabled" → use `workspace` or `share` action `enable-workflow`; "already resolved" → check status with
+`approval` action `details`; "only interjection" → verify entry type with `worklog` action `details`).
 
 **`ai_capabilities` — AI mode availability:**
 
@@ -1635,32 +1723,10 @@ regions, video/audio timestamps, PDF pages).
 
 ---
 
-## MCP Prompts — Guided Workflows
+## MCP Workflow Guidance
 
-MCP-connected agents can use **guided prompts** to get step-by-step instructions for common operations. These are
-especially useful for agents unfamiliar with Fast.io workflows, complex multi-step operations, or operations with
-non-obvious parameter requirements.
-
-Retrieve the full list with `prompts/list` and get detailed guidance for a specific prompt with `prompts/get`.
-
-| Prompt                 | Name                          | When to Use                                                                                          |
-|------------------------|-------------------------------|------------------------------------------------------------------------------------------------------|
-| `get-started`          | Getting Started Guide         | First-time onboarding: create account, org, and workspace. Covers autonomous agents, API key auth, browser login (PKCE), and agents invited to existing orgs. |
-| `add-file`             | Add File Guide                | Adding files from text content, chunked binary upload (with `stage-blob` action or `POST /blob` for binary data), or URL import (Google Drive, OneDrive, Dropbox). |
-| `ask-ai`               | AI Chat Guide                 | Querying files with AI. Covers RAG-indexed vs file attachment modes, intelligence state checks, scoping (folder scope = search boundary, not file enumeration), polling, and response structure. |
-| `comment-conversation` | Comment Collaboration Guide   | Agent-human feedback loop on files. Read/write anchored comments (image regions, video timestamps, PDF pages), threaded replies, emoji reactions, and deep-link URL construction. |
-| `catch-up`             | Activity Catch-Up Guide       | Understanding what happened. AI-powered activity summaries, event search with filters, real-time change monitoring with activity-poll. |
-| `metadata`             | Metadata Extraction Guide     | Extracting structured metadata from files. Covers template creation, workspace assignment, manual and batch AI extraction, and saved views. |
-
-**When to use prompts instead of this guide:**
-
-- **Starting a new workflow** — prompts provide concise, actionable steps tailored to the specific operation
-- **Choosing between approaches** — prompts explain trade-offs (e.g., which upload method, which chat scoping mode)
-- **Parameter-heavy operations** — prompts list exact parameters, required values, and common pitfalls
-- **First-time operations** — prompts walk through prerequisites and setup in order
-
-Prompts complement the reference material in this guide and in `skill.md`. Use this guide for concepts and
-capabilities, `skill.md` for tool-level details, and prompts for guided walkthroughs of specific workflows.
+> **Note:** The MCP server does not provide guided prompts. All workflow guidance is available through
+> SERVER_INSTRUCTIONS (received at connection time), the `skill://guide` resource, and the `/skill.md` endpoint.
 
 ---
 
@@ -1789,6 +1855,10 @@ Fast.io provides five workflow primitives for structured agent collaboration. Th
 work, track progress, handle urgent corrections, manage approvals, and maintain simple checklists — all within the same
 workspaces and shares where files live.
 
+**MCP-connected agents** use four workflow tools — `task`, `worklog`, `approval`, `todo` — instead of calling these
+REST endpoints directly. Enable workflow first via `workspace` action `enable-workflow` or `share` action
+`enable-workflow`.
+
 ### 1. Task Lists & Tasks
 
 Organize work into lists with individual tasks. Task lists belong to a workspace or share and contain ordered tasks.
@@ -1905,6 +1975,7 @@ Workflow features must be enabled on each workspace or share before use:
   agent context windows.
 - **Create notes for context, link tasks to notes via `node_id`** — notes are indexed by AI/RAG, so linked context
   becomes searchable and citable in AI chat.
+- **Always log your work:** After any significant state-changing action, use `POST /worklogs/{entity_type}/{entity_id}/append/` to record what was done and why. Without worklog entries, agent activity is invisible to humans reviewing the workspace.
 - **Pattern:** Create context note → Create task list → Link tasks to notes → Log progress → AI searches across all.
 
 ### Recommended Workflow for Agent Teams
@@ -1912,7 +1983,7 @@ Workflow features must be enabled on each workspace or share before use:
 1. Enable workflow on the workspace
 2. Create a task list for the project
 3. Create tasks with descriptions and link to reference notes
-4. Log progress with worklog entries
+4. Log activity with worklog entries — after uploads, task changes, share creation, member changes, or file moves/deletes, append a worklog entry describing what was done and why. This is how humans track agent activity. For batches of related actions, a single summary entry is sufficient.
 5. Use interjections for urgent corrections
 6. Request approvals for important decisions
 7. Use todos for simple checklists

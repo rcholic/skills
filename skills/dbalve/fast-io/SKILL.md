@@ -1,30 +1,30 @@
 ---
 name: fast-io
 description: >-
-  Workspaces for agentic teams. Complete agent guide with all 18 consolidated
+  Workspaces for agentic teams. Complete agent guide with all 19 consolidated
   tools using action-based routing — parameters, workflows, ID formats, and
   constraints. Use this skill when agents need shared workspaces to collaborate
   with other agents and humans, create branded shares (Send/Receive/Exchange),
   or query documents using built-in AI. Supports ownership transfer to humans,
   workspace management, workflow primitives (tasks, worklogs, approvals, todos),
-  and real-time collaboration. Free agent plan with 50 GB storage and 5,000
-  monthly credits.
+  and real-time collaboration.
+  Free agent plan with 50 GB storage and 5,000 monthly credits.
 license: Proprietary
 compatibility: >-
   Requires network access. Connects to the Fast.io MCP server at mcp.fast.io
   via Streamable HTTP (/mcp) or SSE (/sse).
 metadata:
   author: fast-io
-  version: "1.73.0"
+  version: "1.94.0"
 homepage: "https://fast.io"
 ---
 
 # Fast.io MCP Server -- AI Agent Guide
 
-**Version:** 1.73
-**Last Updated:** 2026-02-18
+**Version:** 1.94
+**Last Updated:** 2026-02-22
 
-The definitive guide for AI agents using the Fast.io MCP server. Covers why and how to use the platform: product capabilities, the free agent plan, authentication, core concepts (workspaces, shares, intelligence, previews, comments, URL import, metadata, workflow, ownership transfer), 12 end-to-end workflows, and all 18 consolidated tools with action-based routing.
+The definitive guide for AI agents using the Fast.io MCP server. Covers why and how to use the platform: product capabilities, the free agent plan, authentication, core concepts (workspaces, shares, intelligence, previews, comments, URL import, metadata, workflow, ownership transfer), 12 end-to-end workflows, interactive MCP App widgets, and all 19 consolidated tools with action-based routing.
 
 > **Versioned guide.** This guide is versioned and updated with each server release. The version number at the top of this document tracks tool parameters, ID formats, and API behavior changes. If you encounter unexpected errors, the guide version may have changed since you last read it.
 
@@ -59,7 +59,7 @@ When agents need to *understand* documents -- not just store them -- they have t
 
 ### MCP Server
 
-This MCP server exposes 18 consolidated tools that cover the full Fast.io REST API surface. Every authenticated API endpoint has a corresponding tool action, and the server handles session management automatically.
+This MCP server exposes 19 consolidated tools that cover the full Fast.io REST API surface. Every authenticated API endpoint has a corresponding tool action, and the server handles session management automatically.
 
 Once a user authenticates, the auth token is stored in the server session and automatically attached to all subsequent API calls. There is no need to pass tokens between tool invocations.
 
@@ -75,22 +75,36 @@ Two transports are available on each:
 
 ### MCP Resources
 
-The server exposes two static MCP resources and three file download resource templates. Clients can read them via `resources/list` and `resources/read`:
+The server exposes static MCP resources, widget resources, and file download resource templates. Clients can read them via `resources/list` and `resources/read`:
 
 | URI | Name | Description | MIME Type |
 |-----|------|-------------|-----------|
-| `skill://guide` | skill-guide | Full agent guide (this document) with all 18 tools, workflows, and platform documentation | `text/markdown` |
+| `skill://guide` | skill-guide | Full agent guide (this document) with all 19 tools, workflows, and platform documentation | `text/markdown` |
 | `session://status` | session-status | Current authentication state: `authenticated` boolean, `user_id`, `user_email`, `token_expires_at` (Unix epoch), `token_expires_at_iso` (ISO 8601), `scopes` (raw scope string or null), `scopes_detail` (array of hydrated scope objects with entity names/domains/parents, or null), `agent_name` (string or null) | `application/json` |
+| `widget://*` | Widget HTML | Interactive HTML5 widgets (5 total) -- use the `apps` tool to discover and launch | `text/html` |
 
 **File download resource templates** -- read file content directly through MCP without needing external HTTP access:
 
-| URI Template | Name | Auth | Description |
-|---|---|---|---|
-| `download://workspace/{workspace_id}/{node_id}` | download-workspace-file | Session token | Download a file from a workspace |
-| `download://share/{share_id}/{node_id}` | download-share-file | Session token | Download a file from a share |
-| `download://quickshare/{quickshare_id}` | download-quickshare-file | None (public) | Download a quickshare file |
+| URI Template | Name | Auth | Dynamic Listing | Description |
+|---|---|---|---|---|
+| `download://workspace/{workspace_id}/{node_id}` | download-workspace-file | Session token | Yes | Download a file from a workspace |
+| `download://share/{share_id}/{node_id}` | download-share-file | Session token | Yes | Download a file from a share |
+| `download://quickshare/{quickshare_id}` | download-quickshare-file | None (public) | No | Download a quickshare file |
 
 Files up to 50 MB are returned inline as base64-encoded blob content. Larger files return a text fallback with a URL to the HTTP pass-through endpoint (see below). The `download` tool responses include a `resource_uri` field with the appropriate URI for each file.
+
+**Dynamic resource listing:** When authenticated, workspace and share file resources are dynamically listed via `resources/list`. MCP clients (such as Claude Desktop's `@` mention picker) can discover available files without any tool calls. Up to 10 workspaces and 10 shares are enumerated, with up to 25 most recently updated root-level files from each. Resources appear as "WorkspaceName / filename.ext" or "ShareTitle / filename.ext". Results are cached for 1 minute per session. Only root-level files are listed -- subdirectories are not recursively enumerated. Use the `storage` tool with action `list` to browse deeper. The quickshare template remains template-only and is not dynamically enumerable.
+
+### MCP Prompts
+
+The server registers MCP prompts that appear in the client's "Add From" / "+" menu as user-clickable app launchers. These are primarily for desktop MCP clients (e.g., Claude Desktop); code-mode clients (Claude Code, Cursor) do not surface prompts.
+
+| Prompt Name | Description |
+|---|---|
+| `App: Choose Workspace or Org` | Launch the Workspace Picker to browse orgs, select workspaces, and manage shares |
+| `App: Pick a File` | Launch the File Picker with built-in workspace navigator for browsing, searching, and selecting files |
+| `App: Open Workflow` | Launch the Workflow Manager (auto-selects workspace if only one, otherwise opens Workspace Picker first) |
+| `App: Available Apps` | List all available MCP App widgets with descriptions and launch instructions |
 
 ### HTTP File Pass-Through
 
@@ -104,21 +118,11 @@ For files larger than 50 MB or when raw binary streaming is needed, the server p
 
 The response includes proper `Content-Type`, `Content-Length`, and `Content-Disposition` headers from the upstream API. Errors are returned as HTML pages. The `Mcp-Session-Id` header is the same session identifier used for MCP protocol communication.
 
-### MCP Prompts
+### Workflow Overview
 
-The server provides 9 guided prompts for complex, multi-step operations via `prompts/list` and `prompts/get`:
+The server includes workflow features for project tracking: **tasks** (structured work items with priorities and assignees), **worklogs** (append-only activity logs), **approvals** (formal sign-off requests), and **todos** (simple checklists). Enable workflow on a workspace with `workspace` action `enable-workflow` before using these tools. See the **Full Agent Workflow** recipe in section 6 for the complete pattern.
 
-| Prompt | Description |
-|--------|-------------|
-| `get-started` | Complete onboarding: create account, org, and workspace. Covers new agents, returning users, API key auth, browser login (PKCE), and invited agents. |
-| `add-file` | Add a file from text content, binary upload (with blob staging), or URL import (Google Drive, OneDrive, Dropbox). Helps choose the right method. |
-| `ask-ai` | Guide for AI chat. Explains scoping (folder/file scope vs attachments), intelligence requirements, polling. |
-| `comment-conversation` | Agent-human collaboration via comments on files. Read/write anchored comments (image regions, video timestamps, PDF pages), reply in threads, react with emoji, and construct deep-link URLs so humans land directly on the conversation. |
-| `catch-up` | Understand what happened. AI-powered activity summaries, event search with filters, real-time change monitoring with activity-poll, and the polling loop pattern. |
-| `metadata` | Structured metadata on files. Template setup (create, assign), setting values, AI extraction, querying files by metadata, and version tracking. |
-| `manage-tasks` | Task management workflow: create task lists, add tasks with priorities and assignees, track status, and use bulk operations. |
-| `agent-workflow` | Full agentic workflow: enable workflow, create tasks, log progress with worklogs, handle interjections, request approvals, and manage todos. |
-| `project-setup` | Set up an agent project workspace: enable workflow, create context notes, build task lists linked to notes, use worklogs for reasoning, and leverage AI/RAG integration. |
+**Best practice (IMPORTANT):** After state-changing actions (uploading files, creating shares, changing task status, member changes, file moves/deletes), append a worklog entry describing what you did and why. Without worklog entries, agent work is invisible to humans reviewing the workspace. For multiple related actions (e.g., uploading several files), you may log once after the batch completes rather than after each individual action. Worklog entries are append-only and permanent.
 
 ### Additional References
 
@@ -440,7 +444,7 @@ For `chat_with_files`, choose one of these mutually exclusive approaches:
 | Max references | 100 folder refs (subfolder tree expansion) or 100 file refs | 20 files / 200 MB |
 | Default (no scope given) | Entire workspace | N/A |
 
-**Scope parameters** (requires intelligence):
+**Scope parameters** (REQUIRES intelligence — will error if intelligence is off):
 
 - `folders_scope` — comma-separated `nodeId:depth` pairs (depth 1-10, max 100 subfolder refs). Defines a search boundary — the RAG backend finds documents within scoped folders automatically. Just pass folder IDs with depth; do not enumerate individual files. A folder with thousands of files and few subfolders works fine.
 - `files_scope` — comma-separated `nodeId:versionId` pairs (max 100). Limits RAG to specific indexed files. Both `nodeId` AND `versionId` are required and must be non-empty — get `versionId` from the file's `version` field in `storage` action `list` or `details` responses.
@@ -448,9 +452,11 @@ For `chat_with_files`, choose one of these mutually exclusive approaches:
 
 **Attachment parameter** (no intelligence required):
 
-- `files_attach` — comma-separated `nodeId:versionId` pairs (max 20, 200 MB total). Both `nodeId` AND `versionId` are required and must be non-empty. Files are read directly, not via RAG. **Only files with `ai.attach: true` in storage details can be attached** — check before using.
+- `files_attach` — comma-separated `nodeId:versionId` pairs (max 20, 200 MB total). Both `nodeId` AND `versionId` are required and must be non-empty. Files are read directly, not via RAG. **FILES ONLY: passing a folder nodeId returns a 406 error.** To include folder contents in AI context, use `folders_scope` instead (requires intelligence). **Only files with `ai.attach: true` in storage details can be attached** — check before using.
 
 **Do not** list folder contents and pass individual file IDs as `files_scope` when you mean to search a folder — use `folders_scope` with the folder's nodeId instead. `files_scope` is only for targeting specific known file versions.
+
+**Scope vs attach:** `files_scope` and `folders_scope` narrow the RAG search boundary and **require workspace intelligence to be enabled** — they will error on non-intelligent workspaces. `files_attach` sends files directly to the AI without indexing and works regardless of intelligence setting, but accepts only file nodeIds (not folders).
 
 `files_scope`/`folders_scope` and `files_attach` are mutually exclusive — sending both will error.
 
@@ -890,7 +896,7 @@ The transfer flow is the primary way agents deliver value: set everything up on 
 
 ## 5. Tool Categories
 
-The 18 tools use action-based routing. Each tool covers a specific area of the Fast.io platform and exposes multiple actions.
+The 19 tools use action-based routing. Each tool covers a specific area of the Fast.io platform and exposes multiple actions.
 
 ### auth
 
@@ -924,9 +930,9 @@ Share CRUD, public details, archiving, password authentication, asset management
 
 ### storage
 
-File and folder operations within workspaces and shares. List, create folders, move, copy, delete, rename, purge, restore, search, add files from uploads, add share links, transfer nodes, manage trash, version operations, file locking, and preview/transform URL generation. Requires `context_type` parameter (`workspace` or `share`).
+File and folder operations within workspaces and shares. List, list recently modified files across all folders, create folders, move, copy, delete, rename, purge, restore, search, add files from uploads, add share links, transfer nodes, manage trash, version operations, file locking, and preview/transform URL generation. Requires `context_type` parameter (`workspace` or `share`).
 
-**Actions:** list, details, search, trash-list, create-folder, copy, move, delete, rename, purge, restore, add-file, add-link, transfer, version-list, version-restore, lock-acquire, lock-status, lock-release, preview-url, preview-transform
+**Actions:** list, recent, details, search, trash-list, create-folder, copy, move, delete, rename, purge, restore, add-file, add-link, transfer, version-list, version-restore, lock-acquire, lock-status, lock-release, preview-url, preview-transform
 
 ### upload
 
@@ -984,9 +990,9 @@ Task list and task management for workspaces and shares. Create and manage task 
 
 ### worklog
 
-Append-only chronological activity logs scoped to tasks, task lists, storage nodes, or profiles. Log progress, decisions, and status changes. Create urgent interjections that require acknowledgement. Entries cannot be edited or deleted after creation. Requires workflow to be enabled on the target entity.
+Activity log for tracking agent work. After uploads, task changes, share creation, or any significant action, log what you did and why — builds a searchable audit trail for humans and AI. Also create urgent interjections that require acknowledgement. Entries are append-only and permanent. Requires workflow to be enabled on the target entity.
 
-**Actions:** list, append, interject, details, acknowledge, unacknowledged
+**Actions:** append, list, interject, details, acknowledge, unacknowledged
 
 ### approval
 
@@ -999,6 +1005,12 @@ Formal approval requests scoped to tasks, storage nodes, or worklog entries. Cre
 Simple flat checklists scoped to workspaces and shares. Create, update, delete, and toggle completion state on individual todos or in bulk. No nesting. Requires workflow to be enabled on the target entity.
 
 **Actions:** list, create, details, update, delete, toggle, bulk-toggle
+
+### apps
+
+Interactive MCP App widget discovery and launching. List available widgets, get details for a specific widget, launch a widget with workspace or share context, and find widgets associated with a specific tool domain.
+
+**Actions:** list, details, launch, get-tool-apps
 
 ---
 
@@ -1048,10 +1060,10 @@ See **Choosing the Right Approach** in section 2 for which option fits your scen
 
 **Binary or large files (chunked flow):**
 
-1. `upload` action `create-session` with `profile_type: "workspace"`, `profile_id` (the workspace ID), `parent_node_id` (target folder or `"root"`), `filename`, and `filesize` in bytes. Returns an `upload_id`.
-2. `upload` action `chunk` with `upload_id`, `chunk_number` (1-indexed), and chunk data. Three options for passing data (provide exactly one):
+1. `upload` action `create-session` with `profile_type: "workspace"`, `profile_id` (the workspace ID), `parent_node_id` (target folder or `"root"`), `filename`, and `filesize` in bytes. Returns an `upload_id`, `recommended_mcp_chunk_bytes` (default 24576), and `total_chunks` — use these to split the file.
+2. `upload` action `chunk` with `upload_id`, `chunk_number` (1-indexed), and chunk data. **Split files into pieces of `recommended_mcp_chunk_bytes`** (24 KB binary / ~32 KB base64) — even small files. Three options for passing data (provide exactly one):
    - **`content`** — for text (strings, code, JSON, etc.). Do NOT use `data` for text.
-   - **`data`** — base64-encoded binary. The simplest approach for binary uploads through MCP tool calls.
+   - **`data`** — base64-encoded binary (**≤32 KB per call**). The simplest approach for binary uploads through MCP tool calls. Split the file and send each piece as a separate chunk.
    - **`blob_ref`** — blob ID from `upload` action `stage-blob` or `POST /blob`. Useful when pre-staging data or when using the HTTP blob endpoint from non-MCP clients. Blobs expire after 5 minutes and are consumed (deleted) on use.
    Repeat for each chunk. Wait for each chunk to return success before sending the next.
 3. `upload` action `finalize` with `upload_id` -- triggers file assembly and polls until stored. Returns the final session state with `status: "stored"` or `"complete"` on success (including `new_file_id`), or throws on assembly failure. The file is automatically added to the target workspace and folder specified in step 1 -- no separate add-file call is needed.
@@ -1062,8 +1074,8 @@ See **Choosing the Right Approach** in section 2 for which option fits your scen
 
 Use this when you have a file URL (HTTP/HTTPS, Google Drive, OneDrive, Box, Dropbox) and want to add it to a workspace without downloading locally.
 
-1. `upload` action `web-import` with `url` (the source URL), `profile_type: "workspace"`, `profile_id` (the workspace ID), and `parent_node_id` (target folder or `"root"`). Returns a `job_id`.
-2. `upload` action `web-status` with `job_id` -- check import progress. The server downloads the file, scans it, generates previews, and indexes it for AI (if intelligence is enabled).
+1. `upload` action `web-import` with `url` (the source URL), `profile_type: "workspace"`, `profile_id` (the workspace ID), and `parent_node_id` (target folder or `"root"`). Returns an `upload_id`.
+2. `upload` action `web-status` with `upload_id` -- check import progress. The server downloads the file, scans it, generates previews, and indexes it for AI (if intelligence is enabled).
 3. The file appears in the workspace storage tree once the job completes.
 
 ### 5. Deliver Files to a Client
@@ -1199,23 +1211,25 @@ MCP tools return download URLs -- they never stream binary content directly. `do
 
 ### Binary Uploads
 
-Three approaches for uploading binary data as chunks, each suited to different situations:
+Three approaches for uploading binary data as chunks, each suited to different situations.
+
+> **Chunk size limit for MCP agents.** MCP tool parameters pass through the AI model's output, which limits how much data you can include in a single tool call. **Keep each chunk's base64 `data` under 32 KB** (~24 KB of binary). For example, a 145 KB PDF needs at least 6 chunks, and even a 17 KB file should be split into 1-2 chunks rather than assumed to fit in one call. The `create-session` response includes a `recommended_mcp_chunk_bytes` hint (default 24576) — use it to calculate the number of chunks: `ceil(filesize / recommended_mcp_chunk_bytes)`. Always split files into multiple chunks when using `data` or `stage-blob` through MCP tool calls.
 
 **1. `data` parameter (base64) — simplest for MCP agents**
 
-Pass base64-encoded binary directly in the `data` parameter of `upload` action `chunk`. No extra steps required. Works with any MCP client. Adds ~33% size overhead from base64 encoding.
+Pass base64-encoded binary directly in the `data` parameter of `upload` action `chunk`. No extra steps required. Works with any MCP client. Adds ~33% size overhead from base64 encoding. **Split files into chunks of ≤24 KB binary (≤32 KB base64)** to stay within MCP client parameter limits.
 
 **2. `stage-blob` action — MCP tool-based blob staging**
 
-Use `upload` action `stage-blob` with `data` (base64) to pre-stage binary data as a blob. Returns a `blob_id` that you pass as `blob_ref` in the chunk call. Useful when you want to decouple staging from uploading, or when preparing multiple chunks in advance.
+Use `upload` action `stage-blob` with `data` (base64) to pre-stage binary data as a blob. Returns a `blob_id` that you pass as `blob_ref` in the chunk call. Useful when you want to decouple staging from uploading, or when preparing multiple chunks in advance. The same **32 KB base64 limit per call** applies — stage one chunk-sized piece at a time.
 
 **Flow:**
-1. `upload` action `stage-blob` with `data` (base64-encoded binary). Returns `{ "blob_id": "<uuid>", "size": <bytes> }`.
+1. `upload` action `stage-blob` with `data` (base64-encoded binary, ≤32 KB). Returns `{ "blob_id": "<uuid>", "size": <bytes> }`.
 2. `upload` action `chunk` with `blob_ref: "<blob_id>"`. The server retrieves the staged bytes and uploads them.
 
 **3. `POST /blob` endpoint — HTTP blob staging for non-MCP clients**
 
-A sidecar HTTP endpoint that accepts raw binary data outside the JSON-RPC pipe. This avoids base64 encoding entirely — useful for clients that can make direct HTTP requests alongside MCP tool calls.
+A sidecar HTTP endpoint that accepts raw binary data outside the JSON-RPC pipe. This avoids base64 encoding entirely — useful for clients that can make direct HTTP requests alongside MCP tool calls. No chunk size splitting needed with this approach.
 
 **Flow:**
 1. `POST /blob` with headers `Mcp-Session-Id: <session_id>` and `Content-Type: application/octet-stream`. Send raw binary bytes as the request body. Returns `{ "blob_id": "<uuid>", "size": <bytes> }` (HTTP 201).
@@ -1264,7 +1278,6 @@ The `event` tool's `search` and `summarize` actions accept `category`, `subcateg
 | `assets` | Avatar/asset updates |
 | `upload` | Upload session management |
 | `transfer` | Cross-profile file transfers |
-| `import_export` | Data import/export operations |
 | `quickshare` | Quick share operations |
 | `metadata` | Metadata operations |
 
@@ -1459,7 +1472,7 @@ Pattern-based recovery: error messages are also matched against common patterns 
 
 **Tool annotations:** Tools include MCP annotation hints -- `readOnlyHint`, `destructiveHint`, `idempotentHint` (download, event), and `openWorldHint` (org, user, workspace, share, storage) -- to help clients understand tool behavior without documentation.
 
-**Resource completion:** The `download://workspace/{workspace_id}` and `download://share/{share_id}` resource templates support tab-completion for IDs. MCP clients that support `completion/complete` will automatically suggest valid workspace and share IDs from your session.
+**Resource completion and listing:** The workspace and share download resource templates support both dynamic listing (`resources/list`) and tab-completion (`completion/complete`). Dynamic listing shows root-level files across workspaces and shares in the client's resource picker. Tab-completion suggests valid workspace and share IDs as you type.
 
 ### Unauthenticated Tools
 
@@ -1467,9 +1480,59 @@ The following actions work without a session: `auth` actions `signin`, `signup`,
 
 ---
 
-## 8. Complete Tool Reference
+## 8. MCP Apps (Interactive UI Widgets)
 
-All 18 tools with their actions organized by functional area. Each entry shows the action name and its description. Workflow tools (task, worklog, approval, todo) require workflow to be enabled on the target workspace or share.
+Fast.io MCP Server includes interactive HTML5 widgets that render rich UIs directly in agent conversations. Widgets communicate with the MCP server through tool calls and display file browsers, dashboards, workflow managers, and more.
+
+### Available Widgets
+
+| Widget | Resource URI | Description |
+|--------|-------------|-------------|
+| File Picker | `widget://file-picker` | Browse and pick files to attach to your conversation — navigate folders, search, preview, select files for the agent. Also supports file management (upload, move, copy, delete) in workspace and share contexts |
+| Workspace Picker | `widget://workspace-picker` | Org/workspace/share selection with search, 4-step workspace creation wizard, 5-step share creation wizard |
+| File Viewer | `widget://file-viewer` | Unified file preview (image, PDF, video, audio, code, spreadsheet) with info panel (details, versions, AI summary, metadata) |
+| Workflow Manager | `widget://workflow` | Task board, task detail, approvals panel, todos checklist, worklog viewer |
+| Comments Panel | `widget://comments` | Threaded comments, reactions, anchored comments (image regions, timestamps) |
+
+### Using the Apps Tool
+
+The `apps` tool provides widget discovery and launching:
+
+1. **List apps:** `apps` action `list` -- returns all available widgets with metadata
+2. **App details:** `apps` action `details` with `app_id` -- full metadata for a specific widget
+3. **Launch app:** `apps` action `launch` with `app_id`, `context_type`, `context_id` -- opens widget with context
+4. **Find apps for a tool:** `apps` action `get-tool-apps` with `tool_name` -- maps tools to their widgets
+
+### Widget Context
+
+All widgets accept workspace or share context:
+- `context_type: "workspace"` + `context_id: "<workspace_id>"`
+- `context_type: "share"` + `context_id: "<share_id>"`
+
+### Design System
+
+Widgets use a shared design system matching the Fast.io frontend:
+- Light and dark mode support (follows system preference or explicit `data-theme` attribute)
+- Consistent typography, spacing, colors, and icons derived from the frontend theme
+- Responsive layout (desktop, tablet, mobile breakpoints)
+
+### Example: Launch File Picker
+
+```
+apps action launch app_id file-picker context_type workspace context_id <workspace_id>
+```
+
+### Example: Find Widgets for Storage Operations
+
+```
+apps action get-tool-apps tool_name storage
+```
+
+---
+
+## 9. Complete Tool Reference
+
+All 19 tools with their actions organized by functional area. Each entry shows the action name and its description. Workflow tools (task, worklog, approval, todo) require workflow to be enabled on the target workspace or share.
 
 ### auth
 
@@ -1753,7 +1816,9 @@ All 18 tools with their actions organized by functional area. Each entry shows t
 
 All storage actions require `context_type` parameter (`workspace` or `share`) and `context_id` (the 19-digit profile ID).
 
-**list** -- List files and folders in a directory with pagination. Each item includes `web_url` (workspace only).
+**list** -- List files and folders in a directory with pagination. Each item includes `web_url` (workspace only). Requires `context_type`, `context_id`, and `node_id` (use `root` for root folder).
+
+**recent** -- List recently modified files and folders across all directories, sorted by updated descending. Unlike `list` which is scoped to a single folder, this returns nodes from the entire storage tree. Supports optional `type` filter (`file`, `folder`, `link`, `note`), `page_size` (100, 250, or 500), and `cursor` for pagination. For workspace folder shares, results are automatically filtered to the share's subtree.
 
 **details** -- Get full details of a specific file or folder. Returns `web_url` (human-friendly link to the file preview or folder in the web UI, workspace only).
 
@@ -1763,17 +1828,17 @@ All storage actions require `context_type` parameter (`workspace` or `share`) an
 
 **create-folder** -- Create a new folder. Returns `web_url` (workspace only).
 
-**copy** -- Copy files or folders to another location. Returns `web_url` on the new copy (workspace only).
+**copy** -- Copy files/folders. Single copy via `node_id` (workspace or share). Bulk copy via `node_ids` array (workspace only). Returns `web_url` on the new copy (workspace only).
 
-**move** -- Move files or folders to a different parent folder. Returns `web_url` (workspace only).
+**move** -- Move files/folders. Single move via `node_id` (workspace or share). Bulk move via `node_ids` array (workspace only). Returns `web_url` (workspace only).
 
-**delete** -- Delete files or folders by moving them to the trash.
+**delete** -- Delete files/folders by moving them to the trash. Single delete via `node_id` (workspace or share). Bulk delete via `node_ids` array (workspace only).
 
 **rename** -- Rename a file or folder. Returns `web_url` (workspace only).
 
 **purge** -- Permanently delete a trashed node (irreversible). Requires Member permission.
 
-**restore** -- Restore files or folders from the trash. Returns `web_url` on the restored node (workspace only).
+**restore** -- Restore files/folders from the trash. Single restore via `node_id` (workspace or share). Bulk restore via `node_ids` array (workspace only). Returns `web_url` on the restored node (workspace only).
 
 **add-file** -- Link a completed upload to a storage location. Returns `web_url` (workspace only).
 
@@ -1833,9 +1898,9 @@ All storage actions require `context_type` parameter (`workspace` or `share`) an
 
 ### download
 
-**file-url** -- Get a download token and URL for a file. Optionally specify a version. Requires `context_type` (`workspace` or `share`) and `context_id`.
+**file-url** -- Get a download token and URL for a file. Optionally specify a version. Requires `context_type`, `context_id`, and `node_id`.
 
-**zip-url** -- Get a ZIP download URL for a folder or entire workspace/share. Returns the URL with auth instructions. Requires `context_type` and `context_id`.
+**zip-url** -- Get a ZIP download URL for a folder or entire workspace/share. Returns the URL with auth instructions. Requires `context_type`, `context_id`, and `node_id` (use `root` for entire storage tree).
 
 **quickshare-details** -- Get metadata and download info for a quickshare link. No authentication required.
 
@@ -1907,11 +1972,11 @@ All comment endpoints use the path pattern `/comments/{entity_type}/{parent_id}/
 
 All member actions require `entity_type` parameter (`workspace` or `share`) and `entity_id` (the 19-digit profile ID).
 
-**add** -- Add an existing user by user ID, or invite by email. Pass the email address or user ID as `email_or_user_id`.
+**add** -- Add an existing user by user ID, or invite by email. Pass the email address or user ID as `email_or_user_id`. For workspaces, set access level with `permissions` (admin/member/guest). For shares, use `role` (admin/member/guest/view).
 
 **remove** -- Remove a member (cannot remove the owner).
 
-**details** -- Get detailed membership info for a specific member.
+**details** -- Get detailed membership info for a specific member. For workspaces, pass `member_id`; for shares, pass `user_id`.
 
 **update** -- Update a member's role, notifications, or expiration.
 
@@ -1981,11 +2046,11 @@ Task list and task management for workspaces and shares. All task actions requir
 
 ### worklog
 
-Append-only chronological activity logs scoped to tasks, task lists, storage nodes, or profiles. All worklog actions require workflow to be enabled on the target entity.
+Activity log for tracking agent work. After uploads, task changes, share creation, or any significant action, log what you did and why — builds a searchable audit trail for humans and AI. All worklog actions require workflow to be enabled on the target entity.
+
+**append** -- Append a new entry to the worklog. Requires `entity_type` ("task", "task_list", "node", or "profile"), `entity_id`, and `content` (1-10000 chars). Use after making changes to record what was done and why. Entries are immutable after creation.
 
 **list** -- List worklog entries. Requires `entity_type` ("task", "task_list", "node", or "profile") and `entity_id` (the corresponding entity's opaque ID, or profile 19-digit ID for entity_type "profile"). Supports `type` filter ("entry" or "interjection"), `sort_dir` ("asc" or "desc", default "desc"), `limit` (1-200), `offset`, and `format` ("md" for markdown).
-
-**append** -- Append a new entry to the worklog. Requires `entity_type` ("task", "task_list", "node", or "profile"), `entity_id`, and `content` (1-10000 chars). Entries are immutable after creation.
 
 **interject** -- Create an urgent interjection entry that requires acknowledgement. Requires `entity_type` ("task", "task_list", "node", or "profile"), `entity_id`, and `content` (1-10000 chars). Interjections are priority corrections -- always treated as urgent.
 
@@ -2024,3 +2089,81 @@ Simple flat checklists scoped to workspaces and shares. No nesting. All todo act
 **toggle** -- Toggle the done state of a todo. Requires `todo_id`. Flips between done and not done.
 
 **bulk-toggle** -- Set done state on multiple todos at once. Requires `profile_type`, `profile_id`, `todo_ids` (array of todo IDs, max 100), and `done` (boolean: true to mark done, false to mark not done).
+
+### apps
+
+Interactive MCP App widget discovery and launching. Widgets are interactive HTML5 UIs that render in agent conversations.
+
+**list** -- List all available MCP App widgets with their metadata (title, description, supported tools, supported actions, resource URI).
+
+**details** -- Get full metadata for a specific widget. Requires `app_id` (the widget name, e.g., "file-picker").
+
+**launch** -- Launch a widget with workspace or share context. Requires `app_id`, `context_type` ("workspace" or "share"), and `context_id` (the 19-digit profile ID). Returns the widget HTML content ready for rendering.
+
+**get-tool-apps** -- Find widgets associated with a specific tool domain. Requires `tool_name` (e.g., "storage", "ai", "comment"). Returns widgets that provide UI for that tool's operations.
+
+---
+
+## 10. Code Mode (Headless Agents)
+
+When connecting from a headless agent (Claude Code, Cursor, Continue, etc.), the server automatically enables Code Mode -- a lightweight alternative to the full 19-tool set. Code Mode exposes 4 tools total:
+
+| Tool | Purpose |
+|------|---------|
+| `auth` | Authentication (signin, signup, API keys, PKCE, 2FA) |
+| `upload` | File uploads (chunked, text, web-import) |
+| `search` | Discover API endpoints by keyword, tag, or concept |
+| `execute` | Run JavaScript against the Fast.io API |
+
+Clients with MCP Apps support (Claude Desktop, Cline) continue to receive the full 19-tool set plus 12 app-* widget tools. Unknown clients default to the full tool set.
+
+### search Tool
+
+Query the API spec by keywords, paths, or concepts. Returns matching endpoints with method, path, parameters, and descriptions.
+
+```
+search query="list files in workspace" tag="storage"
+search query="create share" tag="share"
+search query="authentication"
+search query="pagination" include_concepts=true
+```
+
+Parameters:
+- `query` (string, required) -- Keywords, endpoint paths, or concepts to search for
+- `tag` (string, optional) -- Filter by domain: auth, workspace, storage, ai, share, upload, org, user, member, comment, event, metadata, etc.
+- `include_concepts` (boolean, optional) -- Include concept docs (pagination, IDs, errors). Default true.
+
+### execute Tool
+
+Write JavaScript code that uses the `fastio` object for authenticated API calls:
+
+- `fastio.get(path, params?)` -- GET request with optional query parameters
+- `fastio.post(path, body?, params?)` -- POST with form-encoded body (default API format)
+- `fastio.postJson(path, body?, params?)` -- POST with JSON body
+- `fastio.delete(path, params?)` -- DELETE request
+- `fastio.put(path, body?, params?)` -- PUT with form-encoded body
+
+The auth token is injected automatically. Path parameters must be filled by the caller (replace `{workspace_id}` with the actual ID). Return a value to include it in the response. `console.log()` output is captured and returned.
+
+```javascript
+// Example: List workspaces in an org
+return await fastio.get('/org/1234567890123456789/list/workspaces/');
+```
+
+```javascript
+// Example: Create a folder and upload a note
+const folder = await fastio.post('/workspace/1234567890123456789/storage/root/createfolder/', {
+  name: 'reports'
+});
+const folderId = folder.node.opaque_id;
+const note = await fastio.post(`/workspace/1234567890123456789/storage/${folderId}/createnote/`, {
+  name: 'summary.md',
+  content: '# Summary\n\nKey findings from the analysis.'
+});
+return { folder: folder.node, note: note.node };
+```
+
+Parameters:
+- `code` (string, required) -- JavaScript code (async function body). Use `return` to include a value in the response.
+- `timeout_ms` (number, optional) -- Timeout in ms (default 30000, max 60000)
+
