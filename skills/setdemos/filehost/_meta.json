@@ -1,0 +1,11 @@
+{
+  "owner": "setdemos",
+  "slug": "filehost",
+  "displayName": "LMfiles.com file hosting",
+  "latest": {
+    "version": "1.0.2",
+    "publishedAt": 1771858879923,
+    "commit": null
+  },
+  "history": []
+}
