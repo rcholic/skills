@@ -1,13 +1,18 @@
 {
   "owner": "phutt-bwai",
   "slug": "zonein",
-  "displayName": "Zonein - Smart Money Intel",
+  "displayName": "Zonein: Whale hunting for trading agents on Hyperliquid & Polymarket",
   "latest": {
-    "version": "1.0.13",
-    "publishedAt": 1771473282458,
-    "commit": "https://github.com/openclaw/skills/commit/8bcaf11f374e350ec555ae7f8064419113383ec3"
+    "version": "1.0.14",
+    "publishedAt": 1771883542652,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.13",
+      "publishedAt": 1771473282458,
+      "commit": "https://github.com/openclaw/skills/commit/8bcaf11f374e350ec555ae7f8064419113383ec3"
+    },
     {
       "version": "1.0.12",
       "publishedAt": 1771421605782,

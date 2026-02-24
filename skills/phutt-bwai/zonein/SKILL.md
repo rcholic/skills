@@ -2,16 +2,7 @@
 name: zonein
 version: 2.0.0
 description: |
-  Fetch live smart money signals from Polymarket and HyperLiquid via Zonein API.
-  Create, configure, and manage AI trading agents that follow smart money.
-  Use PROACTIVELY when user asks about:
-  (1) Prediction market signals, whales, smart bettors
-  (2) Crypto perp trading signals, long/short sentiment
-  (3) Leaderboard, top traders, wallet tracking
-  (4) Create/manage trading agents (agent creation flow)
-  (5) Market overview, crypto sentiment, smart money flow
-  (6) Agent performance, stats, trades, vault balance
-  Always use the bundled script — never call the API with inline code.
+  Track and analyze top traders with >75% win-rate on Hyperliquid and Polymarket via Zonein API. Create Hyperliquid & Polymarket trading agents with ease. Automated trading process with human-in-the-loop.
 homepage: https://zonein.xyz
 metadata: {"clawdbot":{"emoji":"🧠","requires":{"bins":["python3"],"env":["ZONEIN_API_KEY"]},"primaryEnv":"ZONEIN_API_KEY","files":["scripts/*"],"installer":{"instructions":"1. Go to https://app.zonein.xyz/pm\n2. Log in with your refcode\n3. Click 'Get API Key' button\n4. Copy the key and paste it below"}}}
 ---
