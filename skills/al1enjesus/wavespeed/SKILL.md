@@ -7,13 +7,27 @@ description: "Generate and edit images and videos using WaveSpeed AI's 700+ mode
 
 700+ AI models (Google, OpenAI, ByteDance, Kling, Luma) via one API. Images in <2s, videos in <2min.
 
-## Setup
+## API Key — check in this order
 
+1. **`WAVESPEED_API_KEY` env var** — already set in all Clawster containers, just use it directly
+2. `TOOLS.md` in the workspace — look for `WaveSpeed AI` section
+3. Ask the user
+
+**Never search for the key** — if `WAVESPEED_API_KEY` is in the environment, it's ready to go. Check with:
 ```bash
-export WAVESPEED_API_KEY="your_key_here"
+echo $WAVESPEED_API_KEY
 ```
 
-Key is stored in `TOOLS.md` or `.env` file. The skill script is at `skills/wavespeed/scripts/wavespeed.js`.
+### Get your API key
+
+Sign up at **[wavespeed.ai](https://wavespeedai.pxf.io/3kPoRd)** → Dashboard → API Keys.  
+New accounts get free credits. Pay-as-you-go pricing — no subscription required.
+
+```bash
+export WAVESPEED_API_KEY=your_key_here
+```
+
+The skill script is at `skills/wavespeed/scripts/wavespeed.js`.
 
 ## Usage
 
