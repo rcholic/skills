@@ -1,0 +1,11 @@
+{
+  "owner": "shapes",
+  "slug": "productai-skill",
+  "displayName": "Generate product photos for ecommerce",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771854826119,
+    "commit": null
+  },
+  "history": []
+}
