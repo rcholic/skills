@@ -24,7 +24,11 @@ from typing import Optional, List, Dict, Any
 try:
     import real_ladybug as lb
 except ImportError:
-    sys.path.insert(0, os.path.expanduser("~/.openclaw/workspace/.venv/lib/python3.13/site-packages"))
+    import glob as _glob
+    _venv_base = os.path.expanduser("~/.openclaw/workspace/.venv/lib")
+    _candidates = sorted(_glob.glob(os.path.join(_venv_base, "python3*/site-packages")), reverse=True)
+    for _candidate in _candidates:
+        sys.path.insert(0, _candidate)
     import real_ladybug as lb
 
 # Config
@@ -156,8 +160,7 @@ def update_memory_stats(memory_ids: List[int]):
             MATCH (n:MemoryNode)
             WHERE n.id IN {ids_str}
             SET n.strength = CASE WHEN n.strength + 0.1 > 1.0 THEN 1.0 ELSE n.strength + 0.1 END,
-                n.decay_rate = CASE WHEN n.decay_rate * 0.9 < 0.001 THEN 0.001 ELSE n.decay_rate * 0.9 END,
-                n.last_accessed = {now}
+                n.decay_rate = CASE WHEN n.decay_rate * 0.9 < 0.001 THEN 0.001 ELSE n.decay_rate * 0.9 END
         """)
     except Exception as e:
         print(f"[ladybug_recall] Stats update warning: {e}", file=sys.stderr)
@@ -176,8 +179,8 @@ def text_search(query: str, limit: int = MAX_RESULTS) -> List[Dict]:
             MATCH (n:MemoryNode)
             WHERE (n.text CONTAINS $query OR n.summary CONTAINS $query)
             AND n.timestamp >= $min_ts
-            RETURN n.id, n.text, n.summary, n.who, n.layer, n.timestamp, 
-                   n.strength, n.decay_rate, n.last_accessed, n.is_ghost, n.dismissal_count
+            RETURN n.id, n.text, n.summary, n.who, n.layer, n.timestamp,
+                   n.strength, n.decay_rate
             LIMIT $result_limit
         """, {"query": query, "min_ts": min_timestamp, "result_limit": limit * 3})
         
@@ -192,9 +195,9 @@ def text_search(query: str, limit: int = MAX_RESULTS) -> List[Dict]:
                 'timestamp': row[5] or 0,
                 'strength': row[6] if row[6] is not None else 1.0,
                 'decay_rate': row[7] if row[7] is not None else 0.01,
-                'last_accessed': row[8] if row[8] is not None else 0,
-                'is_ghost': row[9] if row[9] is not None else False,
-                'dismissal_count': row[10] if row[10] is not None else 0,
+                'last_accessed': 0,
+                'is_ghost': False,
+                'dismissal_count': 0,
                 'fts_score': 1.0
             })
         
@@ -215,7 +218,7 @@ def vector_search(query_embedding: List[float], limit: int = MAX_RESULTS) -> Lis
         result = conn.execute("""
             CALL QUERY_VECTOR_INDEX('MemoryNode', 'embedding_idx', $embedding, $top_k)
             RETURN node.id, node.text, node.summary, node.who, node.layer, node.timestamp, distance,
-                   node.strength, node.decay_rate, node.last_accessed, node.is_ghost, node.dismissal_count
+                   node.strength, node.decay_rate
             ORDER BY distance
         """, {"embedding": query_embedding, "top_k": limit * 4})
         
@@ -238,9 +241,9 @@ def vector_search(query_embedding: List[float], limit: int = MAX_RESULTS) -> Lis
                 'emb_score': score,
                 'strength': row[7] if row[7] is not None else 1.0,
                 'decay_rate': row[8] if row[8] is not None else 0.01,
-                'last_accessed': row[9] if row[9] is not None else 0,
-                'is_ghost': row[10] if row[10] is not None else False,
-                'dismissal_count': row[11] if row[11] is not None else 0
+                'last_accessed': 0,
+                'is_ghost': False,
+                'dismissal_count': 0
             })
         
         return memories, (time.time() - start) * 1000

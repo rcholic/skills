@@ -1,7 +1,7 @@
 ---
 name: nima-core
 description: "Noosphere Integrated Memory Architecture — Complete cognitive stack for AI agents: persistent memory, emotional intelligence, dream consolidation, hive mind, precognitive recall, and lucid moments. 4 embedding providers, LadybugDB graph backend, zero-config install. nima-core.ai"
-version: 3.0.9
+version: 3.1.1
 metadata: {"openclaw":{"emoji":"🧠","source":"https://github.com/lilubot/nima-core","homepage":"https://nima-core.ai","requires":{"bins":["python3","node"],"env":[]},"optional_env":{"NIMA_DATA_DIR":"Override default ~/.nima data directory","NIMA_EMBEDDER":"voyage|openai|ollama|local (default: local — zero external calls)","VOYAGE_API_KEY":"Required when NIMA_EMBEDDER=voyage","OPENAI_API_KEY":"Required when NIMA_EMBEDDER=openai","NIMA_OLLAMA_MODEL":"Model name when NIMA_EMBEDDER=ollama","NIMA_VOICE_TRANSCRIBER":"whisper|local (for voice notes)","WHISPER_MODEL":"tiny|base|small|medium|large","ANTHROPIC_API_KEY":"For memory pruner LLM distillation (opt-in only)"},"permissions":{"reads":["~/.nima/"],"writes":["~/.nima/","~/.openclaw/extensions/nima-*/"],"network":["voyage.ai (only if NIMA_EMBEDDER=voyage)","openai.com (only if NIMA_EMBEDDER=openai)"]},"external_calls":"All external API calls are opt-in via explicit env vars. Default mode uses local embeddings with zero network calls."}}
 ---
 
@@ -87,8 +87,20 @@ PYTHON CORE (nima_core/)
 
 - ✅ All data stored locally in `~/.nima/`
 - ✅ Default: local embeddings = **zero external calls**
-- ❌ No NIMA servers, no tracking, no analytics
-- 🔒 Embedding API calls only when using Voyage/OpenAI (opt-in)
+- ✅ No NIMA-owned servers, no proprietary tracking, no analytics sent to external services
+- ⚠️ Opt-in networking: HiveMind (Redis pub/sub), Precognition (LLM endpoints), LadybugDB migrations — see Optional Features below
+- 🔒 Embedding API calls only when explicitly enabling (VOYAGE_API_KEY, OPENAI_API_KEY, etc.)
+
+### Optional Features with Network Access
+
+| Feature | Env Var | Network Calls To | Default |
+|---------|----------|------------------|---------|
+| Cloud embeddings | `NIMA_EMBEDDER=voyage` | voyage.ai | Off |
+| Cloud embeddings | `NIMA_EMBEDDER=openai` | openai.com | Off |
+| Memory pruner | `ANTHROPIC_API_KEY` set | anthropic.com | Off |
+| Ollama embeddings | `NIMA_EMBEDDER=ollama` | localhost:11434 | Off |
+| HiveMind | `HIVE_ENABLED=true` | Redis pub/sub | Off |
+| Precognition | Using external LLM | Configured endpoint | Off |
 
 ## Security
 

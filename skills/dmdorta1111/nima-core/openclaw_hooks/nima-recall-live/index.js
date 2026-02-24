@@ -12,46 +12,18 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { execPython } from "../utils/async-python.js"; // Async wrapper
 import { existsSync, writeFileSync, readFileSync, unlinkSync, mkdtempSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import os from "node:os";
-import { promisify } from "node:util";
-import { execFile } from "node:child_process";
 
-// --- Inlined: utils/async-python.js (self-contained, no cross-dir imports) ---
-const execFileAsync = promisify(execFile);
-class _RateLimiter {
-  constructor(t, i) { this.max = t; this.interval = i === 'second' ? 1000 : i; this.tokens = t; this.lastRefill = Date.now(); }
-  async removeTokens(c) {
-    this._refill(); if (this.tokens >= c) { this.tokens -= c; return true; }
-    const wait = this.interval - (Date.now() - this.lastRefill);
-    if (wait > 0) { await new Promise(r => setTimeout(r, wait)); this._refill(); }
-    if (this.tokens >= c) { this.tokens -= c; return true; } return false;
-  }
-  _refill() { if (Date.now() - this.lastRefill >= this.interval) { this.tokens = this.max; this.lastRefill = Date.now(); } }
-}
-const _pyLimiter = new _RateLimiter(10, 'second');
-const _breakers = new Map();
-async function execPython(scriptPath, args = [], options = {}) {
-  const { breakerId = "default", ...execOpts } = options;
-  if (!_breakers.has(breakerId)) _breakers.set(breakerId, { failures: 0, lastFail: 0, state: "CLOSED" });
-  const b = _breakers.get(breakerId);
-  if (b.state === "OPEN") { if (Date.now() - b.lastFail > 60000) b.state = "HALF-OPEN"; else throw new Error(`Circuit breaker '${breakerId}' is OPEN`); }
-  await _pyLimiter.removeTokens(1);
-  try {
-    const venvPy = join(os.homedir(), ".openclaw", "workspace", ".venv", "bin", "python3");
-    const cmd = (scriptPath.endsWith(".py") || scriptPath === "python3") ? venvPy : scriptPath;
-    const finalArgs = scriptPath === "python3" ? args : scriptPath.endsWith(".py") ? [scriptPath, ...args] : args;
-    const { stdout } = await execFileAsync(cmd, finalArgs, { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024, ...execOpts });
-    b.failures = 0; b.state = "CLOSED"; return stdout;
-  } catch (err) { b.failures++; b.lastFail = Date.now(); if (b.failures >= 5) b.state = "OPEN"; throw err; }
-}
-// --- End inlined ---
-
-// Debug flag - gate ALL verbose logging behind this
-const DEBUG_RECALL = process.env.NIMA_DEBUG_RECALL === "1";
+// ESM __dirname polyfill
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const GRAPH_DB = join(os.homedir(), ".nima", "memory", "graph.sqlite");
+const DEBUG_RECALL = process.env.NIMA_DEBUG_RECALL === "1" || process.env.NIMA_DEBUG_RECALL === "true";
 const LADYBUG_DB = join(os.homedir(), ".nima", "memory", "ladybug.lbug");
 const MAX_RESULTS = 7; // Increased from 3 for richer context
 const QUERY_TIMEOUT = 10000; // 10s max — includes Voyage embedding call
@@ -63,6 +35,7 @@ const USE_LADYBUG = true; // Use LadybugDB backend (default: true)
 
 // Session-level memory tracking for deduplication and budget
 const SESSION_MEMORY_IDS = new Set();
+let recallCounter = 0; // Cycles for dedup reset
 const SESSION_TOKEN_BUDGET = 3000; // Max memory tokens per session (increased from 500)
 const USE_COMPRESSED_FORMAT = true; // Compressed format saves ~80% tokens
 let sessionTokensUsed = 0;
@@ -175,6 +148,11 @@ function extractUserMessage(prompt) {
     if (line.startsWith('"') && line.endsWith(',')) continue; // JSON fields
     if (line.includes("doctorHint") || line.includes("sessionKey")) continue;
     if (line.includes("[NIMA RECALL")) continue; // Don't re-query our own output
+    // Strip metadata injection lines
+    if (line.includes("Conversation info (untrusted metadata)")) continue;
+    if (line.includes('"sender"') || line.includes('"message_id"')) continue;
+    if (line.startsWith("```json") || line.startsWith("```")) continue;
+    if (line.includes("gateway-client")) continue;
     
     // Strip channel prefix to get actual message content
     let cleaned = stripChannelPrefix(line);
@@ -481,6 +459,66 @@ function formatMemories(memories) {
 }
 
 /**
+ * Get active precognitions (predictions) for injection into recall context.
+ * 
+ * OPTIMIZATIONS (v2):
+ * 1. Dedup: Hash-checks output, skips if identical to last injection
+ * 2. Inject-once: Only injects on first message per session (or when predictions change)
+ * 3. Compact format: Short tag format instead of full sentences
+ */
+let _lastPrecogHash = null;
+let _precogInjectCount = 0;
+
+async function getPrecognitions(queryText) {
+  try {
+    // Use standalone Python script — no inline code, no query injection
+    const scriptPath = join(__dirname, "query_precognitions.py");
+    if (!existsSync(scriptPath)) {
+      return "";
+    }
+    
+    // Pass query as argument (execPython uses execFile, not shell)
+    const rawResult = await execPython(scriptPath, [queryText, "--limit", "3"], {
+      timeout: 5000,
+      breakerId: "recall-precog"
+    });
+    const trimmed = rawResult.trim();
+    if (!trimmed) return "";
+    
+    // Parse JSON output from standalone script
+    let parsed;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return "";
+    }
+    
+    const { parts, hash } = parsed;
+    if (!parts || !parts.length) return "";
+    
+    // Dedup — skip if hash matches last injection
+    if (hash === _lastPrecogHash) {
+      return "";
+    }
+    
+    _lastPrecogHash = hash;
+    _precogInjectCount++;
+    
+    // Compact format
+    const compact = "🔮 " + parts.join(" | ");
+    if (DEBUG_RECALL) {
+      console.error(`[nima-recall-live] Precog injected (${compact.length} chars, hash=${hash})`);
+    }
+    return compact;
+  } catch (e) {
+    if (DEBUG_RECALL) {
+      console.error(`[nima-recall-live] Precognition query failed: ${e.message}`);
+    }
+    return "";
+  }
+}
+
+/**
  * Apply affect bleed from recalled memories to current affect state.
  * Memories nudge emotions - not displayed as tags, just transferred.
  */
@@ -549,45 +587,6 @@ function applyAffectBleed(bleed, identityName = "agent", conversationId = null) 
   }
 }
 
-/**
- * Get active precognitions (predictions) for injection into recall context.
- * Uses NimaPrecognition class from nima_core package (portable, no hardcoded paths).
- */
-async function getPrecognitions(queryText) {
-  try {
-    const pythonScript = `
-import sys, os
-
-# Try installed package first, then common dev locations
-try:
-    from nima_core.precognition import NimaPrecognition
-except ImportError:
-    # Dev fallback: find nima-core relative to common install locations
-    candidates = [
-        os.path.expanduser("~/.openclaw/workspace/nima-core"),
-        os.path.expanduser("~/nima-core"),
-    ]
-    for c in candidates:
-        if os.path.exists(c):
-            sys.path.insert(0, c)
-            break
-    from nima_core.precognition import NimaPrecognition
-
-try:
-    pc = NimaPrecognition()
-    result = pc.inject("""${queryText.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"')}""", top_k=3)
-    print(result or "")
-except Exception as e:
-    print("")
-`;
-    const result = await execPython("python3", ["-c", pythonScript], { timeout: 5000 });
-    return result.trim();
-  } catch (e) {
-    console.error(`[nima-recall-live] Precognition query failed: ${e.message}`);
-    return "";
-  }
-}
-
 // Export metadata for gateway hook registration
 export const metadata = {
   events: ["before_agent_start", "before_compaction"],
@@ -613,34 +612,33 @@ export default function nimaRecallLivePlugin(api, config) {
     }
     
     // TRACE: Log full context to find conversation ID
-    if (DEBUG_RECALL) {
-      console.error(`[nima-recall-live] 🔍 CTX: conversationId=${conversationId}, ctx.conversationId=${ctx?.conversationId}`);
-    }
+    console.error(`[nima-recall-live] 🔍 CTX: conversationId=${conversationId}, ctx.conversationId=${ctx?.conversationId}`);
     
     // Reset session state if conversation changed
     resetSessionIfNeeded(conversationId);
     
+    // Fix: Clear dedup set every 5 cycles to prevent aggressive blocking
+    recallCounter++;
+    if (recallCounter % 5 === 0) {
+      console.error(`[nima-recall-live] 🔄 Cycle ${recallCounter}: Clearing dedup cache`);
+      SESSION_MEMORY_IDS.clear();
+    }
+    
     try {
       // Debug: log that we fired
-      if (DEBUG_RECALL) {
-        console.error(`[nima-recall-live] FIRED. event keys: ${Object.keys(event || {}).join(",")}, ctx keys: ${Object.keys(ctx || {}).join(",")}`);
-        console.error(`[nima-recall-live] event.prompt type: ${typeof event?.prompt}, length: ${event?.prompt?.length || 0}`);
-        console.error(`[nima-recall-live] event.prompt first 200: ${String(event?.prompt || "").substring(0, 200)}`);
-      }
+      console.error(`[nima-recall-live] FIRED. event keys: ${Object.keys(event || {}).join(",")}, ctx keys: ${Object.keys(ctx || {}).join(",")}`);
+      console.error(`[nima-recall-live] event.prompt type: ${typeof event?.prompt}, length: ${event?.prompt?.length || 0}`);
+      console.error(`[nima-recall-live] event.prompt first 200: ${String(event?.prompt || "").substring(0, 200)}`);
       
       // Skip subagents and heartbeats
       if (skipSubagents && ctx.sessionKey?.includes(":subagent:")) return;
       if (ctx.sessionKey?.includes("heartbeat")) return;
       
       const userMessage = extractUserMessage(event.prompt);
-      if (DEBUG_RECALL) {
-        console.error(`[nima-recall-live] extracted userMessage (${userMessage.length}): ${userMessage.substring(0, 100)}`);
-        console.error(`[nima-recall-live] 🚀 Running ${FTS_ONLY_MODE ? 'FTS-only' : 'HYBRID'} recall (max ${MAX_RESULTS} results)`);
-      }
+      console.error(`[nima-recall-live] extracted userMessage (${userMessage.length}): ${userMessage.substring(0, 100)}`);
+      console.error(`[nima-recall-live] 🚀 Running ${FTS_ONLY_MODE ? 'FTS-only' : 'HYBRID'} recall (max ${MAX_RESULTS} results)`);
       if (!userMessage || userMessage.length < MIN_QUERY_LENGTH) {
-        if (DEBUG_RECALL) {
-          console.error(`[nima-recall-live] SKIP: too short (${userMessage.length} < ${MIN_QUERY_LENGTH})`);
-        }
+        console.error(`[nima-recall-live] SKIP: too short (${userMessage.length} < ${MIN_QUERY_LENGTH})`);
         return;
       }
       
@@ -650,7 +648,7 @@ export default function nimaRecallLivePlugin(api, config) {
       if (queryKey === lastQuery && (now - lastQueryTime) < COOLDOWN_MS) {
         // Return cached result, but still apply bleed
         if (lastBleed && Object.keys(lastBleed).length > 0) {
-          const conversationId = ctx.conversationId || ctx.chatId || ctx.channelId || null;
+          const conversationId = ctx.conversationId || ctx.channelId || ctx.chatId || null;
           const identityName = config?.identity_name || "agent";
           applyAffectBleed(lastBleed, identityName, conversationId);
         }
@@ -658,41 +656,43 @@ export default function nimaRecallLivePlugin(api, config) {
         return;
       }
       
-      if (DEBUG_RECALL) {
-        console.error(`[nima-recall-live] 🚀 About to call quickRecall with: "${userMessage.substring(0,30)}"`);
-      }
+      console.error(`[nima-recall-live] 🚀 About to call quickRecall with: "${userMessage.substring(0,30)}"`);
       const result = await quickRecall(userMessage);
-      if (DEBUG_RECALL) {
-        console.error(`[nima-recall-live] ✅ Recall complete: ${result?.memories?.length || 0} memories returned`);
-      }
+      console.error(`[nima-recall-live] ✅ Recall complete: ${result?.memories?.length || 0} memories returned`);
       
       // Handle both old array format and new {memories, affect_bleed} format
       const memories = Array.isArray(result) ? result : (result?.memories || []);
       const affectBleed = result?.affect_bleed || null;
-      const formatted = formatMemories(memories);
+      let formatted = formatMemories(memories);
       
-      // Debug: ONLY write to file when debug is enabled
-      if (DEBUG_RECALL) {
-        const debugPath = join(os.homedir(), ".nima", "recall_trace.log");
-        try {
-          writeFileSync(debugPath, JSON.stringify({
-            timestamp: new Date().toISOString(),
-            userMessage: userMessage.substring(0, 50),
-            hasResult: !!result,
-            memoriesCount: memories?.length || 0,
-            affectBleed: affectBleed,
-          }, null, 2) + "\n", { flag: "a" });
-        } catch (e) {}
+      // Inject precognitions (predictions based on patterns)
+      try {
+        const precogText = await getPrecognitions(userMessage);
+        if (precogText) {
+          formatted = precogText + "\n" + formatted;
+        }
+      } catch (e) {
+        // Silent fail - don't break recall if precog fails
       }
+      
+      // Debug: ALWAYS write to file to trace execution
+      const debugPath = join(os.homedir(), ".nima", "recall_trace.log");
+      try {
+        writeFileSync(debugPath, JSON.stringify({
+          timestamp: new Date().toISOString(),
+          userMessage: userMessage.substring(0, 50),
+          hasResult: !!result,
+          memoriesCount: memories?.length || 0,
+          affectBleed: affectBleed,
+        }, null, 2) + "\n", { flag: "a" });
+      } catch (e) {}
       
       // Apply affect bleed if present (memories nudge current emotional state)
       if (affectBleed && Object.keys(affectBleed).length > 0) {
         const identityName = config?.identity_name || "agent";  // Match nima-affect default
         
         // Use conversationId extracted from prompt at top of hook
-        if (DEBUG_RECALL) {
-          console.error(`[nima-recall-live] 🎭 Applying bleed: identity=${identityName}, convId=${conversationId}`);
-        }
+        console.error(`[nima-recall-live] 🎭 Applying bleed: identity=${identityName}, convId=${conversationId}`);
         applyAffectBleed(affectBleed, identityName, conversationId);
       }
       
@@ -703,11 +703,8 @@ export default function nimaRecallLivePlugin(api, config) {
       lastBleed = affectBleed;
       
       if (formatted) {
-        // Inject precognitions above memories
-        const precogText = await getPrecognitions(userMessage);
-        const fullContext = precogText ? `${precogText}\n\n${formatted}` : formatted;
         log.info?.(`[nima-recall-live] Injected ${memories.length} memories`);
-        return { prependContext: fullContext };
+        return { prependContext: formatted };
       }
     } catch (err) {
       console.error(`[nima-recall-live] Error: ${err.message}`);

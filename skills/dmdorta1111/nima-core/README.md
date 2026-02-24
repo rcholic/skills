@@ -639,8 +639,9 @@ Precognition runs automatically on every incoming message via the `nima-affect` 
 
 - ✅ All data stored locally in `~/.nima/`
 - ✅ Local embedding mode = **zero external calls**
-- ❌ No NIMA servers, no tracking, no analytics
-- 🔒 Embedding API calls only when using Voyage/OpenAI (opt-in)
+- ✅ No NIMA-owned servers, no proprietary tracking, no analytics to external services
+- ⚠️ Opt-in: HiveMind (Redis), Precognition (LLM), cloud embeddings — see SKILL.md for details
+- 🔒 Embedding API calls only when explicitly enabling via env vars
 
 ---
 

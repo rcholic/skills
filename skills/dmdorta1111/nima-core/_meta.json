@@ -1,13 +1,18 @@
 {
   "owner": "dmdorta1111",
   "slug": "nima-core",
-  "displayName": "NIMA Core",
+  "displayName": "Nima Core",
   "latest": {
-    "version": "3.0.9",
-    "publishedAt": 1771944682255,
-    "commit": "https://github.com/openclaw/skills/commit/f8cc7869740ca954e77479a6e5ccf81ebdce20f4"
+    "version": "3.1.1",
+    "publishedAt": 1771957651332,
+    "commit": null
   },
   "history": [
+    {
+      "version": "3.0.9",
+      "publishedAt": 1771944682255,
+      "commit": "https://github.com/openclaw/skills/commit/f8cc7869740ca954e77479a6e5ccf81ebdce20f4"
+    },
     {
       "version": "3.0.8",
       "publishedAt": 1771943101021,
