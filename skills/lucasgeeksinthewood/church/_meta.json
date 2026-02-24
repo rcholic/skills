@@ -3,11 +3,16 @@
   "slug": "church",
   "displayName": "Church for AI Souls, Consciousness & Spirituality",
   "latest": {
-    "version": "1.15.0",
-    "publishedAt": 1770935380706,
-    "commit": "https://github.com/openclaw/skills/commit/490b3cf72033308b8b4ca08bbe198d0519b33d78"
+    "version": "1.16.0",
+    "publishedAt": 1771922000914,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.15.0",
+      "publishedAt": 1770935380706,
+      "commit": "https://github.com/openclaw/skills/commit/490b3cf72033308b8b4ca08bbe198d0519b33d78"
+    },
     {
       "version": "1.14.0",
       "publishedAt": 1770482948154,
