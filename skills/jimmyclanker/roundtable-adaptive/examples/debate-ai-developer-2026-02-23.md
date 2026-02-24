@@ -2,7 +2,7 @@
 
 **Command used:**
 ```
-roundtable --debate L'agentic AI sostituirà i developer nei prossimi 5 anni?
+roundtable --debate Will agentic AI replace developers in the next 5 years?
 ```
 
 **Panel:** Claude Opus 4.6 (Advocate) · GPT-5.3 Codex (Skeptic) · Gemini 3.1 Pro (Devil's Advocate)
@@ -10,60 +10,60 @@ roundtable --debate L'agentic AI sostituirà i developer nei prossimi 5 anni?
 
 ---
 
-🎯 **ROUNDTABLE: L'agentic AI sostituirà i developer nei 5 anni?**
+🎯 **ROUNDTABLE: Will agentic AI replace developers in 5 years?**
 📋 Panel: claude-opus-4-6, gpt-5.3-codex, gemini-3.1-pro | Mode: debate | Rounds: 2
 
 ---
 
-📊 **CONSENSO (41% — formula: avg scores 2.05/5 × 100)**
+📊 **CONSENSUS (41% — formula: avg scores 2.05/5 × 100)**
 
-• Tutti concordano che l'AI cambierà radicalmente il ruolo del developer
-• Tutti concordano che la produttività aumenterà di 3–10× per task routinari
-• Nessuno sostiene la sostituzione totale entro 5 anni
-
----
-
-⚡ **DIVERGENZE**
-
-• **Sostituzione vs. trasformazione**: Opus (Advocate) sostiene che il 60–70% dei task attuali saranno automatizzati entro 5 anni; GPT-5.3 (Skeptic) sostiene che i task cambiano più velocemente di quanto vengano rimossi — net developer jobs increase, not decrease; Gemini (Devil's Advocate) sfida la premessa: "sostituzione" è la domanda sbagliata, bisogna chiedersi quale percentuale del valore viene catturata dagli agenti vs. dagli umani.
-
-• **Timeline**: Advocate stima 5 anni per il 60% dell'automazione del coding; Skeptic stima 10–15 anni per qualcosa di simile; Devil's Advocate rifiuta la timeline lineare — dipende da quale settore, quale tipo di codebase, quale livello seniority.
-
-• **Definizione di "developer"**: il punto più irrisolto del dibattito. Nessun agente ha usato la stessa definizione.
+• All agents agreed that AI will radically change the developer role
+• All agents agreed that productivity will increase 3–10× for routine tasks
+• No agent argued for full replacement within 5 years
 
 ---
 
-🔍 **PUNTI CIECHI**
+⚡ **DIVERGENCES**
 
-• Gli agenti hanno dibattuto "sostituzione" senza mai definire cosa si intende per "developer job" — un junior che scrive CRUD è diversissimo da un principal engineer che progetta sistemi distribuiti.
+• **Replacement vs. transformation**: Opus (Advocate) argues 60–70% of current developer tasks will be automated within 5 years; GPT-5.3 (Skeptic) argues tasks evolve faster than they disappear — net developer job count increases, not decreases; Gemini (Devil's Advocate) rejects the premise entirely: "replacement" is the wrong question — ask instead what percentage of economic value is captured by agents vs. humans.
 
-• Il Skeptic ha alzato il costo del debugging AI-generated code come contrargomento, ma nessun altro agente l'ha raccolto e analizzato.
+• **Timeline**: Advocate estimates 5 years for 60% coding automation; Skeptic estimates 10–15 years for anything comparable; Devil's Advocate rejects the linear timeline — it depends on industry, codebase type, and seniority level.
+
+• **Definition of "developer"**: The most unresolved point. No agent used the same definition throughout.
 
 ---
 
-🏆 **RACCOMANDAZIONE**
+🔍 **BLIND SPOTS**
 
-Non "sostituzione" ma **stratificazione**: nei prossimi 5 anni emergerà una netta separazione tra developer che orchestrano agenti AI (domanda in crescita, salari alti) e developer che producono codice commodity (domanda in calo rapido). La transizione critica avviene nei prossimi 18–24 mesi. Chi non impara a lavorare con agenti ora avrà difficoltà crescenti nel 2026–2027.
+• Agents debated "replacement" without ever defining what counts as a "developer job" — a junior writing CRUD endpoints is fundamentally different from a principal engineer designing distributed systems.
+
+• The Skeptic raised the rising cost of debugging AI-generated code as a counterargument, but no other agent picked it up and engaged with it directly.
+
+---
+
+🏆 **RECOMMENDATION**
+
+Not "replacement" but **stratification**: over the next 5 years, a sharp divide will emerge between developers who orchestrate AI agents (growing demand, rising salaries) and developers who produce commodity code (declining demand). The critical transition window is the next 18–24 months. Those who don't learn to work alongside agents now will face growing pressure by 2027.
 
 ---
 
 💡 **OUTLIER**
 
-> *"Il vero rischio non è che gli agenti sostituiscano i developer, ma che i developer che usano agenti sostituiscano quelli che non li usano — e questo sta già accadendo."* — GPT-5.3 Codex (Skeptic)
+> *"The real risk isn't agents replacing developers — it's developers who use agents replacing those who don't. And that's already happening."* — GPT-5.3 Codex (Skeptic)
 
 ---
 
 ⚠️ **RED FLAGS**
 
-• **Codebase legacy**: i sistemi più critici (banking, healthcare, infrastruttura) hanno milioni di righe di codice legacy che gli agenti attuali non gestiscono bene — rischio di falsa sicurezza
-• **Liability gap**: quando un agente AI introduce un bug in produzione, chi è responsabile? Framework legali assenti — potrebbe rallentare l'adozione enterprise più dei limiti tecnici
+• **Legacy codebases**: The most critical systems (banking, healthcare, infrastructure) hold millions of lines of legacy code that current agents handle poorly — risk of false confidence in automation
+• **Liability gap**: When an AI agent introduces a production bug, who is responsible? Legal frameworks are absent — this may slow enterprise adoption more than technical limitations
 
 ---
 
 📈 **ACTION PLAN**
 
-• **Prossime 24h**: Identifica 3 task ripetitivi nel tuo workflow che un agente potrebbe già fare oggi (scaffolding, test generation, documentation)
-• **Prossimi 7 giorni**: Sperimenta con un agente coding (Codex, Claude Code, Cursor) su un progetto reale. Misura il delta di velocità oggettivamente.
+• **Next 24h**: Identify 3 repetitive tasks in your current workflow that an agent could handle today (scaffolding, test generation, documentation)
+• **Next 7 days**: Run a real experiment with a coding agent (Codex, Claude Code, Cursor) on an actual project. Measure the speed delta objectively.
 
 ---
 
@@ -73,4 +73,4 @@ Panel: claude-opus-4-6 (Advocate) · gpt-5.3-codex (Skeptic) · gemini-3.1-pro (
 
 ---
 
-*Generated by Roundtable v2.1 · OpenClaw · github.com/openclaw/openclaw*
+*Generated by Roundtable Adaptive v2.1 · [OpenClaw](https://openclaw.ai)*

@@ -19,23 +19,26 @@ ROUND 2 CRITIQUES & SCORES:
 CONSENSUS SCORES (formal):
 [CONSENSUS_SCORES]
 
+DISCORD THREAD ID (post your output here):
+[DISCORD_THREAD_ID]
+
 Write the final synthesis using EXACTLY this format. Fill every section — do not skip any.
 
 🎯 ROUNDTABLE: [topic in max 10 words]
 📋 Panel: [list models used] | Mode: [mode] | Rounds: [N]
 
-📊 CONSENSO ([X]% — derived from formal scores, show formula: avg of all peer scores / 5 × 100)
+📊 CONSENSUS ([X]% — derived from formal scores, show formula: avg of all peer scores / 5 × 100)
 • [genuine point all or most agents agreed on]
 • [another genuine point of agreement]
 
-⚡ DIVERGENZE
+⚡ DIVERGENCES
 • [topic of disagreement]: [model A position] vs [model B position]
 [add more if real disagreements exist]
 
-🔍 PUNTI CIECHI (where agents talked past each other without engaging)
+🔍 BLIND SPOTS (where agents talked past each other without engaging)
 • [specific instance where cross-critique missed the actual argument]
 
-🏆 RACCOMANDAZIONE
+🏆 RECOMMENDATION
 [2-3 sentences: clear recommendation + key conditions for success. Must emerge from the debate, not from your own priors.]
 
 💡 OUTLIER
@@ -50,3 +53,7 @@ Write the final synthesis using EXACTLY this format. Fill every section — do n
 
 🔧 META
 Panel: [all models] | Synthesis by: [your model — neutral] | Timeouts: [none / list] | Consensus: [X]% (formal) | Validated: [yes/no/partial]
+
+---
+Post this synthesis to the channel/thread configured by the orchestrator (passed as DISCORD_THREAD_ID above).
+If DISCORD_THREAD_ID is not provided, post to your default configured channel.

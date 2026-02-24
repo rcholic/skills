@@ -80,10 +80,10 @@ Every roundtable produces a structured synthesis:
 🎯 ROUNDTABLE: [topic]
 📋 Panel: [models] | Mode: [mode] | Rounds: [N]
 
-📊 CONSENSO (XX%)
-⚡ DIVERGENZE
-🔍 PUNTI CIECHI
-🏆 RACCOMANDAZIONE
+📊 CONSENSUS (XX%)
+⚡ DIVERGENCES
+🔍 BLIND SPOTS
+🏆 RECOMMENDATION
 💡 OUTLIER
 ⚠️ RED FLAGS
 📈 ACTION PLAN
@@ -113,11 +113,11 @@ See [`examples/`](./examples/) for real completed roundtable outputs.
 
 > **Topic**: Should we use AI agents to replace manual QA testing?
 >
-> **📊 CONSENSO (58%)** — All agents agreed automated agents excel at regression testing; all disagreed about edge-case coverage.
+> **📊 CONSENSUS (58%)** — All agents agreed automated agents excel at regression testing; all disagreed about edge-case coverage.
 >
-> **⚡ DIVERGENZE** — GPT-5.2 argued for full automation now; Opus argued hybrid human+AI is safer for 3+ years; Grok challenged the premise entirely ("QA is the wrong question — design for testability first").
+> **⚡ DIVERGENCES** — GPT-5.2 argued for full automation now; Opus argued hybrid human+AI is safer for 3+ years; Grok challenged the premise entirely ("QA is the wrong question — design for testability first").
 >
-> **🏆 RACCOMANDAZIONE** — Adopt AI agents for regression and smoke testing immediately. Keep human QA for exploratory and acceptance testing until hallucination rates drop below 2%.
+> **🏆 RECOMMENDATION** — Adopt AI agents for regression and smoke testing immediately. Keep human QA for exploratory and acceptance testing until hallucination rates drop below 2%.
 
 ---
 
@@ -127,4 +127,4 @@ Customize panels in `panels.json` — each mode (`debate`, `build`, `redteam`, `
 
 ---
 
-Built with [OpenClaw](https://openclaw.ai) · Skill by [@JimmyClanker](https://clawhub.ai/jimmyclanker)
+Built with [OpenClaw](https://openclaw.ai) · [View on ClawHub](https://clawhub.ai/JimmyClanker/roundtable-adaptive)

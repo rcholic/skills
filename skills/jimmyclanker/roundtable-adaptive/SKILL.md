@@ -11,7 +11,7 @@ metadata:
 
 # Roundtable v2 — Adaptive Multi-Model Orchestrator
 
-**Jimmy (main session) = TRIGGER ONLY.** When roundtable is called, spawn ONE isolated orchestrator and reply "🎯 Roundtable avviato..." — then stop.
+**Your main agent session = TRIGGER ONLY.** When roundtable is called, spawn ONE isolated orchestrator and reply "🎯 Roundtable started..." — then stop.
 
 ```
 sessions_spawn(
@@ -23,7 +23,7 @@ sessions_spawn(
 )
 ```
 
-**The orchestrator (blockrun/sonnet) = COORDINATOR ONLY.** Never argues a position, never joins the panel.
+**The orchestrator = COORDINATOR ONLY.** Never argues a position, never joins the panel.
 
 Core principle: the Meta-Panel (4 premium models) designs the optimal WORKFLOW for the task — not just which models to use, but how they collaborate, in what order, and with what division of labor.
 
@@ -54,6 +54,28 @@ Without Blockrun, panels degrade automatically to available fallbacks (see `pane
 - `roundtable --validate [prompt]` — add Round 3 agent validation of synthesis
 - `roundtable --context-from YYYY-MM-DD-slug [prompt]` — inject previous roundtable as context *(planned — not yet implemented in prompts; currently loads the JSON from memory and prepends to CURRENT_CONTEXT manually)*
 - `roundtable --no-search [prompt]` — skip web search (use only for purely theoretical/abstract topics)
+
+---
+
+## Step -1: Create a Thread (FIRST ACTION)
+
+Before anything else, create a thread in your configured channel and save the thread ID.
+
+```
+message(
+  action = 'thread-create',
+  channel = '[your configured channel]',
+  channelId = '[CHANNEL_ID from user config]',
+  threadName = '🎯 [topic — max 8 words] [[MODE]]',
+  message = '**Panel:** [model list]\n**Mode:** [mode] | **Rounds:** [N]\n⏳ Analysis in progress...'
+)
+```
+
+Save the returned thread ID as `THREAD_ID`.
+
+**All subsequent message() calls use `target = THREAD_ID`, NOT the channel ID.**
+
+If thread creation fails or channel is not configured: fall back to posting directly in the active channel.
 
 ---
 
@@ -99,7 +121,7 @@ sessions_spawn(
 
 ### 0b. Synthesize workflow from 4 recommendations
 
-After collecting all meta responses, YOU (Jimmy) synthesize the final workflow:
+After collecting all meta responses, the orchestrator synthesizes the final workflow:
 
 1. **Workflow type**: majority vote among 4 recommendations
    - Tie → prefer `hybrid` (more flexible)
@@ -107,7 +129,7 @@ After collecting all meta responses, YOU (Jimmy) synthesize the final workflow:
 2. **Stage composition**: tally model recommendations per stage
    - For each stage position, pick the most-recommended model
    - If a model is not in `agents.defaults.models` allowlist → skip, use next
-   - If a model is `anthropic/claude-sonnet-4-6` → skip (reserved for Jimmy)
+   - If a model is your orchestrator's model → skip (reserved for the orchestrator, never a panelist)
 
 3. **Rounds**: median of recommendations (round up if tie) — **hard cap at 3 max, always**
 
@@ -259,8 +281,9 @@ Fill `prompts/final-synthesis.md` placeholders:
 - `[ROUND1_SUMMARIES]` → all self-digests: "**[ROLE]** ([model]): [digest]"
 - `[ROUND2_SUMMARIES]` → critiques: "**[ROLE]** criticized **[peer]**'s [claim] because [reason]"
 - `[CONSENSUS_SCORES]` → full score matrix + calculated %
+- `[DISCORD_THREAD_ID]` → the THREAD_ID from Step -1 (synthesis agent posts here)
 
-**Post to Discord** (or your configured channel). Channel ID is user-specific — use your default Discord channel or pass `--channel <id>` when triggering.
+**Post to Discord** using `THREAD_ID` from Step -1 (not the channel ID). All round outputs and the final synthesis go into the same thread.
 
 ---
 
@@ -300,7 +323,7 @@ Save to `~/clawd/memory/roundtables/YYYY-MM-DD-[topic-slug].json`:
 | No blockrun configured | Warn user: "Blockrun not available. Using budget panel. Full panel requires Blockrun at localhost:8402." Auto-switch to `budget` profile from panels.json. |
 | Agent timeout (any round) | **FAIL-CONTINUE**: treat as absent, mark `[TIMEOUT]` in META, proceed with surviving agents |
 | Agent fails mid-Round 2 | Use its Round 1 digest as final position, omit its scores from consensus calculation |
-| Synthesis agent fails | Jimmy writes synthesis, note: "Synthesis by orchestrator (bias risk — no neutral model)" |
+| Synthesis agent fails | Orchestrator writes synthesis, note: "Synthesis by orchestrator (bias risk — no neutral model available)" |
 | Stage 2 agent fails | Note in META, synthesize with Stage 1 only |
 | 0 agents respond | Report failure, suggest retry |
 | 1 agent responds | Skip Round 2 (no peers), synthesize from Round 1 only, mark consensus "N/A" |
