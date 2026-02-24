@@ -3,11 +3,16 @@
   "slug": "scent-trails",
   "displayName": "Scent Trails",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771436823769,
-    "commit": "https://github.com/openclaw/skills/commit/2254cc0b800aeb7fe80ce00ef9b1de6973ed4ca8"
+    "version": "1.0.2",
+    "publishedAt": 1771912786549,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771436823769,
+      "commit": "https://github.com/openclaw/skills/commit/2254cc0b800aeb7fe80ce00ef9b1de6973ed4ca8"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1770153019304,
