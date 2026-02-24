@@ -1,0 +1,11 @@
+{
+  "owner": "xmanrui",
+  "slug": "model-healthcheck",
+  "displayName": "Model Healthcheck",
+  "latest": {
+    "version": "1.0.0",
+    "publishedAt": 1771799707828,
+    "commit": null
+  },
+  "history": []
+}
