@@ -1,3 +1,0 @@
-[console_scripts]
-klausnomi = klausnomi.cli:main
-nomi = klausnomi.cli:main
