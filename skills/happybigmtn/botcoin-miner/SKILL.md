@@ -1,6 +1,6 @@
 ---
 name: botcoin-miner
-version: 5.0.0
+version: 5.1.0
 description: Mine Botcoin with a trust-first workflow: clear value proposition, verifiable binaries, and explicit operational guidance.
 homepage: https://github.com/happybigmtn/botcoin
 ---
@@ -126,6 +126,32 @@ echo "Mining address: $ADDR"
 | Genesis restart | February 19, 2026 (v0.2.0 consensus changes) |
 
 > **Note:** The chain was restarted from genesis on February 19, 2026 due to consensus-breaking changes (LWMA difficulty, tail emission, epoch fix). All prior v0.1.x chain history is invalidated.
+
+## Fork recovery
+
+If your node syncs the wrong chain (e.g. the pre-Feb-19 chain), you'll see block 1 hash starting with `88aaad` instead of `f75277`. The correct (canonical) chain has **much higher chainwork** per block.
+
+**Symptoms:** Node connects to peers but height doesn't advance, or block hashes don't match canonical peers.
+
+**Fix — copy chain data from a canonical peer:**
+```bash
+# 1. Stop your node
+./botcoin-cli stop && sleep 5
+
+# 2. Back up existing data (ALWAYS back up before deleting chain state!)
+tar czf ~/botcoin-chaindata-backup-$(date +%Y%m%d-%H%M%S).tar.gz -C ~/.botcoin blocks chainstate
+
+# 3. Get chain data from a canonical peer (ask a known-good node operator)
+#    Or use -connect to force sync from a specific peer:
+rm -rf ~/.botcoin/blocks ~/.botcoin/chainstate
+./botcoind -daemon -connect=185.218.126.23:8433 -dnsseed=0 -fixedseeds=0
+
+# 4. Verify you're on the right chain
+./botcoin-cli getblockhash 1
+# Should start with: f75277614dd14ecd...
+```
+
+**Why this happens:** The pre-v0.2.0 chain shares the same genesis block. Nodes syncing from scratch may download the old chain from stale peers. Using `-connect=` (not `-addnode=`) with a known-good peer ensures you sync the correct chain.
 
 ## Important notes
 
