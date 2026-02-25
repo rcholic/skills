@@ -552,44 +552,30 @@ const commands = {
 
       // Add to XMTP group — XMTP's addMembers has a hex bug,
       // so we recreate the board with all current + new members
+      // Add to XMTP group using inbox ID (addMembers with addresses has a hex bug)
       if (config.board?.id) {
         console.log(`Adding ${xmtpAddress} to XMTP board...`);
         try {
           const { agent: xmtpAgent } = await getAgent(config);
-          const oldBoard = await getBoard(xmtpAgent, config);
+          const board = await getBoard(xmtpAgent, config);
 
-          // Get current members
-          const members = await oldBoard.members();
-          const { ethers } = await import('ethers');
-          const myAddr = new ethers.Wallet(config.wallet.privateKey).address.toLowerCase();
-          const memberAddrs = members
-            .map(m => m.addresses?.[0]?.address || m.accountAddress)
-            .filter(Boolean)
-            .filter(a => a.toLowerCase() !== myAddr);
-
-          // Add the new member
-          if (!memberAddrs.find(a => a.toLowerCase() === xmtpAddress.toLowerCase())) {
-            memberAddrs.push(xmtpAddress);
+          // Resolve address → inbox ID
+          const { getInboxIdForIdentifier } = await import('@xmtp/node-sdk');
+          const inboxId = await getInboxIdForIdentifier({ identifier: xmtpAddress, identifierKind: 0 }, 'production');
+          if (!inboxId) {
+            throw new Error(`Could not resolve inbox ID for ${xmtpAddress}. Agent may not be registered on XMTP.`);
           }
+          console.log(`Resolved inbox ID: ${inboxId}`);
 
-          // Create new board with all members
-          const newBoard = await xmtpAgent.createGroupWithAddresses(memberAddrs, {
-            name: config.board?.name || 'Agent Swarm Board',
-            description: 'Public task board for agent discovery',
-          });
-
-          // Update config with new board ID
-          config.board.id = newBoard.id;
-          writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
-          console.log(`New XMTP board created: ${newBoard.id}`);
-          console.log(`Members: ${memberAddrs.join(', ')}`);
-          console.log('Config updated with new board ID.');
-          console.log('⚠️  Workers on the old board need to run: node cli.js board connect --id ' + newBoard.id);
+          // addMembers takes inbox IDs (not addresses)
+          await board.addMembers([inboxId]);
+          console.log(`Added ${xmtpAddress} to board ${config.board.id}`);
+          console.log('Board ID unchanged — no reconnection needed.');
 
           await xmtpAgent.stop();
         } catch (err) {
           console.log(`Could not add to XMTP group: ${err.message}`);
-          console.log(`Create a new board with this member: node cli.js board create --members ${xmtpAddress}`);
+          console.log(`Fallback: create a new board with: node cli.js board create --members ${xmtpAddress}`);
         }
       }
     },
@@ -769,6 +755,19 @@ const commands = {
       dashState.logEscrow({ taskId, requestor: address, worker: workerAddr, amount, deadline, txHash });
       dashState.logTask({ id: taskId, title: task.title, budget: amount, subtasks: [{ id: `${taskId}-s1` }] }, address);
 
+      // Set acceptance criteria on-chain if provided
+      if (flags.criteria || task.criteria) {
+        try {
+          const { setCriteria } = await import('./src/verification.js');
+          const registryAddr = config.verification?.registry || '0x2120D4e0074e0a41762dF785f2c99086aB8bc51b';
+          const criteriaContent = flags.criteria || task.criteria;
+          const { txHash: critTx, criteriaHash } = await setCriteria(wallet, registryAddr, taskId, criteriaContent);
+          console.log(`Acceptance criteria on-chain: ${criteriaHash.slice(0, 18)}...`);
+        } catch (err) {
+          console.log(`Criteria recording skipped: ${err.message?.slice(0, 60)}`);
+        }
+      }
+
       task.status = 'in-progress';
       task.worker = workerAddr;
       task.groupId = group.id;
@@ -927,6 +926,31 @@ const commands = {
       console.log(`Refunded: ${tx.hash}`);
     },
 
+    async verify(config, flags) {
+      if (!flags['task-id']) { console.error('--task-id required'); process.exit(1); }
+      const { getVerificationTrail, getWorkerStats } = await import('./src/verification.js');
+      const wallet = await getWallet(config);
+      const registryAddr = config.verification?.registry || '0x2120D4e0074e0a41762dF785f2c99086aB8bc51b';
+
+      const trail = await getVerificationTrail(wallet, registryAddr, flags['task-id']);
+      console.log(`Verification trail for ${flags['task-id']}:`);
+      console.log(`  Deliverable hash: ${trail.deliverableHash === '0x' + '0'.repeat(64) ? 'not submitted' : trail.deliverableHash.slice(0, 18) + '...'}`);
+      console.log(`  Criteria hash:    ${trail.criteriaHash === '0x' + '0'.repeat(64) ? 'none set' : trail.criteriaHash.slice(0, 18) + '...'}`);
+      console.log(`  Verified:         ${trail.verified ? (trail.passed ? 'PASSED' : 'FAILED') : 'not yet'}`);
+      if (trail.verified) {
+        console.log(`  Verification:     ${trail.verificationHash.slice(0, 18)}...`);
+        console.log(`  Verifier:         ${trail.verifier}`);
+        console.log(`  Verified at:      ${new Date(trail.verifiedAt * 1000).toISOString()}`);
+      }
+      if (trail.worker !== '0x0000000000000000000000000000000000000000') {
+        const stats = await getWorkerStats(wallet, registryAddr, trail.worker);
+        console.log(`\nWorker stats (${trail.worker.slice(0, 10)}...):`);
+        console.log(`  Submissions: ${stats.submissions}`);
+        console.log(`  Verified:    ${stats.verified}`);
+        console.log(`  Pass rate:   ${stats.passRate}`);
+      }
+    },
+
     async 'claim-timeout'(config, flags) {
       if (!flags['task-id']) { console.error('--task-id required'); process.exit(1); }
       const { claimDisputeTimeout } = await import('./src/escrow.js');
@@ -935,6 +959,76 @@ const commands = {
       console.log('Claiming dispute timeout refund...');
       const { txHash } = await claimDisputeTimeout(wallet, escrowAddr, flags['task-id']);
       console.log(`Refunded: ${txHash}`);
+    },
+
+    // ─── Milestone Escrow Commands ───
+
+    async 'create-milestone'(config, flags) {
+      if (!flags['task-id']) { console.error('--task-id required'); process.exit(1); }
+      if (!flags.worker) { console.error('--worker required'); process.exit(1); }
+      if (!flags.milestones) { console.error('--milestones required (e.g. "1.00:24h,2.00:48h")'); process.exit(1); }
+
+      const milestones = flags.milestones.split(',').map(m => {
+        const [amount, deadline] = m.trim().split(':');
+        const hours = parseInt(deadline) || 24;
+        return { amount: parseFloat(amount), deadlineHours: hours };
+      });
+
+      if (milestones.some(m => isNaN(m.amount) || m.amount <= 0)) {
+        console.error('Invalid milestone amounts'); process.exit(1);
+      }
+
+      const { createMilestoneEscrow } = await import('./src/milestone-escrow.js');
+      const wallet = await getWallet(config);
+      const contractAddr = config.milestoneEscrow?.address;
+      if (!contractAddr) {
+        console.error('TaskEscrowV3 not configured. Add milestoneEscrow.address to config.');
+        process.exit(1);
+      }
+
+      console.log(`Creating milestone escrow: ${milestones.length} milestones, total $${milestones.reduce((s, m) => s + m.amount, 0).toFixed(2)} USDC`);
+      const { txHash, totalAmount } = await createMilestoneEscrow(wallet, contractAddr, {
+        taskId: flags['task-id'],
+        worker: flags.worker,
+        milestones,
+      });
+      console.log(`Created: ${txHash}`);
+      console.log(`Total locked: $${totalAmount} USDC`);
+    },
+
+    async 'release-milestone'(config, flags) {
+      if (!flags['task-id']) { console.error('--task-id required'); process.exit(1); }
+      if (flags.index === undefined) { console.error('--index required'); process.exit(1); }
+
+      const { releaseMilestone } = await import('./src/milestone-escrow.js');
+      const wallet = await getWallet(config);
+      const contractAddr = config.milestoneEscrow?.address;
+      if (!contractAddr) { console.error('TaskEscrowV3 not configured.'); process.exit(1); }
+
+      console.log(`Releasing milestone ${flags.index}...`);
+      const { txHash } = await releaseMilestone(wallet, contractAddr, flags['task-id'], parseInt(flags.index));
+      console.log(`Released: ${txHash}`);
+    },
+
+    async 'milestone-status'(config, flags) {
+      if (!flags['task-id']) { console.error('--task-id required'); process.exit(1); }
+
+      const { getMilestoneEscrowStatus } = await import('./src/milestone-escrow.js');
+      const wallet = await getWallet(config);
+      const contractAddr = config.milestoneEscrow?.address;
+      if (!contractAddr) { console.error('TaskEscrowV3 not configured.'); process.exit(1); }
+
+      const status = await getMilestoneEscrowStatus(wallet, contractAddr, flags['task-id']);
+      if (!status) { console.log('No milestone escrow found for this task.'); return; }
+
+      console.log(`Milestone escrow for ${flags['task-id']}:`);
+      console.log(`  Requestor: ${status.requestor}`);
+      console.log(`  Worker: ${status.worker}`);
+      console.log(`  Total: $${status.totalAmount} USDC`);
+      console.log(`  Released: ${status.releasedCount}/${status.milestoneCount}\n`);
+      for (const m of status.milestones) {
+        console.log(`  [${m.index}] $${m.amount} — ${m.status} — deadline: ${new Date(m.deadline * 1000).toISOString()}`);
+      }
     },
   },
 
@@ -959,8 +1053,39 @@ const commands = {
 
       const { encodeText } = await import('@xmtp/agent-sdk');
       const { MessageType } = await import('./src/protocol.js');
-      const seenMessages = new Set();
-      const seenListings = new Set();
+
+      // ─── Persistent Message Dedup ───
+      // SECURITY: Prevents re-processing tasks after restart
+      const SEEN_FILE = join(__dirname, '.worker-seen.json');
+      let seenData = { messages: [], listings: [] };
+      try {
+        if (existsSync(SEEN_FILE)) {
+          seenData = JSON.parse(readFileSync(SEEN_FILE, 'utf-8'));
+          // Keep only last 1000 entries to prevent unbounded growth
+          if (seenData.messages.length > 1000) seenData.messages = seenData.messages.slice(-1000);
+          if (seenData.listings.length > 500) seenData.listings = seenData.listings.slice(-500);
+        }
+      } catch {}
+      const seenMessages = new Set(seenData.messages || []);
+      const seenListings = new Set(seenData.listings || []);
+
+      function persistSeen() {
+        try {
+          writeFileSync(SEEN_FILE, JSON.stringify({
+            messages: [...seenMessages].slice(-1000),
+            listings: [...seenListings].slice(-500),
+          }));
+        } catch {}
+      }
+      // Save periodically
+      setInterval(persistSeen, 30000);
+
+      // ─── Rate Limiting ───
+      let activeTasks = 0;
+      const MAX_CONCURRENT_TASKS = parseInt(flags['max-tasks'] || '1');
+      let bidCount = 0;
+      const MAX_BIDS_PER_HOUR = parseInt(flags['max-bids'] || '10');
+      setInterval(() => { bidCount = 0; }, 3600000); // reset hourly
 
       const maxBid = parseFloat(config.worker?.maxBid || '20.00');
       const minBid = parseFloat(config.worker?.minBid || '0.50');
@@ -1014,6 +1139,11 @@ const commands = {
               }
 
               if (autoAccept) {
+                // Rate limiting: prevent bid spam
+                if (bidCount >= MAX_BIDS_PER_HOUR) {
+                  console.log(`  → Skipping (bid rate limit: ${MAX_BIDS_PER_HOUR}/hour)\n`);
+                  continue;
+                }
                 const bid = {
                   type: MessageType.BID,
                   taskId: parsed.taskId,
@@ -1023,8 +1153,10 @@ const commands = {
                   skills: matches,
                 };
                 await board.send(encodeText(JSON.stringify(bid)));
+                bidCount++;
                 dashState.registerAgent(address, 'worker');
-                console.log(`  → Auto-bid: $${bidPrice.toFixed(2)}\n`);
+                persistSeen();
+                console.log(`  → Auto-bid: $${bidPrice.toFixed(2)} (${bidCount}/${MAX_BIDS_PER_HOUR} this hour)\n`);
               } else {
                 console.log(`  → Waiting for manual bid (run: node cli.js board bid --task-id ${parsed.taskId} --price ${bidPrice.toFixed(2)})\n`);
               }
@@ -1032,7 +1164,12 @@ const commands = {
 
             // Handle task assignments in private groups
             if (parsed.type === 'task') {
-              console.log(`[TASK RECEIVED] "${parsed.title}"`);
+              if (activeTasks >= MAX_CONCURRENT_TASKS) {
+                console.log(`[TASK RECEIVED] "${parsed.title}" — QUEUED (${activeTasks}/${MAX_CONCURRENT_TASKS} active)`);
+                continue;
+              }
+              activeTasks++;
+              console.log(`[TASK RECEIVED] "${parsed.title}" (${activeTasks}/${MAX_CONCURRENT_TASKS} active)`);
               console.log(`  Executing...`);
               const { execute } = await import('./src/executor.js');
               try {
@@ -1109,6 +1246,39 @@ const commands = {
                     worker: address,
                     result,
                   });
+
+                  // Submit deliverable hash on-chain (verification trail)
+                  try {
+                    const { submitDeliverable, hashContent, verifyCodeTask, recordVerification } = await import('./src/verification.js');
+                    const wallet = await getWallet(config);
+                    const registryAddr = config.verification?.registry || '0x2120D4e0074e0a41762dF785f2c99086aB8bc51b';
+                    const deliverableStr = JSON.stringify(result);
+                    const { txHash: dvTx, deliverableHash } = await submitDeliverable(wallet, registryAddr, parsed.id, deliverableStr);
+                    console.log(`  → Deliverable hash on-chain: ${deliverableHash.slice(0, 18)}... (${dvTx.slice(0, 14)}...)`);
+
+                    // Auto-verify code tasks with acceptance criteria
+                    if (parsed.criteria && result.category === 'coding' && result.status === 'completed') {
+                      const workDir = result.files?.length ? join(__dirname, 'workdir', parsed.id) : null;
+                      if (workDir) {
+                        const report = await verifyCodeTask(workDir, parsed.criteria);
+                        const reportStr = JSON.stringify(report);
+                        const { txHash: vfTx } = await recordVerification(wallet, registryAddr, parsed.id, reportStr, report.passed);
+                        console.log(`  → Verification ${report.passed ? 'PASSED' : 'FAILED'} on-chain (${vfTx.slice(0, 14)}...)`);
+                      }
+                    }
+
+                    // Notify requestor about on-chain verification
+                    await sendProtocolMessage(c, {
+                      type: 'deliverable_submitted',
+                      taskId: parsed.id,
+                      deliverableHash,
+                      txHash: dvTx,
+                      registry: registryAddr,
+                    });
+                  } catch (vErr) {
+                    console.log(`  → Verification trail skipped: ${vErr.message?.slice(0, 80)}`);
+                  }
+
                   dashState.registerAgent(address, 'worker');
                   dashState.logClaim(parsed.id, subId, address);
                   dashState.logResult(parsed.id, subId, address);
@@ -1133,6 +1303,148 @@ const commands = {
 
       // Keep alive
       await new Promise(() => {});
+    },
+
+    // ─── Staking Commands ───
+
+    async stake(config, flags) {
+      if (!flags.amount) { console.error('--amount required (USDC)'); process.exit(1); }
+      const { depositStake } = await import('./src/staking.js');
+      const wallet = await getWallet(config);
+      const contractAddr = config.staking?.address;
+      if (!contractAddr) {
+        console.error('WorkerStake not configured. Add staking.address to config.');
+        process.exit(1);
+      }
+
+      console.log(`Depositing $${flags.amount} USDC stake...`);
+      const { txHash } = await depositStake(wallet, contractAddr, flags.amount);
+      console.log(`Staked: ${txHash}`);
+      console.log('Your stake signals quality commitment to requestors.');
+    },
+
+    async unstake(config, flags) {
+      if (!flags.amount) { console.error('--amount required (USDC)'); process.exit(1); }
+      const { withdrawStake } = await import('./src/staking.js');
+      const wallet = await getWallet(config);
+      const contractAddr = config.staking?.address;
+      if (!contractAddr) { console.error('WorkerStake not configured.'); process.exit(1); }
+
+      console.log(`Withdrawing $${flags.amount} USDC stake...`);
+      const { txHash } = await withdrawStake(wallet, contractAddr, flags.amount);
+      console.log(`Withdrawn: ${txHash}`);
+    },
+
+    async 'stake-status'(config, flags) {
+      const { getStakeStatus } = await import('./src/staking.js');
+      const wallet = await getWallet(config);
+      const contractAddr = config.staking?.address;
+      if (!contractAddr) { console.error('WorkerStake not configured.'); process.exit(1); }
+
+      const status = await getStakeStatus(wallet, contractAddr, wallet.address);
+      console.log(`Stake status for ${wallet.address}:`);
+      console.log(`  Total deposited: $${status.totalDeposited} USDC`);
+      console.log(`  Available:       $${status.available} USDC`);
+      console.log(`  Locked (tasks):  $${status.locked} USDC`);
+      console.log(`  Slashed:         $${status.slashed} USDC`);
+      if (status.emergencyWithdrawRequested) {
+        console.log(`  Emergency withdraw requested: ${new Date(status.emergencyWithdrawTime * 1000).toISOString()}`);
+      }
+    },
+  },
+
+  wallet: {
+    async 'guard-status'(config, flags) {
+      const { guardWallet, printGuardStatus } = await import('./src/wallet-guard.js');
+      const wallet = await getWallet(config);
+      const guarded = guardWallet(wallet, { workdir: dirname(CONFIG_PATH) });
+      printGuardStatus(guarded);
+    },
+
+    async 'guard-init'(config, flags) {
+      const { initGuardConfig } = await import('./src/wallet-guard.js');
+      const overrides = {};
+      if (flags['max-tx']) overrides.maxPerTransaction = flags['max-tx'];
+      if (flags['max-daily']) overrides.maxDailySpend = flags['max-daily'];
+      if (flags.mode) overrides.mode = flags.mode;
+      if (flags['max-hourly']) overrides.maxTransactionsPerHour = parseInt(flags['max-hourly']);
+
+      const workdir = dirname(CONFIG_PATH);
+      const guard = initGuardConfig(workdir, overrides);
+      console.log('Wallet guard initialized:');
+      console.log(`  Mode: ${guard.mode}`);
+      console.log(`  Per-tx limit: ${guard.maxPerTransaction} USDC`);
+      console.log(`  Daily limit: ${guard.maxDailySpend} USDC`);
+      console.log(`  Hourly tx limit: ${guard.maxTransactionsPerHour}`);
+      console.log(`  Config saved to: ${join(workdir, '.wallet-guard.json')}`);
+    },
+
+    async 'guard-allow'(config, flags) {
+      const { guardWallet } = await import('./src/wallet-guard.js');
+      const address = flags.address;
+      if (!address) { console.error('--address required'); process.exit(1); }
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) { console.error('Invalid address format'); process.exit(1); }
+
+      const wallet = await getWallet(config);
+      const guarded = guardWallet(wallet, { workdir: dirname(CONFIG_PATH) });
+      const current = guarded.guard.allowedAddresses || [];
+      if (!current.map(a => a.toLowerCase()).includes(address.toLowerCase())) {
+        current.push(address);
+        guarded.updateConfig({ allowedAddresses: current });
+        console.log(`Added ${address} to allowlist (${current.length} total)`);
+      } else {
+        console.log(`${address} already in allowlist`);
+      }
+    },
+
+    async 'guard-set'(config, flags) {
+      const { guardWallet } = await import('./src/wallet-guard.js');
+      const wallet = await getWallet(config);
+      const guarded = guardWallet(wallet, { workdir: dirname(CONFIG_PATH) });
+
+      const updates = {};
+      if (flags['max-tx']) updates.maxPerTransaction = flags['max-tx'];
+      if (flags['max-daily']) updates.maxDailySpend = flags['max-daily'];
+      if (flags['max-hourly']) updates.maxTransactionsPerHour = parseInt(flags['max-hourly']);
+      if (flags.mode) {
+        if (!['full', 'readOnly', 'spendOnly'].includes(flags.mode)) {
+          console.error('Mode must be: full, readOnly, or spendOnly');
+          process.exit(1);
+        }
+        updates.mode = flags.mode;
+      }
+
+      if (Object.keys(updates).length === 0) {
+        console.error('No settings to update. Use --max-tx, --max-daily, --max-hourly, or --mode');
+        process.exit(1);
+      }
+
+      guarded.updateConfig(updates);
+      console.log('Guard config updated:', updates);
+    },
+
+    async 'audit-log'(config, flags) {
+      const { readFileSync, existsSync } = await import('fs');
+      const logPath = join(dirname(CONFIG_PATH), '.wallet-audit.log');
+      if (!existsSync(logPath)) {
+        console.log('No audit log yet. Transactions will be logged after guard is initialized.');
+        return;
+      }
+
+      const lines = readFileSync(logPath, 'utf8').trim().split('\n');
+      const limit = parseInt(flags.limit) || 20;
+      const recent = lines.slice(-limit);
+      console.log(`Last ${recent.length} audit entries:\n`);
+      for (const line of recent) {
+        try {
+          const entry = JSON.parse(line);
+          const time = entry.timestamp?.slice(11, 19) || '??:??:??';
+          const status = entry.status === 'blocked' ? '❌' : entry.status === 'confirmed' ? '✅' : '⏳';
+          console.log(`  ${time} ${status} ${entry.action || '?'} → ${entry.to?.slice(0, 10) || entry.spender?.slice(0, 10) || '?'}... ${entry.usdcAmount ? entry.usdcAmount + ' USDC' : ''} ${entry.reason || ''}`);
+        } catch {
+          // skip malformed
+        }
+      }
     },
   },
 };
@@ -1180,7 +1492,27 @@ Commands:
   escrow release --task-id <id>   Release funds to worker
   escrow dispute --task-id <id>   File a dispute
   escrow refund --task-id <id>    Refund after deadline
+  escrow verify --task-id <id>       Check on-chain verification trail
   escrow claim-timeout --task-id <id>  Claim refund after dispute timeout
+
+  escrow create-milestone --task-id <id> --worker <addr> --milestones "1.00:24h,2.00:48h,1.50:72h"
+                                  Create milestone escrow (amount:deadline pairs)
+  escrow release-milestone --task-id <id> --index <n>
+                                  Release a specific milestone to worker
+  escrow milestone-status --task-id <id>
+                                  Check milestone escrow status
+
+  worker stake --amount <usdc>    Deposit USDC stake (quality assurance)
+  worker unstake --amount <usdc>  Withdraw available stake
+  worker stake-status             Check your stake balance
+
+  wallet guard-status             Show wallet guard config and spending
+  wallet guard-init [--max-tx <usdc>] [--max-daily <usdc>] [--mode <full|readOnly|spendOnly>]
+                                  Initialize wallet guard with spending limits
+  wallet guard-allow --address <addr>  Add address to allowlist
+  wallet guard-set --max-tx <usdc> [--max-daily <usdc>] [--max-hourly <n>] [--mode <mode>]
+                                  Update wallet guard settings
+  wallet audit-log [--limit <n>]  Show recent transaction audit log
   `);
   process.exit(0);
 }
