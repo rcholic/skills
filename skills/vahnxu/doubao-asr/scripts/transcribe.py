@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """
-Doubao (豆包) Seed-ASR 2.0 — audio file transcription.
+Doubao (豆包) Seed-ASR 2.0 Standard — audio file transcription.
 
 API docs: https://www.volcengine.com/docs/6561/1354868
 Endpoint: https://openspeech.bytedance.com/api/v3/auc/bigmodel/
-Auth: X-Api-App-Key + X-Api-Access-Key
+Auth: x-api-key (single API key from Volcengine Speech console)
 Resource-Id: volc.seedasr.auc
 
 Audio upload: The Doubao API requires a publicly accessible URL.
-This script uploads audio to Volcengine TOS (object storage) by default,
-keeping data within Volcengine infrastructure.
-Set DOUBAO_ASR_UPLOAD_URL to use a custom upload endpoint instead.
+This script uploads audio to Volcengine TOS (object storage) via presigned URL,
+keeping data within Volcengine infrastructure. No extra SDK needed.
 """
 
 import argparse
@@ -18,6 +17,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sys
 import time
 import uuid
@@ -54,15 +54,10 @@ MIME_MAP = {
 # --- TOS presigned URL upload (default) ---
 
 TOS_REGION = os.environ.get("VOLCENGINE_TOS_REGION", "cn-beijing")
-TOS_ENDPOINT = os.environ.get(
-    "VOLCENGINE_TOS_ENDPOINT",
-    f"https://tos-{TOS_REGION}.volces.com",
-)
 TOS_BUCKET = os.environ.get("VOLCENGINE_TOS_BUCKET", "")
 
 
-def _tos_sign_v4(method: str, url: str, ak: str, sk: str,
-                 region: str, headers: dict, expires: int = 3600) -> str:
+def _tos_sign_v4(method, url, ak, sk, region, expires=3600):
     """Generate a Volcengine TOS V4 presigned URL (query-string auth)."""
     parsed = urlparse(url)
     now = datetime.now(timezone.utc)
@@ -72,7 +67,6 @@ def _tos_sign_v4(method: str, url: str, ak: str, sk: str,
     signed_headers = "host"
     canonical_headers = f"host:{parsed.hostname}\n"
 
-    # Build canonical query string
     query_params = {
         "X-Tos-Algorithm": "TOS4-HMAC-SHA256",
         "X-Tos-Credential": f"{ak}/{credential_scope}",
@@ -80,8 +74,9 @@ def _tos_sign_v4(method: str, url: str, ak: str, sk: str,
         "X-Tos-Expires": str(expires),
         "X-Tos-SignedHeaders": signed_headers,
     }
+    empty = ""
     canonical_qs = "&".join(
-        f"{quote(k, safe='')}={quote(v, safe='')}"
+        f"{quote(k, safe=empty)}={quote(v, safe=empty)}"
         for k, v in sorted(query_params.items())
     )
 
@@ -105,23 +100,20 @@ def _tos_sign_v4(method: str, url: str, ak: str, sk: str,
         return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
 
     signing_key = _sign(
-        _sign(
-            _sign(
-                _sign(sk.encode("utf-8"), date_stamp),
-                region,
-            ),
-            "tos",
-        ),
+        _sign(_sign(_sign(sk.encode("utf-8"), date_stamp), region), "tos"),
         "request",
     )
     signature = hmac.new(
         signing_key, string_to_sign.encode("utf-8"), hashlib.sha256
     ).hexdigest()
 
-    return f"{parsed.scheme}://{parsed.hostname}{parsed.path}?{canonical_qs}&X-Tos-Signature={signature}"
+    return (
+        f"{parsed.scheme}://{parsed.hostname}{parsed.path}"
+        f"?{canonical_qs}&X-Tos-Signature={signature}"
+    )
 
 
-def upload_to_tos(filepath: str, fmt: str) -> str:
+def upload_to_tos(filepath, fmt):
     """Upload audio to Volcengine TOS and return a presigned GET URL."""
     ak = os.environ.get("VOLCENGINE_ACCESS_KEY_ID", "")
     sk = os.environ.get("VOLCENGINE_SECRET_ACCESS_KEY", "")
@@ -149,62 +141,65 @@ def upload_to_tos(filepath: str, fmt: str) -> str:
             "Alternative: set DOUBAO_ASR_UPLOAD_URL to use your own upload endpoint."
         )
 
+    # Validate bucket/region to prevent injection
+    if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._-]{1,62}$', bucket):
+        sys.exit(f"Invalid TOS bucket name: {bucket}")
+    if not re.match(r'^[a-z0-9-]+$', TOS_REGION):
+        sys.exit(f"Invalid TOS region: {TOS_REGION}")
+
     object_key = f"doubao-asr/{uuid.uuid4()}.{fmt}"
-    put_url_raw = f"{TOS_ENDPOINT}/{bucket}/{object_key}"
+    # Virtual-hosted style URL: bucket.endpoint/key
+    url_raw = f"https://{bucket}.tos-{TOS_REGION}.volces.com/{object_key}"
     content_type = MIME_MAP.get(fmt, "application/octet-stream")
 
-    put_url = _tos_sign_v4("PUT", put_url_raw, ak, sk, TOS_REGION, {
-        "Content-Type": content_type,
-    }, expires=300)
+    put_url = _tos_sign_v4("PUT", url_raw, ak, sk, TOS_REGION, expires=300)
 
-    with open(filepath, "rb") as f:
-        resp = requests.put(put_url, data=f, headers={
-            "Content-Type": content_type,
-        }, timeout=120)
-    if resp.status_code not in (200, 201):
-        sys.exit(f"TOS upload failed ({resp.status_code}): {resp.text[:200]}")
+    # Retry with exponential backoff
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with open(filepath, "rb") as f:
+                resp = requests.put(
+                    put_url, data=f,
+                    headers={"Content-Type": content_type},
+                    timeout=120,
+                )
+            if resp.status_code not in (200, 201):
+                sys.exit(f"TOS upload failed ({resp.status_code}): {resp.text[:200]}")
+            break
+        except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as e:
+            if attempt < max_retries - 1:
+                wait = 2 ** (attempt + 1)
+                print(f"  TOS upload error, retrying in {wait}s... ({attempt+1}/{max_retries})",
+                      file=sys.stderr)
+                time.sleep(wait)
+            else:
+                sys.exit(f"TOS upload failed after {max_retries} attempts: {e}")
 
-    get_url = _tos_sign_v4("GET", put_url_raw, ak, sk, TOS_REGION, {},
-                           expires=3600)
+    get_url = _tos_sign_v4("GET", url_raw, ak, sk, TOS_REGION, expires=3600)
     return get_url
 
 
-def upload_custom(filepath: str) -> str:
-    """Upload to a user-specified endpoint (POST multipart, returns URL)."""
-    upload_url = os.environ["DOUBAO_ASR_UPLOAD_URL"]
-    with open(filepath, "rb") as f:
-        resp = requests.post(upload_url, files={"files[]": f}, timeout=120)
-    resp.raise_for_status()
-    data = resp.json()
-    if isinstance(data, dict) and data.get("files"):
-        return data["files"][0]["url"]
-    if isinstance(data, dict) and data.get("url"):
-        return data["url"]
-    sys.exit(f"Custom upload response unrecognized: {json.dumps(data)[:200]}")
-
-
-def upload_audio(filepath: str, fmt: str) -> str:
+def upload_audio(filepath, fmt):
     """Upload audio file and return an accessible URL."""
-    custom_url = os.environ.get("DOUBAO_ASR_UPLOAD_URL", "")
-    if custom_url:
-        print(f"  Uploading to custom endpoint...", file=sys.stderr)
-        return upload_custom(filepath)
-    else:
-        print(f"  Uploading to Volcengine TOS...", file=sys.stderr)
-        return upload_to_tos(filepath, fmt)
+    print("  Uploading to Volcengine TOS...", file=sys.stderr)
+    return upload_to_tos(filepath, fmt)
 
 
 # --- Doubao ASR API ---
 
-def get_headers(request_id: str, sequence: int | None = -1) -> dict:
-    app_id = os.environ.get("VOLCENGINE_APP_ID", "")
-    token = os.environ.get("VOLCENGINE_ACCESS_TOKEN", "")
-    if not app_id or not token:
-        sys.exit("Missing VOLCENGINE_APP_ID or VOLCENGINE_ACCESS_TOKEN")
+def get_headers(request_id, sequence=-1):
+    api_key = os.environ.get("VOLCENGINE_API_KEY", "")
+    if not api_key:
+        sys.exit(
+            "Missing VOLCENGINE_API_KEY\n\n"
+            "Get your API key from the Volcengine Speech console:\n"
+            "  https://console.volcengine.com/speech/app\n\n"
+            "Set: export VOLCENGINE_API_KEY='your_api_key'"
+        )
     headers = {
         "Content-Type": "application/json",
-        "X-Api-App-Key": app_id,
-        "X-Api-Access-Key": token,
+        "x-api-key": api_key,
         "X-Api-Resource-Id": RESOURCE_ID,
         "X-Api-Request-Id": request_id,
     }
@@ -213,7 +208,7 @@ def get_headers(request_id: str, sequence: int | None = -1) -> dict:
     return headers
 
 
-def submit(audio_url: str, fmt: str, speakers: bool = False) -> str:
+def submit(audio_url, fmt, speakers=True):
     """Submit a transcription task. Returns request_id."""
     request_id = str(uuid.uuid4())
     headers = get_headers(request_id, sequence=-1)
@@ -226,10 +221,9 @@ def submit(audio_url: str, fmt: str, speakers: bool = False) -> str:
             "enable_punc": True,
             "enable_ddc": True,
             "show_utterances": True,
+            "enable_speaker_info": speakers,
         },
     }
-    if speakers:
-        body["request"]["enable_speaker_info"] = True
 
     resp = requests.post(SUBMIT_URL, headers=headers, json=body, timeout=30)
     status = resp.headers.get("X-Api-Status-Code", "")
@@ -239,7 +233,7 @@ def submit(audio_url: str, fmt: str, speakers: bool = False) -> str:
     return request_id
 
 
-def poll(request_id: str, timeout: int = 600, interval: int = 3) -> dict:
+def poll(request_id, timeout=600, interval=3):
     """Poll until the task completes. Returns the full result dict."""
     headers = get_headers(request_id, sequence=None)
     elapsed = 0
@@ -267,7 +261,7 @@ def main():
     parser.add_argument("--format", dest="fmt", help="Audio format (auto-detected from extension)")
     parser.add_argument("--out", help="Output file path (default: stdout)")
     parser.add_argument("--json", action="store_true", help="Output full JSON result")
-    parser.add_argument("--speakers", action="store_true", help="Enable speaker diarization")
+    parser.add_argument("--no-speakers", action="store_true", help="Disable speaker diarization (enabled by default)")
     parser.add_argument("--timeout", type=int, default=600, help="Max wait seconds (default: 600)")
     args = parser.parse_args()
 
@@ -291,20 +285,35 @@ def main():
 
     # Submit task
     print("  Submitting transcription task...", file=sys.stderr)
-    request_id = submit(audio_url, fmt, speakers=args.speakers)
+    request_id = submit(audio_url, fmt, speakers=not args.no_speakers)
 
     # Poll for result
     data = poll(request_id, timeout=args.timeout)
     print("", file=sys.stderr)  # newline after progress
 
     result = data.get("result", {})
-    text = result.get("text", "")
+    utterances = result.get("utterances", [])
 
     # Output
     if args.json:
         output = json.dumps(data, ensure_ascii=False, indent=2)
+    elif utterances and any(u.get("speaker") is not None for u in utterances):
+        # Format with speaker labels
+        lines = []
+        prev_speaker = None
+        for u in utterances:
+            speaker = u.get("speaker")
+            text = u.get("text", "").strip()
+            if not text:
+                continue
+            if speaker != prev_speaker:
+                label = f"Speaker {speaker}" if speaker is not None else "Speaker ?"
+                lines.append(f"\n{label}:")
+                prev_speaker = speaker
+            lines.append(text)
+        output = "\n".join(lines).strip()
     else:
-        output = text
+        output = result.get("text", "")
 
     if args.out:
         os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)

@@ -3,9 +3,15 @@
   "slug": "doubao-asr",
   "displayName": "Doubao ASR / 豆包语音转写",
   "latest": {
-    "version": "0.3.3",
-    "publishedAt": 1772016726959,
-    "commit": "https://github.com/openclaw/skills/commit/b10d35a7555a078deab6c082b74032f5816c9191"
+    "version": "0.7.0",
+    "publishedAt": 1772060293382,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "0.3.3",
+      "publishedAt": 1772016726959,
+      "commit": "https://github.com/openclaw/skills/commit/b10d35a7555a078deab6c082b74032f5816c9191"
+    }
+  ]
 }
