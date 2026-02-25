@@ -3,11 +3,16 @@
   "slug": "minimax-web-search",
   "displayName": "minimax-web-search",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771769643698,
-    "commit": "https://github.com/openclaw/skills/commit/924b078143465a6a52059893a5ed58062955b296"
+    "version": "1.0.2",
+    "publishedAt": 1771917478021,
+    "commit": null
   },
   "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771769643698,
+      "commit": "https://github.com/openclaw/skills/commit/924b078143465a6a52059893a5ed58062955b296"
+    },
     {
       "version": "1.0.0",
       "publishedAt": 1771336626107,

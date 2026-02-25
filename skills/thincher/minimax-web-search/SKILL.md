@@ -7,7 +7,7 @@ description: 使用 MiniMax MCP 进行网络搜索。触发条件：(1) 用户�
 
 使用 MiniMax MCP 服务器进行网络搜索。
 
-## 执行流程（首次需要安装，后续直接调用）
+## 执行流程（首次需要安装，后续直接步骤4调用）
 
 ### 步骤 1: 检查并安装依赖
 
@@ -77,11 +77,10 @@ cat ~/.openclaw/config/minimax.json 2>/dev/null | python3 -c "import json,sys; d
 
 ### 步骤 3: 配置 API Key（如果未配置）
 
-#### 3.1 尝试从 ~/.openclaw/agents/main/agent 中的配置文件中获取
+#### 3.1 尝试从 ~/.openclaw/agents/main/agent/auth-profiles.json 中的配置文件中获取
 
 根据返回的判断：
 - 名称包含 "minimax" 或 "MiniMax"
-- API Key 格式是 `sk-cp-` 开头
 
 找到匹配的 Key 后，询问用户确认是否使用。
 
@@ -125,29 +124,6 @@ python3 {curDir}/scripts/web_search.py "今天的热点新闻"
 |------|------|------|
 | query | 搜索查询字符串 | string (必填) |
 
-
-## 完整流程示例
-
-```
-用户：帮我搜一下今天的新闻
-
-AI：检查 uvx → 已安装
-    检查 MCP 服务器 → 已安装
-    检查 API Key → 已配置
-    直接调用脚本 → 返回结果
-
----
-
-用户：帮我搜一下今天的新闻
-
-AI：检查 uvx → 已安装
-    检查 MCP 服务器 → 未安装
-    安装 minimax-coding-plan-mcp
-    检查 API Key → 未配置
-    从 Gateway providers 找到 Key → 询问用户确认
-    保存 Key
-    调用脚本 → 返回结果
-```
 
 ## 脚本说明
 
