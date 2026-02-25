@@ -1,7 +1,7 @@
 ---
 name: navclaw
 description: Personal AI Navigation Assistant — Exhaustive route search with smart detour that may outperform official recommendations. One-tap deep links for iOS/Android. Bonus toolbox like weather, POI search, geocoding, district query, etc. Currently supports Amap, more platforms coming 
-version: 0.1.2
+version: 0.1.8
 icon: 🦀
 ---
 
@@ -30,31 +30,21 @@ export API_KEY="your_amap_api_key"
 
 **Output format**:
 
-- **Universal method (recommended first)**: Run `wrapper.py --origin "A" --dest "B" --no-send`, results output to stdout. OpenClaw reads and forwards to user. stdout format:
-- **Mattermost (built-in)**: Configure `MM_BASEURL`, `MM_BOT_TOKEN`, `MM_CHANNEL_ID` in `config.py`, then run `wrapper.py --origin "A" --dest "B"` to auto-send 3 messages + log attachment.
 
-**Strongly recommended to use universal method (`--no-send`) first**, verify results, then configure specific platforms. stdout format:
+- **Mattermost (recommended first, built-in)**: Configure `MM_BASEURL`, `MM_BOT_TOKEN`, `MM_CHANNEL_ID` in `config.py`, then run `wrapper.py --origin "A" --dest "B"` to auto-send 3 messages + log attachment (prefer Mattermost messages and log attachment; fall back to backup method if unsuccessful).
 
-```
-────────────────────────────────────────────────────────────
-📨 Message 1
-────────────────────────────────────────────────────────────
-(Full comparison table: all baselines + bypass routes, with time/distance/congestion%/toll)
+### Mattermost file attachment
+OpenClaw Mattermost plugin does not support native attachments. Use curl to call the API directly:
+1. POST /api/v4/files to upload file, get file_id
+2. POST /api/v4/posts to create post with file_ids field
 
-────────────────────────────────────────────────────────────
-📨 Message 2
-────────────────────────────────────────────────────────────
-(Quick navigation links: fastest bypass + least congestion + Android/iOS deep links)
+- **Universal method (backup plan)**: Run `wrapper.py --origin "A" --dest "B" --no-send`, results output to stdout. OpenClaw reads and forwards to user. stdout format:
+OpenClaw can read stdout and forward by splitting on `📨 Message 1/2/3`. Log file path appears at the end of stdout, look for the line containing `log/navclaw/`. Do not send the path — read the log and send the content. If you cannot send as attachment, send the raw content instead.
+(You must forward all messages to the user as-is, especially preserving all links — do not omit them)
 
-────────────────────────────────────────────────────────────
-📨 Message 3
-────────────────────────────────────────────────────────────
-(Top recommendations: time ranking / congestion ranking / official baseline + one-tap navigation links)
-```
+**Strongly recommended to use native method first**
 
-OpenClaw can read stdout and forward by splitting on `📨 Message 1/2/3`. Log file path appears at the end of stdout, look for the line containing `log/navclaw/`.
-
-**Installation**: `pip install requests` → `cp config_example.py config.py` → edit with Amap API Key, default destination, Mattermost config (optional).
+**Installation**: `pip install requests` → `cp config_example.py config.py` → edit with Amap API Key, default destination, Mattermost config (optional, including MM_BASEURL, MM_BOT_TOKEN, MM_CHANNEL_ID — if not found in memory or config, prompt user; if user doesn't have them, skip. If available, write to corresponding fields in config.py).
 
 **File locations**: Entry point `wrapper.py`, core engine `navclaw.py`, config `config.py` (user-created), template `config_example.py`, logs `log/`.
 
