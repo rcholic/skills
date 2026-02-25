@@ -3,9 +3,15 @@
   "slug": "fundamental-stock-analysis",
   "displayName": "Fundamental Stock Analysis",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1771537513651,
-    "commit": "https://github.com/openclaw/skills/commit/2070edaa2e039bc02b0dcb07c6c522bbc68c9766"
+    "version": "1.0.5",
+    "publishedAt": 1772061333556,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1771537513651,
+      "commit": "https://github.com/openclaw/skills/commit/2070edaa2e039bc02b0dcb07c6c522bbc68c9766"
+    }
+  ]
 }
