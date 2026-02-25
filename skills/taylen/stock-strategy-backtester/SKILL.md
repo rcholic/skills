@@ -91,26 +91,6 @@ python scripts/backtest_strategy.py \
   --quiet
 ```
 
-- Publish to OpenClaw marketplace (requires `clawhub` CLI and network):
-
-```bash
-bash scripts/publish_openclaw.sh 1.0.0 \
-  "Initial release: stock strategy backtesting with win-rate and return analytics."
-```
-
-- Retry publish when rate-limited:
-
-```bash
-bash scripts/publish_with_retry.sh 1.0.1 \
-  "Add A/B marketplace copy variants and Chinese listing text for conversion optimization."
-```
-
-- Poll scan/listing status:
-
-```bash
-bash scripts/check_openclaw_status.sh stock-strategy-backtester 12 30
-```
-
 ## Output Contract
 
 - Script prints a JSON object to stdout with:
@@ -140,6 +120,3 @@ bash scripts/check_openclaw_status.sh stock-strategy-backtester 12 30
 ## References
 
 - Metrics details: `references/backtest-metrics.md`
-- Launch/distribution checklist: `references/market-launch-checklist.md`
-- Listing copy template: `references/listing-copy.md`
-- A/B listing variants: `references/listing-copy-ab.md`
