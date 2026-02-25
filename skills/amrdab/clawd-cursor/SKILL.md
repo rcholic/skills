@@ -1,91 +1,125 @@
 ---
 name: clawd-cursor
-version: 0.4.1
+version: 0.5.1
 description: >
-  AI desktop agent that controls Windows/Mac natively via @nut-tree-fork/nut-js. Gives your agent eyes and full cursor control —
-  direct screen capture, mouse clicks, keyboard input, drag operations, and GUI automation.
-  Use when the user wants desktop automation, native AI control, or GUI testing.
-  No external server required. Requires: AI API key (Anthropic or OpenAI) for vision features.
-  Installs: Node.js dependencies via npm.
-  Privacy note: screenshots are sent to AI provider APIs (Anthropic/OpenAI) for vision processing.
+  AI desktop agent with smart 4-layer pipeline. Controls Windows and macOS natively via screen + accessibility APIs.
+  Works with any AI provider (Anthropic, OpenAI, Ollama, Kimi) or completely free with local models.
+  Auto-configures via 'clawd-cursor doctor'. Smart Interaction Layer handles browser tasks with 95% fewer tokens.
+  Cross-platform: Windows (PowerShell/.NET) + macOS (JXA/AppleScript).
+privacy: >
+  All screenshots and data stay local on the user's machine. AI calls go only to the user's own configured
+  API provider and key — no data is sent to third-party servers or skill authors. With Ollama, everything
+  runs 100% locally with zero external network calls.
 metadata:
   openclaw:
     requires:
-      env:
-        - AI_API_KEY
       bins:
         - node
         - npm
-    primaryEnv: AI_API_KEY
     install:
       - git clone https://github.com/AmrDab/clawd-cursor.git
       - cd clawd-cursor && npm install && npm run build
+      - cd clawd-cursor && npx clawd-cursor doctor
     privacy:
-      - Screenshots sent to external AI provider (Anthropic/OpenAI)
+      - Screenshots processed by user's own configured AI provider only
+      - With Ollama, fully offline — no external API calls
+credentials:
+  - name: AI_API_KEY
+    sensitivity: high
+    description: API key for AI provider (Anthropic, OpenAI, or Kimi). Not needed if using Ollama locally.
+    required: false
 ---
 
 # Clawd Cursor
 
-**One skill, multiple endpoints.** Instead of integrating dozens of APIs, give your agent a screen. Gmail, Slack, Jira, Figma — if you can click it, your agent can too. Desktop automation skill for OpenClaw via native OS-level control.
+**One skill, every app.** Instead of integrating dozens of APIs, give your agent a screen. Gmail, Slack, Jira, Figma — if you can click it, your agent can too.
 
-## Required Credentials
+## What's New in v0.5.1
 
-| Variable | Sensitivity | Purpose |
-|----------|------------|---------|
-| `AI_API_KEY` | **High** — enables external API calls | Anthropic or OpenAI key for vision/planning |
+- **Smart Interaction Layer** — Browser tasks use 1 LLM call instead of 18 (95% token savings)
+- **CDP Driver** — Chrome DevTools Protocol for fast, free browser DOM interaction
+- **UI Driver** — Native UI Automation for Windows (.NET) and macOS (JXA)
+- **macOS Support** — Full cross-platform: JXA scripts for accessibility, AppleScript for UI control
+- **Doctor Version Check** — Tells you when updates are available
+- **Self-healing pipeline** — Falls through layers automatically on failure
 
-**Privacy:** Screenshots of your desktop are sent to the configured AI provider (Anthropic or OpenAI) for processing. Only use on machines without sensitive data visible, or in a sandbox/VM.
-
-**Optional variables:** `AI_PROVIDER` (anthropic\|openai)
-
-## Installation
-
-Requires **Node.js 20+**.
+## Quick Start
 
 ```bash
 git clone https://github.com/AmrDab/clawd-cursor.git
 cd clawd-cursor
 npm install && npm run build
+npx clawd-cursor doctor    # auto-detects and configures everything
+npm start
 ```
 
-No external server or setup script required — native desktop control works out of the box.
+That's it. The doctor handles provider detection, model testing, and pipeline configuration.
 
-## Configuration
+### macOS Users
+Grant **Accessibility permission** to your terminal app:
+**System Settings → Privacy & Security → Accessibility → add Terminal/iTerm**
 
-Create `.env` in project root:
+See `docs/MACOS-SETUP.md` for full setup guide.
 
-```env
-AI_API_KEY=sk-ant-api03-...
-AI_PROVIDER=anthropic
+## How It Works — 4-Layer Pipeline
+
+Every task flows through layers. Most tasks are handled by Layer 1 (free, instant). Only complex tasks reach Layer 3.
+
+| Layer | What | Speed | Cost |
+|-------|------|-------|------|
+| **0: Browser Layer** | URL detection → direct navigation | Instant | Free |
+| **1: Action Router** | Regex + UI Automation. Opens apps, types, clicks by name | Instant | Free |
+| **1.5: Smart Interaction** | 1 LLM plan → CDP/UIDriver executes steps free | ~2-5s | 1 LLM call |
+| **2: Accessibility Reasoner** | Reads UI tree → cheap text LLM decides action | ~1s | Free (Qwen) or $0.25/M (Haiku) |
+| **3: Computer Use** | Full screenshot → vision LLM or Anthropic Computer Use | ~5-8s | ~$3/M (Sonnet) |
+
+**Example:** Sending a Gmail email — Layer 1.5 does it in **1 LLM call, 21 seconds**. Computer Use would take 18 LLM calls, 162 seconds.
+
+## Provider Support
+
+| Provider | Setup | Layer 2 | Layer 3 | Computer Use |
+|----------|-------|---------|---------|-------------|
+| **Ollama** | `ollama pull qwen2.5:7b` | Qwen (free) | Limited | ❌ |
+| **Anthropic** | `AI_API_KEY=sk-ant-...` | Haiku or Qwen | Sonnet | ✅ |
+| **OpenAI** | `AI_API_KEY=sk-...` | GPT-4o-mini | GPT-4o | ❌ |
+| **Kimi** | `AI_API_KEY=sk-...` | Moonshot-8k | Moonshot-8k | ❌ |
+
+## Platform Support
+
+| Platform | UI Automation | Accessibility | Browser (CDP) |
+|----------|--------------|---------------|---------------|
+| **Windows** | PowerShell/.NET UIAutomation | ✅ Full | ✅ Edge/Chrome |
+| **macOS** | JXA/AppleScript + System Events | ✅ Full | ✅ Chrome |
+| **Linux** | Not yet | Not yet | ✅ Chrome |
+
+## OpenClaw Agent Instructions
+
+When an OpenClaw agent dispatches Clawd Cursor tasks:
+
+### Simple Tasks
+```
+POST http://localhost:3847/task
+{"task": "Open Notepad and type hello world"}
 ```
 
-## Running
+### Complex Tasks (two-agent pattern)
+For heavy workloads, spawn two sub-agents:
+1. **Setup agent** — runs `doctor`, starts server, validates connectivity
+2. **Task agent** — sends tasks via REST API, monitors status, reports results
+
+## Doctor (Self-Healing)
 
 ```bash
-# Computer Use (Anthropic — recommended for complex tasks)
-npm start -- --provider anthropic
-
-# Action Router (OpenAI/offline — fast for simple tasks)
-npm start -- --provider openai
+npx clawd-cursor doctor
 ```
 
-## Execution Paths
-
-### Path A: Computer Use API (Anthropic)
-Full task → Claude with native `computer_20250124` tools → screenshots, plans, executes autonomously.
-Best for complex multi-app workflows. ~100–156s. Very reliable.
-
-### Path B: Decompose + Route (OpenAI/Offline)
-Task → subtasks → UI Automation tree → direct element interaction. Zero LLM for common patterns.
-Best for simple tasks. ~2s. Works offline.
-
-## Safety Tiers
-
-| Tier | Actions | Behavior |
-|------|---------|----------|
-| 🟢 Auto | Navigation, reading, opening apps | Runs immediately |
-| 🟡 Preview | Typing, form filling | Logs before executing |
-| 🔴 Confirm | Sending messages, deleting, purchases | Pauses for `/confirm` approval |
+The doctor:
+1. Checks for updates against GitHub releases
+2. Tests screen capture and accessibility bridge
+3. Detects available AI providers and tests models
+4. Builds the optimal pipeline config
+5. Falls back gracefully if models are unavailable
+6. Saves config to `.clawd-config.json`
 
 ## API Endpoints
 
@@ -98,35 +132,18 @@ Best for simple tasks. ~2s. Works offline.
 | `/confirm` | POST | `{"approved": true}` |
 | `/abort` | POST | Stop current task |
 
-## Security Considerations
+## Safety
 
-- **Screenshots are NOT saved to disk by default.** They are held in memory only and sent to the AI provider for processing. Use `--debug` flag to enable disk saves for troubleshooting.
-- AI API keys allow **sending screenshots to external APIs** — use scoped/temporary keys, rotate after testing.
-- The Express API **binds to 127.0.0.1 only** — not accessible from other machines on the network.
-- The `/confirm` endpoint enforces the 🔴 safety tier for destructive actions (send messages, delete files, purchases).
-- Run in a **sandbox or VM** when testing with sensitive data visible on screen.
-- **No postinstall scripts** — `npm install` only fetches dependencies, no code runs automatically.
+| Tier | Actions | Behavior |
+|------|---------|----------|
+| 🟢 Auto | Navigation, reading, opening apps | Runs immediately |
+| 🟡 Preview | Typing, form filling | Logs before executing |
+| 🔴 Confirm | Sending messages, deleting | Pauses for approval |
 
-## Changelog
+## Security
 
-### v0.4.1
-- **Security: screenshots no longer saved to disk** — held in memory only, sent to AI provider, then discarded
-- Debug saves opt-in via `--debug` flag
-- Localhost-only API binding documented
-- Cleaned 2,857 lines of dead VNC code
-
-### v0.4.0
-- **Native desktop control** via @nut-tree-fork/nut-js — no VNC server required
-- 17× faster screenshots (~50ms vs ~850ms)
-- 5× faster connect time (~38ms vs ~200ms)
-- Simplified onboarding: `npm install && npm start`
-
-### v0.3.3
-- Bulletproof headless setup — setup.ps1 runs end-to-end in non-interactive shells
-
-### v0.3.0
-- 6 performance optimizations (~70% faster task execution, 90% fewer redundant LLM calls)
-
-### v0.2.0
-- Anthropic Computer Use API as primary execution path
-- Action Router (zero-LLM) for simple tasks
+- Screenshots are NOT saved to disk by default (memory only, sent to user's own AI provider)
+- API binds to 127.0.0.1 only — not network accessible
+- Use `--debug` to opt-in to disk screenshot saves
+- Run in a sandbox/VM when testing with sensitive screen content
+- With Ollama, everything runs 100% locally — no external API calls
