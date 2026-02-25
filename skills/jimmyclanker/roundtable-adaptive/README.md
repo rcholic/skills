@@ -68,7 +68,7 @@ Each roundtable gets its own thread with 4 live agents — you can keep talking 
 ## Requirements
 
 **Full experience (recommended):** Blockrun configured at `localhost:8402`
-→ Provides: Claude Opus 4.6, GPT-5.2, Gemini 3.1 Pro, Grok 4 via unified proxy
+→ Provides: Claude Opus 4.6, GPT-5.3 Codex, Gemini 3.1 Pro, Grok 4 via unified proxy
 
 **Without Blockrun:** Skill degrades gracefully to available providers:
 - `anthropic` provider → Claude Opus/Sonnet as fallback
@@ -119,7 +119,7 @@ See [`examples/`](./examples/) for real completed roundtable outputs.
 >
 > **📊 CONSENSUS (58%)** — All agents agreed automated agents excel at regression testing; all disagreed about edge-case coverage.
 >
-> **⚡ DIVERGENCES** — GPT-5.2 argued for full automation now; Opus argued hybrid human+AI is safer for 3+ years; Grok challenged the premise entirely ("QA is the wrong question — design for testability first").
+> **⚡ DIVERGENCES** — GPT-5.3 Codex argued for full automation now; Opus argued hybrid human+AI is safer for 3+ years; Grok challenged the premise entirely ("QA is the wrong question — design for testability first").
 >
 > **🏆 RECOMMENDATION** — Adopt AI agents for regression and smoke testing immediately. Keep human QA for exploratory and acceptance testing until hallucination rates drop below 2%.
 
