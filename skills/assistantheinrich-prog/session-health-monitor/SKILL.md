@@ -1,36 +1,68 @@
 ---
 name: session-health-monitor
-description: Context window health monitoring with compaction detection, pre-compaction snapshots, and memory rotation for Claude Code sessions.
+description: Context window health monitoring for OpenClaw agents — threshold warnings via Telegram, pre-compaction snapshots, and memory rotation.
 allowed-tools:
   - Bash
   - Read
   - Write
-version: 1.0.0
+version: 1.1.0
 author: heinrichclawdster
 ---
 
 # Session Health Monitor
 
-Monitor your Claude Code context window health, detect compactions, save critical facts before they're lost, and keep your memory directory clean.
+Monitor your OpenClaw agent context window health, get warnings via Telegram when usage is high, save critical facts before compaction, and keep memory directories clean.
 
 ## Overview
 
-Four capabilities, fully standalone (no OpenClaw required):
+Four capabilities for OpenClaw agent sessions:
 
-1. **StatusLine Display** — Color-coded context window usage in your Claude Code status bar
-2. **Compaction Detection** — Infers when context was compacted by tracking usage drops
-3. **Pre-Compaction Snapshots** — Save key facts and decisions to daily memory files
+1. **Context Threshold Warnings** — Agents append usage footer to Telegram messages and warn at configurable thresholds
+2. **Compaction Detection** — Track usage drops to infer when context was compacted
+3. **Pre-Compaction Snapshots** — Save key facts and decisions to daily memory files before they're lost
 4. **Memory Rotation** — Archive old daily memory files to prevent clutter
 
-## Quick Setup
+## Quick Setup (OpenClaw)
 
-```bash
-bash scripts/setup-statusline.sh
+### 1. Add shared skill reference
+
+Add to your `shared/INDEX.md`:
+
+```markdown
+| Context window health, compaction detection, pre-compaction snapshots | `skill-session-health.md` |
 ```
 
-That's it. Restart Claude Code and the statusline appears.
+### 2. Create shared skill doc
 
-For snapshot and rotation, the scripts work standalone — call them from your agent loops or manually.
+Create `shared/skill-session-health.md`:
+
+```markdown
+# Session Health Monitor
+
+## Context Health Thresholds
+| Level  | Condition                          | Action                        |
+|--------|------------------------------------|-------------------------------|
+| GREEN  | <50% used AND 0 compactions        | Normal operation              |
+| YELLOW | >=50% used OR >=1 compaction       | Save key facts via snapshot   |
+| RED    | >=75% used OR >=2 compactions      | Save facts NOW, session ending|
+
+## Behavioral Rules
+1. When context reaches YELLOW+, extract 3-5 key facts (decisions, files changed, blockers)
+2. Run: `bash scripts/snapshot.sh "fact1" "fact2"`
+3. Append footer to Telegram messages at YELLOW+: `X% Context Window | Nx compacted`
+4. Do this BEFORE session ends or context gets compacted
+5. After any detected compaction, immediately snapshot what you remember
+```
+
+### 3. Add heartbeat step
+
+Add to your agent heartbeat/loop:
+
+```markdown
+**Context health check**: Run `session_status` → always append context % to Telegram messages
+as footer: `📊 X% Context Window`. If Context >50% OR Compactions >=1, add:
+"⚠️ consider /restart after current task." If Context >75% OR Compactions >=2, flag as urgent.
+```
 
 ## Context Health Thresholds
 
@@ -40,17 +72,17 @@ For snapshot and rotation, the scripts work standalone — call them from your a
 | YELLOW | >=50% used OR >=1 compaction           | Consider saving key facts     |
 | RED    | >=75% used OR >=2 compactions          | Save facts NOW, session ending|
 
-## StatusLine Display
+## Telegram Message Footer
 
-The statusline shows a color-coded indicator:
+Agents append a footer to every outgoing Telegram message:
 
 ```
-42% Context | 0x compact     # GREEN — all good
-63% Context | 1x compact     # YELLOW — getting warm
-81% Context | 2x compact     # RED — save facts immediately
+📊 42% Context Window                          # GREEN — no extra warning
+📊 63% Context Window | 1x compacted           # YELLOW — consider restart
+⚠️ 📊 81% Context Window | 2x compacted        # RED — urgent, save facts
 ```
 
-Colors use ANSI codes compatible with Claude Code's terminal rendering.
+This keeps the user informed about session health without requiring manual checks.
 
 ## Pre-Compaction Snapshot Protocol
 
@@ -78,26 +110,8 @@ Colors use ANSI codes compatible with Claude Code's terminal rendering.
 
 ## Scripts Reference
 
-### statusline.sh
-Reads Claude Code statusline JSON from stdin and outputs formatted context info.
-
-```bash
-# Called automatically by Claude Code via settings.local.json
-# Manual test:
-echo '{"context_window":{"used_percentage":42},"session_id":"test-123"}' | bash scripts/statusline.sh
-```
-
-### setup-statusline.sh
-One-command installer. Copies the statusline script and patches Claude Code settings.
-
-```bash
-bash scripts/setup-statusline.sh
-# Backs up settings.local.json before patching
-# Requires: jq
-```
-
 ### context-check.sh
-Standalone health check, useful in heartbeat loops or CI.
+Standalone health check, useful in heartbeat loops.
 
 ```bash
 bash scripts/context-check.sh                    # Human-readable output
@@ -121,17 +135,6 @@ Archive old daily memory files.
 bash scripts/rotate.sh           # Archives files older than 3 days (default)
 KEEP_DAYS=7 bash scripts/rotate.sh  # Keep 7 days instead
 ```
-
-## Messaging Footer
-
-When context is at YELLOW or above, agents should append a footer to outgoing messages:
-
-```
----
-63% Context Window | 1x compacted
-```
-
-This helps the user understand when a session is running long and may need a fresh start.
 
 ## Configuration
 
@@ -160,16 +163,12 @@ brew install jq
 sudo apt-get install jq
 ```
 
-### Statusline not updating
-1. Check the script is at `~/.claude/session-health-statusline.sh`
-2. Check `settings.local.json` has the `statusLine` key
-3. Restart Claude Code
-4. Test manually: `echo '{}' | bash ~/.claude/session-health-statusline.sh`
-
 ### Reset compaction state
 ```bash
 rm /tmp/session-health-*.json
 ```
 
-### Statusline shows "Context Window" with no percentage
-Normal on first run — the statusline needs one data point from Claude Code before it can display usage. It will update on the next tick.
+### Agent not appending footer
+1. Check `shared/INDEX.md` references `skill-session-health.md`
+2. Check heartbeat includes the context health step
+3. Verify `session_status` tool is available to the agent
