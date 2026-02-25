@@ -1,0 +1,20 @@
+{
+  "name": "kite-agent-smart-wallet-permissionless-protocol-v2",
+  "version": "2.0.0",
+  "description": "Kite AI Agent Smart Wallet Permissionless Protocol V2.0 - Telegram wallet control",
+  "author": "VandNi",
+  "keywords": ["kite", "ai", "agent", "wallet", "telegram", "bot", "permissionless"],
+  "contracts": {
+    "AgentSmartWalletFactory": "0x0fa9F878B038DE435b1EFaDA3eed1859a6Dc098a",
+    "ModuleRegistry": "0xfdf654b7dDbdFf0C7ec9017Aece166a75a5197B5",
+    "SpendingLimitModule": "0x00E593eA476DfC0b22d9DF0A8fe436e5323Ae05F",
+    "SessionKeyModule": "0x5b6C45EC7C9d7C688413d6bB2CC3B0A35f5B79B8"
+  },
+  "network": {
+    "testnet": {
+      "chainId": 2368,
+      "rpc": "https://rpc-testnet.gokite.ai",
+      "explorer": "https://testnet.kitescan.ai"
+    }
+  }
+}
