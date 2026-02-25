@@ -1,0 +1,9 @@
+{
+  "name": "openclaw-model-failover",
+  "version": "0.1.5",
+  "private": true,
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  }
+}

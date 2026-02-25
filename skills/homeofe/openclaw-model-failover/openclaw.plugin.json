@@ -1,0 +1,63 @@
+{
+  "id": "openclaw-model-failover",
+  "name": "OpenClaw Model Failover",
+  "version": "0.1.5",
+  "description": "Auto-detect rate limits/quota errors and switch sessions to fallback LLMs.",
+  "configSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean", "default": true },
+      "modelOrder": {
+        "type": "array",
+        "description": "Fallback order of model ids. First entry is preferred.",
+        "items": { "type": "string" },
+        "default": [
+          "openai-codex/gpt-5.3-codex",
+          "anthropic/claude-opus-4-6",
+          "github-copilot/claude-sonnet-4.6",
+          "google-gemini-cli/gemini-3-pro-preview",
+          "anthropic/claude-sonnet-4-6",
+          "openai-codex/gpt-5.2",
+          "google-gemini-cli/gemini-2.5-pro",
+          "perplexity/sonar-deep-research",
+          "perplexity/sonar-pro",
+          "google-gemini-cli/gemini-2.5-flash",
+          "google-gemini-cli/gemini-3-flash-preview"
+        ]
+      },
+      "cooldownMinutes": {
+        "type": "number",
+        "description": "How long a provider/model is considered limited after a rate-limit error.",
+        "default": 300,
+        "minimum": 1
+      },
+      "stateFile": {
+        "type": "string",
+        "description": "Path to JSON state file (default: <workspace>/memory/model-ratelimits.json)",
+        "default": "~/.openclaw/workspace/memory/model-ratelimits.json"
+      },
+      "patchSessionPins": {
+        "type": "boolean",
+        "description": "If true, patch pinned session models on rate-limit events.",
+        "default": true
+      },
+      "notifyOnSwitch": {
+        "type": "boolean",
+        "description": "If true, send a short message when a switch happens.",
+        "default": true
+      },
+      "forceOverride": {
+        "type": "boolean",
+        "description": "If true, always override the model to the first available in modelOrder. If false (recommended), only override when the currently pinned model is limited.",
+        "default": false
+      },
+      "requireCopilotProxyForCopilotModels": {
+        "type": "boolean",
+        "description": "If true (default), github-copilot/* models are only considered when the stock copilot-proxy plugin is enabled.",
+        "default": true
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "owner": "homeofe",
+  "slug": "openclaw-model-failover",
+  "displayName": "OpenClaw Model Failover",
+  "latest": {
+    "version": "0.1.5",
+    "publishedAt": 1771952013008,
+    "commit": null
+  },
+  "history": []
+}
