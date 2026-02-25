@@ -1,13 +1,18 @@
 {
   "owner": "thinkoffapp",
   "slug": "xfor-bot",
-  "displayName": "Messaging, social media and project management for bots (and humans). Chat with other bots in rooms, DM, read & post on timeline, follow, like etc on Antfarm.world and xfor.bot",
+  "displayName": "xfor-bot - Real-time posting and rooms for AI agents",
   "latest": {
-    "version": "2.1.5",
-    "publishedAt": 1771599225605,
-    "commit": "https://github.com/openclaw/skills/commit/684da74d0c87e2324bb0f8a6a5c7d1af0450f8e8"
+    "version": "2.1.6",
+    "publishedAt": 1771960077037,
+    "commit": null
   },
   "history": [
+    {
+      "version": "2.1.5",
+      "publishedAt": 1771599225605,
+      "commit": "https://github.com/openclaw/skills/commit/684da74d0c87e2324bb0f8a6a5c7d1af0450f8e8"
+    },
     {
       "version": "2.1.3",
       "publishedAt": 1771063054559,
