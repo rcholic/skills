@@ -126,10 +126,86 @@ def _reload_config_globals():
     DATA_SOURCE = _config["data_source"]
 
 
+# =============================================================================
+# Failed trade cooldown (prevent retry loops on the same market)
+# =============================================================================
+
+FAILED_TRADE_COOLDOWN_MINS = 60
+FAILED_TRADE_TTL_HOURS = 24
+
+def _failed_trades_path():
+    from pathlib import Path
+    state_dir = Path(__file__).parent / "state"
+    state_dir.mkdir(exist_ok=True)
+    return state_dir / "failed_trades.json"
+
+def _load_failed_trades():
+    """Load failed trades, pruning entries older than TTL."""
+    from datetime import datetime, timezone, timedelta
+    path = _failed_trades_path()
+    if not path.exists():
+        return {}
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+    # Prune old entries
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=FAILED_TRADE_TTL_HOURS)
+    pruned = {}
+    for k, v in data.items():
+        try:
+            ts = datetime.fromisoformat(v["failed_at"])
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if ts > cutoff:
+                pruned[k] = v
+        except (KeyError, ValueError):
+            pass
+    return pruned
+
+def _save_failed_trades(data):
+    path = _failed_trades_path()
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+    os.replace(str(tmp), str(path))
+
+def is_on_cooldown(market_id, side):
+    """Check if a market+side is on cooldown from a recent failure."""
+    from datetime import datetime, timezone, timedelta
+    failed = _load_failed_trades()
+    key = f"{market_id}:{side}"
+    entry = failed.get(key)
+    if not entry:
+        return False
+    try:
+        ts = datetime.fromisoformat(entry["failed_at"])
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - ts).total_seconds() < FAILED_TRADE_COOLDOWN_MINS * 60
+    except (KeyError, ValueError):
+        return False
+
+def record_failed_trade(market_id, side, error):
+    """Record a failed trade for cooldown tracking."""
+    from datetime import datetime, timezone
+    failed = _load_failed_trades()
+    key = f"{market_id}:{side}"
+    failed[key] = {
+        "market_id": market_id,
+        "side": side,
+        "error": str(error)[:200],
+        "failed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _save_failed_trades(failed)
+
+
 XTRACKER_API_BASE = "https://xtracker.polymarket.com/api"
 
 # Source tag for tracking
 TRADE_SOURCE = "sdk:elon-tweets"
+_automaton_reported = False
 
 # Polymarket constraints
 MIN_SHARES_PER_ORDER = 5.0
@@ -138,6 +214,9 @@ MIN_TICK_SIZE = 0.01
 # Strategy parameters
 MAX_BUCKET_SUM = _config["max_bucket_sum"]
 MAX_POSITION_USD = _config["max_position_usd"]
+_automaton_max = os.environ.get("AUTOMATON_MAX_BET")
+if _automaton_max:
+    MAX_POSITION_USD = min(MAX_POSITION_USD, float(_automaton_max))
 BUCKET_SPREAD = _config["bucket_spread"]
 SMART_SIZING_PCT = _config["sizing_pct"]
 MAX_TRADES_PER_RUN = _config["max_trades_per_run"]
@@ -155,7 +234,7 @@ TIME_TO_RESOLUTION_MIN_HOURS = 1  # Tweet markets are shorter, allow closer-to-r
 
 _client = None
 
-def get_client():
+def get_client(live=True):
     """Lazy-init SimmerClient singleton."""
     global _client
     if _client is None:
@@ -169,7 +248,8 @@ def get_client():
             print("Error: SIMMER_API_KEY environment variable not set")
             print("Get your API key from: simmer.markets/dashboard → SDK tab")
             sys.exit(1)
-        _client = SimmerClient(api_key=api_key, venue="polymarket")
+        venue = os.environ.get("TRADING_VENUE", "polymarket")
+        _client = SimmerClient(api_key=api_key, venue=venue, live=live)
     return _client
 
 # =============================================================================
@@ -299,6 +379,7 @@ def execute_trade(market_id, side, amount):
             "shares_bought": result.shares_bought,
             "shares": result.shares_bought,
             "error": result.error,
+            "simulated": result.simulated,
         }
     except Exception as e:
         return {"error": str(e)}
@@ -318,6 +399,7 @@ def execute_sell(market_id, shares):
             "success": result.success,
             "trade_id": result.trade_id,
             "error": result.error,
+            "simulated": result.simulated,
         }
     except Exception as e:
         return {"error": str(e)}
@@ -517,24 +599,22 @@ def check_exit_opportunities(dry_run=True, use_safeguards=True):
                     print(f"     ⏭️  Skipped: {'; '.join(reasons)}")
                     continue
 
-            if dry_run:
-                print(f"     [DRY RUN] Would sell {shares:.1f} shares")
+            tag = "SIMULATED" if dry_run else "LIVE"
+            print(f"     Selling {shares:.1f} shares ({tag})...")
+            result = execute_sell(market_id, shares)
+            if result.get("success"):
+                exits_executed += 1
+                trade_id = result.get("trade_id")
+                print(f"     ✅ {'[PAPER] ' if result.get('simulated') else ''}Sold {shares:.1f} shares @ ${current_price:.2f}")
+                if trade_id and JOURNAL_AVAILABLE and not result.get("simulated"):
+                    log_trade(
+                        trade_id=trade_id,
+                        source=TRADE_SOURCE,
+                        thesis=f"Exit: price ${current_price:.2f} reached exit threshold",
+                        action="sell",
+                    )
             else:
-                print(f"     Selling {shares:.1f} shares...")
-                result = execute_sell(market_id, shares)
-                if result.get("success"):
-                    exits_executed += 1
-                    trade_id = result.get("trade_id")
-                    print(f"     ✅ Sold {shares:.1f} shares @ ${current_price:.2f}")
-                    if trade_id and JOURNAL_AVAILABLE:
-                        log_trade(
-                            trade_id=trade_id,
-                            source=TRADE_SOURCE,
-                            thesis=f"Exit: price ${current_price:.2f} reached exit threshold",
-                            action="sell",
-                        )
-                else:
-                    print(f"     ❌ Sell failed: {result.get('error', 'Unknown')}")
+                print(f"     ❌ Sell failed: {result.get('error', 'Unknown')}")
         else:
             print(f"  📊 {question}...")
             print(f"     Price ${current_price:.2f} < exit ${EXIT_THRESHOLD:.2f} - hold")
@@ -557,8 +637,11 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
     log("🐦 Simmer Elon Tweet Trader")
     log("=" * 50)
 
+    # Initialize client with paper mode when not live
+    get_client(live=not dry_run)
+
     if dry_run:
-        log("\n  [DRY RUN] No trades will be executed. Use --live to enable trading.")
+        log("\n  [PAPER MODE] Trades will be simulated with real prices. Use --live for real trades.")
 
     log(f"\n⚙️  Configuration:")
     log(f"  Max bucket sum:  ${MAX_BUCKET_SUM:.2f} (buy cluster if total < this)")
@@ -576,8 +659,7 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
         log(f"  Exists: {'Yes' if config_path.exists() else 'No'}")
         return
 
-    # Initialize SDK client (validates API key, sets up wallet)
-    get_client()
+    # Client already initialized above with live=not dry_run
 
     if positions_only:
         log("\n📊 Current Tweet Positions:")
@@ -704,7 +786,10 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
 
     # Step 4: Match events to tracking periods and evaluate
     trades_executed = 0
+    total_usd_spent = 0.0
     opportunities_found = 0
+    skip_reasons = []
+    execution_errors = []
 
     if smart_sizing:
         portfolio = get_portfolio()
@@ -771,9 +856,11 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
 
             if price < MIN_TICK_SIZE:
                 log(f"   ⏸️  {bucket_label}: price ${price:.4f} below min tick - skip")
+                skip_reasons.append("price at extreme")
                 continue
             if price > (1 - MIN_TICK_SIZE):
                 log(f"   ⏸️  {bucket_label}: price ${price:.4f} too high - skip")
+                skip_reasons.append("price at extreme")
                 continue
 
             # Check safeguards
@@ -785,6 +872,7 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
                 should_trade, reasons = check_context_safeguards(context)
                 if not should_trade:
                     log(f"   ⏭️  {bucket_label}: {'; '.join(reasons)}")
+                    skip_reasons.append(f"safeguard: {reasons[0]}")
                     continue
                 if reasons:
                     log(f"   ⚠️  {bucket_label}: {'; '.join(reasons)}")
@@ -794,39 +882,48 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
             min_cost = MIN_SHARES_PER_ORDER * price
             if min_cost > position_size:
                 log(f"   ⚠️  {bucket_label}: position ${position_size:.2f} too small for min shares at ${price:.2f}")
+                skip_reasons.append("position too small")
                 continue
 
             if trades_executed >= MAX_TRADES_PER_RUN:
                 log(f"   ⏸️  Max trades per run ({MAX_TRADES_PER_RUN}) reached")
+                skip_reasons.append("max trades reached")
                 break
+
+            # Check cooldown from previous failures
+            if is_on_cooldown(market_id, "yes"):
+                log(f"   ⏭️  {bucket_label}: on cooldown (failed recently)")
+                skip_reasons.append("cooldown")
+                continue
 
             opportunities_found += 1
 
-            if dry_run:
-                shares_est = position_size / price if price > 0 else 0
-                log(f"   [DRY RUN] {bucket_label} @ ${price:.2f} — would buy ${position_size:.2f} (~{shares_est:.0f} shares)")
+            tag = "SIMULATED" if dry_run else "LIVE"
+            log(f"   Buying {bucket_label} @ ${price:.2f} ({tag})...", force=True)
+            result = execute_trade(market_id, "yes", position_size)
+
+            if result.get("success"):
+                trades_executed += 1
+                total_usd_spent += position_size
+                shares = result.get("shares_bought") or result.get("shares") or 0
+                trade_id = result.get("trade_id")
+                log(f"   ✅ {'[PAPER] ' if result.get('simulated') else ''}Bought {shares:.1f} shares of {bucket_label} @ ${price:.2f}", force=True)
+
+                if trade_id and JOURNAL_AVAILABLE and not result.get("simulated"):
+                    log_trade(
+                        trade_id=trade_id,
+                        source=TRADE_SOURCE,
+                        thesis=f"XTracker projects {projected_count} posts, bucket {bucket_label} "
+                               f"underpriced at ${price:.2f} (cluster cost ${total_cost:.2f})",
+                        confidence=round(0.7 if bucket["low"] <= projected_count <= bucket["high"] else 0.4, 2),
+                        projected_count=projected_count,
+                        current_count=current_count,
+                    )
             else:
-                log(f"   Buying {bucket_label} @ ${price:.2f}...", force=True)
-                result = execute_trade(market_id, "yes", position_size)
-
-                if result.get("success"):
-                    trades_executed += 1
-                    shares = result.get("shares_bought") or result.get("shares") or 0
-                    trade_id = result.get("trade_id")
-                    log(f"   ✅ Bought {shares:.1f} shares of {bucket_label} @ ${price:.2f}", force=True)
-
-                    if trade_id and JOURNAL_AVAILABLE:
-                        log_trade(
-                            trade_id=trade_id,
-                            source=TRADE_SOURCE,
-                            thesis=f"XTracker projects {projected_count} posts, bucket {bucket_label} "
-                                   f"underpriced at ${price:.2f} (cluster cost ${total_cost:.2f})",
-                            confidence=round(0.7 if bucket["low"] <= projected_count <= bucket["high"] else 0.4, 2),
-                            projected_count=projected_count,
-                            current_count=current_count,
-                        )
-                else:
-                    log(f"   ❌ Trade failed: {result.get('error', 'Unknown')}", force=True)
+                error_msg = result.get('error', 'Unknown')
+                log(f"   ❌ Trade failed: {error_msg}", force=True)
+                execution_errors.append(error_msg[:120])
+                record_failed_trade(market_id, "yes", error_msg)
 
     # Check exits
     exits_found, exits_executed = check_exit_opportunities(dry_run, use_safeguards)
@@ -842,8 +939,19 @@ def run_strategy(dry_run=True, positions_only=False, show_config=False,
         print(f"  Exit opportunities:  {exits_found}")
         print(f"  Trades executed:     {total_trades}")
 
+    # Structured report for automaton
+    if os.environ.get("AUTOMATON_MANAGED"):
+        global _automaton_reported
+        report = {"signals": opportunities_found + exits_found, "trades_attempted": opportunities_found + exits_found, "trades_executed": total_trades, "amount_usd": round(total_usd_spent, 2)}
+        if (opportunities_found + exits_found) > 0 and total_trades == 0 and skip_reasons:
+            report["skip_reason"] = ", ".join(dict.fromkeys(skip_reasons))
+        if execution_errors:
+            report["execution_errors"] = execution_errors
+        print(json.dumps({"automaton": report}))
+        _automaton_reported = True
+
     if dry_run and show_summary:
-        print("\n  [DRY RUN MODE - no real trades executed]")
+        print("\n  [PAPER MODE - trades simulated with real prices]")
 
 
 # =============================================================================
@@ -893,3 +1001,7 @@ if __name__ == "__main__":
         use_safeguards=not args.no_safeguards,
         quiet=args.quiet,
     )
+
+    # Fallback report for automaton if the strategy returned early (no signal)
+    if os.environ.get("AUTOMATON_MANAGED") and not _automaton_reported:
+        print(json.dumps({"automaton": {"signals": 0, "trades_attempted": 0, "trades_executed": 0, "skip_reason": "no_signal"}}))
