@@ -1,0 +1,11 @@
+{
+  "owner": "bendusy",
+  "slug": "mlx-local-inference",
+  "displayName": "MLX Local Inference Stack",
+  "latest": {
+    "version": "2.0.0",
+    "publishedAt": 1772006380738,
+    "commit": null
+  },
+  "history": []
+}
