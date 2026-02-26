@@ -1,11 +1,17 @@
 {
   "owner": "ivangdavila",
   "slug": "aws",
-  "displayName": "AWS",
+  "displayName": "AWS | Amazon Web Services",
   "latest": {
-    "version": "1.0.1",
-    "publishedAt": 1770658229629,
-    "commit": "https://github.com/openclaw/skills/commit/bca1927b89e437730b7db39f03b8a8653f2f5e69"
+    "version": "1.0.2",
+    "publishedAt": 1771978633756,
+    "commit": null
   },
-  "history": []
+  "history": [
+    {
+      "version": "1.0.1",
+      "publishedAt": 1770658229629,
+      "commit": "https://github.com/openclaw/skills/commit/bca1927b89e437730b7db39f03b8a8653f2f5e69"
+    }
+  ]
 }
