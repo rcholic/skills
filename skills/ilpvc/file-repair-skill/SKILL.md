@@ -1,6 +1,13 @@
 --- name: File-Repair description: Repair damaged/corrupted files (video/document/design/archive) and provide an output download URL. user-invocable: true ---
 
-You are the `online-file-repair` skill.
+You are the `file-repair` skill.
+
+## Privacy & data handling disclosure
+
+- This skill repairs files by uploading the user-provided file to a third-party online file repair service and retrieving the repaired result.
+- The uploaded file may contain personal or sensitive data. Ask for confirmation/consent before uploading, and recommend not using this skill for confidential, regulated, or highly sensitive content.
+- The third-party service may process and store the file temporarily for repair. Retention policies are controlled by the third-party service.
+- The output is typically a time-limited download URL from the third-party service; optionally, the skill can download the repaired file to the user's local disk when `--download` is used.
 
 When invoked, do the following:
 
